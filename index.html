@@ -25,10 +25,7 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
   border-bottom:1px solid var(--bd);background:var(--sf);flex-shrink:0}
 .logo{font-family:'Space Mono',monospace;font-size:11px;color:var(--ac);letter-spacing:2px;white-space:nowrap}
 .fname{flex:1;font-size:10px;color:var(--dm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-.hbtn{background:var(--s2);border:1px solid var(--bd);border-radius:5px;font-size:13px;
-  width:32px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
-.hbtn.wide{width:auto;padding:0 8px;font-size:10px;font-family:'Space Mono',monospace;color:var(--dm)}
-.hbtn:active{opacity:.6}
+
 #fileInput,#folderInput,#importData{display:none}
 
 /* PLAYLIST */
@@ -45,6 +42,15 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
 .wave-wrap{position:relative;background:var(--sf);border-bottom:1px solid var(--bd);
   flex-shrink:0;touch-action:none;user-select:none;-webkit-user-select:none}
 #waveCanvas{display:block;width:100%;height:72px}
+
+/* WAVE ZOOM BUTTONS */
+.wave-zoom-btns{position:absolute;left:4px;top:50%;transform:translateY(-50%);
+  display:flex;flex-direction:column;gap:3px;z-index:5}
+.wzb{width:26px;height:26px;background:rgba(19,19,26,.85);border:1px solid var(--bd);
+  border-radius:6px;color:var(--ac);font-size:16px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  font-family:'Space Mono',monospace;line-height:1;user-select:none;-webkit-user-select:none}
+.wzb:active{background:rgba(0,229,255,.2)}
 
 /* INFO */
 .info{display:flex;align-items:center;gap:4px;padding:2px 8px;
@@ -102,34 +108,11 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
 .ctrl-wrap{flex-shrink:0;background:var(--sf);border-bottom:1px solid var(--bd);padding:5px 8px}
 .crow{display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:4px}
 .crow:last-child{margin-bottom:0}
-/* base circle button */
-.tb{background:var(--s2);border:1px solid var(--bd);border-radius:50%;color:var(--tx);
-  display:flex;align-items:center;justify-content:center;
-  cursor:pointer;font-family:'Space Mono',monospace;flex-shrink:0}
-.tb:active{opacity:.6;transform:scale(.93)}
-/* sizes */
-.tb.s28{width:28px;height:28px;font-size:9px}
-.tb.s36{width:36px;height:36px;font-size:11px}
-.tb.s44{width:44px;height:44px;font-size:14px}
-.tb.s56{width:56px;height:56px;font-size:0;background:var(--ac);border-color:var(--ac);color:#000}
-.tb.s56::after{content:'▶';font-size:22px;position:relative;left:2px}
-.tb.s56.pause::after{content:'⏸';left:0}
-/* head/tail: square rounded, bigger */
-.tb.edge{border-radius:8px;width:44px;height:44px;font-size:18px;background:var(--s2)}
-/* mark button */
-.mkbtn{background:var(--a2);border:1px solid var(--a2);border-radius:8px;color:#fff;
-  display:flex;align-items:center;justify-content:center;flex-direction:column;
-  cursor:pointer;width:72px;height:44px;flex-shrink:0}
-.mkbtn:active{opacity:.6;transform:scale(.94)}
-.mkbtn .mi{font-size:14px;line-height:1.2}
-.mkbtn .ml{font-size:7px;color:rgba(255,255,255,.7);font-family:'Space Mono',monospace}
-/* undo/redo */
-.udbtn{background:var(--s2);border:1px solid var(--bd);border-radius:8px;color:var(--tx);
-  display:flex;align-items:center;justify-content:center;flex-direction:column;
-  cursor:pointer;width:56px;height:44px;flex-shrink:0}
-.udbtn:active{opacity:.6;transform:scale(.94)}
-.udbtn .mi{font-size:14px;line-height:1.2}
-.udbtn .ml{font-size:7px;color:var(--dm);font-family:'Space Mono',monospace}
+/* Canvas buttons */
+.cbtn{display:block;cursor:pointer;flex-shrink:0;border-radius:8px;}
+.cbtn:active{opacity:.7;transform:scale(.93)}
+.cbtn-play{border-radius:50%}
+.cbtn-hdr{border-radius:6px}
 
 /* SKIP */
 .skip-row{display:flex;align-items:center;justify-content:center;gap:5px;
@@ -186,10 +169,10 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
   <span class="logo">AUDIOCHK</span>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
-    <div class="hbtn" id="prevFileBtnH" title="前のファイル">⏮</div>
-    <div class="hbtn" id="nextFileBtnH" title="次のファイル">⏭</div>
-    <div class="hbtn" onclick="document.getElementById('folderInput').click()" title="フォルダ">📁</div>
-    <div class="hbtn" onclick="document.getElementById('fileInput').click()" title="ファイル">🎵</div>
+    <canvas class="cbtn cbtn-hdr" id="prevFileBtnH" width="32" height="28"></canvas>
+    <canvas class="cbtn cbtn-hdr" id="nextFileBtnH" width="32" height="28"></canvas>
+    <canvas class="cbtn cbtn-hdr" id="folderBtn" width="32" height="28"></canvas>
+    <canvas class="cbtn cbtn-hdr" id="fileBtn" width="32" height="28"></canvas>
   </div>
   <input type="file" id="fileInput"
     accept=".mp3,.m4a,.aac,.wav,.ogg,.flac,.opus,.caf,audio/mpeg,audio/mp4,audio/x-m4a,audio/aac,audio/wav,audio/ogg,audio/flac,audio/opus">
@@ -198,7 +181,13 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
 </header>
 <audio id="audioEl" playsinline webkit-playsinline preload="auto" style="display:none"></audio>
 <div id="playlist"></div>
-<div class="wave-wrap" id="waveArea"><canvas id="waveCanvas"></canvas></div>
+<div class="wave-wrap" id="waveArea">
+  <canvas id="waveCanvas"></canvas>
+  <div class="wave-zoom-btns">
+    <div class="wzb" id="wzoomIn">+</div>
+    <div class="wzb" id="wzoomOut">−</div>
+  </div>
+</div>
 <div class="info">
   <span id="timeDisp">00:00:00.0</span>
   <span id="timeTotal">/ --:--:--</span>
@@ -240,21 +229,21 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
 </div>
 
 <div class="ctrl-wrap">
-  <!-- Row1: undo / mark / redo -->
+  <!-- Row1: undo / mark / redo — canvas buttons -->
   <div class="crow">
-    <div class="udbtn" id="undoBtn"><span class="mi">↩</span><span class="ml">取消</span></div>
-    <div class="mkbtn" id="markBtn"><span class="mi">🔖</span><span class="ml">マーク追加</span></div>
-    <div class="udbtn" id="redoBtn"><span class="mi">↪</span><span class="ml">やり直し</span></div>
+    <canvas class="cbtn" id="undoBtn" width="56" height="44"></canvas>
+    <canvas class="cbtn cbtn-mark" id="markBtn" width="80" height="44"></canvas>
+    <canvas class="cbtn" id="redoBtn" width="56" height="44"></canvas>
   </div>
-  <!-- Row2: transport -->
+  <!-- Row2: transport — canvas buttons -->
   <div class="crow">
-    <div class="tb edge" id="fileHeadBtn" title="先頭">⏮</div>
-    <div class="tb s28" id="back01Btn" style="font-size:9px">-.1</div>
-    <div class="tb s44" id="backNBtn">«<span id="backLbl">5</span></div>
-    <div class="tb s56" id="playBtn"></div>
-    <div class="tb s44" id="fwdNBtn"><span id="fwdLbl">5</span>»</div>
-    <div class="tb s28" id="fwd01Btn" style="font-size:9px">.1+</div>
-    <div class="tb edge" id="fileTailBtn" title="末尾">⏭</div>
+    <canvas class="cbtn" id="fileHeadBtn" width="44" height="44"></canvas>
+    <canvas class="cbtn" id="back01Btn" width="34" height="34"></canvas>
+    <canvas class="cbtn" id="backNBtn" width="44" height="44"></canvas>
+    <canvas class="cbtn cbtn-play" id="playBtn" width="56" height="56"></canvas>
+    <canvas class="cbtn" id="fwdNBtn" width="44" height="44"></canvas>
+    <canvas class="cbtn" id="fwd01Btn" width="34" height="34"></canvas>
+    <canvas class="cbtn" id="fileTailBtn" width="44" height="44"></canvas>
   </div>
 </div>
 
@@ -454,35 +443,21 @@ async function buildWaveform(file){
   if(!nativeBuf) throw new Error('decodeAudioData failed');
   if(curFileName!==file.name){ nativeBuf=null; return; }
 
-  // Step 2: resample to WAVE_SAMPLE_RATE using OfflineAudioContext
-  // This dramatically reduces the PCM buffer size in memory
-  const nativeDur=nativeBuf.duration;
-  const targetSamples=Math.ceil(nativeDur*WAVE_SAMPLE_RATE);
-  let offCtx=new OfflineAudioContext(1, targetSamples, WAVE_SAMPLE_RATE);
-  let src=offCtx.createBufferSource();
-  src.buffer=nativeBuf;
-  src.connect(offCtx.destination);
-  src.start(0);
-  nativeBuf=null; // release native PCM — offCtx has its own copy
-
-  let rendered=null;
-  try{ rendered=await offCtx.startRendering(); }
-  finally{ offCtx=null; src=null; }
-  if(!rendered) throw new Error('offline render failed');
-  if(curFileName!==file.name){ rendered=null; return; }
-
-  // Step 3: downsample rendered buffer to WSAMP points
-  const ch=rendered.getChannelData(0);
-  const step=Math.max(1,Math.floor(ch.length/WSAMP));
+  // Step 2: downsample nativeBuf directly to WSAMP points
+  // We skip OfflineAudioContext resampling to avoid potential crashes on iOS.
+  // Direct downsample of the native PCM is fast and memory-efficient.
+  const ch=nativeBuf.getChannelData(0);
+  const totalSamples=ch.length;
+  const step=Math.max(1,Math.floor(totalSamples/WSAMP));
   waveData=new Float32Array(WSAMP);
   for(let i=0;i<WSAMP;i++){
     let mx=0; const b=i*step;
-    for(let j=0;j<step&&b+j<ch.length;j++){
+    for(let j=0;j<step&&b+j<totalSamples;j++){
       const v=Math.abs(ch[b+j]); if(v>mx) mx=v;
     }
     waveData[i]=mx;
   }
-  rendered=null; // release low-rate PCM
+  nativeBuf=null; // release native PCM after downsampling
 
   extractSilence();
 }
@@ -526,6 +501,19 @@ document.getElementById('prevFileBtnH').addEventListener('click',prevFile);
 document.getElementById('nextFileBtnH').addEventListener('click',nextFile);
 
 // ═══ DRAW WAVEFORM ════════════════════════════
+// Block-style display:
+// - Each 0.1s = one block (at ×1 zoom, ≈1px per block)
+// - Silence blocks: bright pink bg
+// - Audio blocks: dark teal / bright teal (played)
+// - waveData used for amplitude height if available, otherwise flat
+
+function getZoomWindow(){
+  const hs=1/(2*zoomLv);
+  let sf=zoomCtr-hs, ef=zoomCtr+hs;
+  if(sf<0){ef-=sf;sf=0;} if(ef>1){sf-=ef-1;ef=1;}
+  return{sf:Math.max(0,sf), ef:Math.min(1,ef)};
+}
+
 function drawWavePlaceholder(){
   const cv=document.getElementById('waveCanvas'),wa=document.getElementById('waveArea');
   const dpr=Math.min(window.devicePixelRatio||1,2),W=wa.clientWidth||320,H=72;
@@ -543,44 +531,74 @@ function drawWave(ct){
   c.fillStyle='#0d0d16';c.fillRect(0,0,W,H);
   if(!duration){c.fillStyle='#1e3a4a';c.fillRect(0,H/2-1,W,2);return;}
 
-  // clamp zoom window
-  const hs=1/(2*zoomLv);
-  let sf=zoomCtr-hs,ef=zoomCtr+hs;
-  if(sf<0){ef-=sf;sf=0;}if(ef>1){sf-=ef-1;ef=1;}
-  sf=Math.max(0,sf);ef=Math.min(1,ef);
-  const startT=sf*duration,span=(ef-sf)*duration,mid=H/2;
-  const ppx=((ct-startT)/span)*W;
+  const{sf,ef}=getZoomWindow();
+  const startT=sf*duration, span=(ef-sf)*duration, mid=H/2;
 
-  // silence regions
-  for(const sr of silReg){
-    if(sr.end<startT||sr.start>startT+span) continue;
-    const sx=Math.max(0,((sr.start-startT)/span)*W);
-    const ex=Math.min(W,((sr.end-startT)/span)*W);
-    c.fillStyle='rgba(255,64,129,.16)';c.fillRect(sx,0,ex-sx,H);
-    if(ex-sx>14){
-      c.fillStyle='rgba(255,64,129,.75)';
-      c.font="8px 'Space Mono',monospace";
-      c.fillText(sr.dur.toFixed(1)+'s',Math.max(2,Math.min(W-28,(sx+ex)/2-8)),H-3);
+  // Block grid: each block = 0.1 seconds
+  const BLOCK_SEC=0.1;
+  const blocksVisible=span/BLOCK_SEC;
+  const blockPx=W/blocksVisible; // px per 0.1s block
+  const firstBlock=Math.floor(startT/BLOCK_SEC);
+  const lastBlock=Math.ceil((startT+span)/BLOCK_SEC);
+  const gap=Math.max(0, blockPx>4?1:0); // gap between blocks when large enough
+
+  for(let bi=firstBlock;bi<=lastBlock;bi++){
+    const bStart=bi*BLOCK_SEC, bEnd=bStart+BLOCK_SEC;
+    const bx=((bStart-startT)/span)*W;
+    const bw=Math.max(1, blockPx-gap);
+    if(bx+bw<0||bx>W) continue;
+
+    // Is this block in a silence region?
+    let inSil=false;
+    for(const sr of silReg){
+      if(bStart>=sr.start&&bEnd<=sr.end){inSil=true;break;}
+      if(bStart<sr.end&&bEnd>sr.start){inSil=true;break;}// partial overlap
+    }
+
+    const played=bEnd<=ct;
+    const isCurrent=(ct>=bStart&&ct<bEnd);
+
+    if(inSil){
+      c.fillStyle=played?'rgba(255,64,129,.55)':'rgba(255,64,129,.22)';
+      c.fillRect(bx,2,bw,H-4);
+    } else if(waveData){
+      // get amplitude for this block
+      const wi=Math.floor((bStart/duration)*WSAMP);
+      const amp=Math.min(1,waveData[Math.max(0,Math.min(WSAMP-1,wi))])*mid*.9||mid*.25;
+      c.fillStyle=played?'#00b8d4':'#1e3a4a';
+      c.fillRect(bx, mid-amp, bw, amp*2||2);
+    } else {
+      // no waveform data — flat block
+      const h=H*0.3;
+      c.fillStyle=played?'#005f7a':'#162433';
+      c.fillRect(bx, mid-h/2, bw, h);
+    }
+
+    // Current block highlight
+    if(isCurrent){
+      c.fillStyle='rgba(0,229,255,.15)';
+      c.fillRect(bx,0,bw,H);
     }
   }
 
-  // waveform bars
-  if(waveData){
-    const si=Math.floor(sf*WSAMP),ei=Math.ceil(ef*WSAMP);
-    const bw=Math.max(1,W/(ei-si));
-    for(let i=si;i<ei;i++){
-      const x=((i+.5)/WSAMP-sf)/(ef-sf)*W;
-      const amp=waveData[i]*mid*.9;
-      c.fillStyle=x<ppx?'#00b8d4':'#1e3a4a';
-      c.fillRect(x-bw/2,mid-amp,bw,amp*2||1);
-    }
-  } else {
-    c.fillStyle='#1e3a4a';c.fillRect(0,mid-2,W,4);
-    if(ppx>0){c.fillStyle='#005f7a';c.fillRect(0,mid-2,Math.min(ppx,W),4);}
-  }
+  // Center line
   c.fillStyle='#2a2a3d';c.fillRect(0,mid-.5,W,1);
 
-  // markers
+  // Silence labels (only when block is wide enough)
+  if(blockPx>30){
+    for(const sr of silReg){
+      if(sr.end<startT||sr.start>startT+span) continue;
+      const sx=Math.max(0,((sr.start-startT)/span)*W);
+      const ex=Math.min(W,((sr.end-startT)/span)*W);
+      if(ex-sx>20){
+        c.fillStyle='rgba(255,64,129,.85)';
+        c.font="8px 'Space Mono',monospace";
+        c.fillText(sr.dur.toFixed(1)+'s',Math.max(2,Math.min(W-28,(sx+ex)/2-8)),H-3);
+      }
+    }
+  }
+
+  // Markers
   for(const m of markers){
     if(m.time<startT||m.time>startT+span) continue;
     const mx=((m.time-startT)/span)*W;
@@ -589,11 +607,11 @@ function drawWave(ct){
     c.fillStyle='#ff4081';
     c.beginPath();c.moveTo(mx-3,0);c.lineTo(mx+3,0);c.lineTo(mx,6);c.fill();
   }
-  // playhead
-  if(ct>=startT&&ct<=startT+span){
-    const px=((ct-startT)/span)*W;
+  // Playhead line
+  const ppx=((ct-startT)/span)*W;
+  if(ppx>=0&&ppx<=W){
     c.strokeStyle='#00e5ff';c.lineWidth=2;
-    c.beginPath();c.moveTo(px,0);c.lineTo(px,H);c.stroke();
+    c.beginPath();c.moveTo(ppx,0);c.lineTo(ppx,H);c.stroke();
   }
 }
 
@@ -1024,6 +1042,199 @@ function setSpd(s,silent){
   savePrefs();
 }
 drawWavePlaceholder();drawSeek(0);renderMarkers();
+
+// ═══ CANVAS BUTTON DRAWING ════════════════════
+// Shared drawing helpers
+function btnBg(c,W,H,r,fill,stroke){
+  c.beginPath();
+  if(c.roundRect){c.roundRect(0,0,W,H,r);}
+  else{c.rect(0,0,W,H);}
+  if(fill){c.fillStyle=fill;c.fill();}
+  if(stroke){c.strokeStyle=stroke;c.lineWidth=1.5;c.stroke();}
+}
+function drawIcon(id, drawFn){
+  const cv=document.getElementById(id);
+  if(!cv) return;
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  const W=cv.width, H=cv.height;
+  cv.width=W*dpr; cv.height=H*dpr;
+  cv.style.width=W+'px'; cv.style.height=H+'px';
+  const c=cv.getContext('2d'); c.scale(dpr,dpr);
+  c.clearRect(0,0,W,H);
+  drawFn(c,W,H);
+}
+function drawAllButtons(playing){
+  const bg='#1c1c28', bd='#2a2a3d', ac='#00e5ff', a2='#ff4081', dm='#6b6b88', tx='#e8e8f0';
+  // ── Header buttons ──
+  drawIcon('prevFileBtnH',(c,W,H)=>{
+    btnBg(c,W,H,5,bg,bd);
+    // |◀ shape
+    c.fillStyle=dm;
+    c.fillRect(W/2-7,H/2-6,2,12);
+    c.beginPath();c.moveTo(W/2-4,H/2-5);c.lineTo(W/2-4,H/2+5);c.lineTo(W/2+5,H/2);c.fill();
+  });
+  drawIcon('nextFileBtnH',(c,W,H)=>{
+    btnBg(c,W,H,5,bg,bd);
+    c.fillStyle=dm;
+    c.fillRect(W/2+5,H/2-6,2,12);
+    c.beginPath();c.moveTo(W/2+4,H/2-5);c.lineTo(W/2+4,H/2+5);c.lineTo(W/2-5,H/2);c.fill();
+  });
+  drawIcon('folderBtn',(c,W,H)=>{
+    btnBg(c,W,H,5,bg,bd);
+    c.fillStyle=dm;
+    // folder icon
+    const fx=W/2-7,fy=H/2-5,fw=14,fh=10;
+    c.beginPath();
+    c.moveTo(fx,fy+2);c.lineTo(fx+5,fy+2);c.lineTo(fx+6,fy);c.lineTo(fx+fw,fy);
+    c.lineTo(fx+fw,fy+fh);c.lineTo(fx,fy+fh);c.closePath();c.fill();
+  });
+  drawIcon('fileBtn',(c,W,H)=>{
+    btnBg(c,W,H,5,bg,bd);
+    c.fillStyle=dm;
+    // music note
+    const cx=W/2,cy=H/2;
+    c.beginPath();c.arc(cx-2,cy+4,3,0,Math.PI*2);c.fill();
+    c.fillRect(cx,cy-7,2,11);
+    c.fillRect(cx,cy-7,6,2);
+  });
+
+  // ── Undo / Redo ──
+  drawIcon('undoBtn',(c,W,H)=>{
+    btnBg(c,W,H,8,bg,bd);
+    c.strokeStyle=tx;c.lineWidth=2;c.lineCap='round';
+    // curved arrow left
+    c.beginPath();c.arc(W/2+1,H/2,8,Math.PI*0.2,Math.PI*1.1);c.stroke();
+    c.fillStyle=tx;
+    c.beginPath();c.moveTo(W/2-7,H/2-4);c.lineTo(W/2-11,H/2+1);c.lineTo(W/2-4,H/2+2);c.fill();
+    // label
+    c.fillStyle=dm;c.font="7px 'Space Mono',monospace";c.textAlign='center';
+    c.fillText('取消',W/2,H-5);c.textAlign='left';
+  });
+  drawIcon('redoBtn',(c,W,H)=>{
+    btnBg(c,W,H,8,bg,bd);
+    c.strokeStyle=tx;c.lineWidth=2;c.lineCap='round';
+    c.beginPath();c.arc(W/2-1,H/2,8,Math.PI*1.9,Math.PI*.9,true);c.stroke();
+    c.fillStyle=tx;
+    c.beginPath();c.moveTo(W/2+7,H/2-4);c.lineTo(W/2+11,H/2+1);c.lineTo(W/2+4,H/2+2);c.fill();
+    c.fillStyle=dm;c.font="7px 'Space Mono',monospace";c.textAlign='center';
+    c.fillText('やり直し',W/2,H-5);c.textAlign='left';
+  });
+
+  // ── Mark button ──
+  drawIcon('markBtn',(c,W,H)=>{
+    btnBg(c,W,H,8,a2,'#ff80ab');
+    // bookmark shape
+    const bx=W/2-7,by=H/2-11,bw=14,bh=18;
+    c.fillStyle='rgba(255,255,255,.9)';
+    c.beginPath();c.moveTo(bx,by);c.lineTo(bx+bw,by);c.lineTo(bx+bw,by+bh);
+    c.lineTo(bx+bw/2,by+bh-5);c.lineTo(bx,by+bh);c.closePath();c.fill();
+    // + symbol
+    c.fillStyle=a2;c.fillRect(bx+bw/2-1,by+3,2,7);c.fillRect(bx+3,by+6,8,2);
+    // label
+    c.fillStyle='rgba(255,255,255,.7)';c.font="7px 'Space Mono',monospace";c.textAlign='center';
+    c.fillText('マーク追加',W/2,H-3);c.textAlign='left';
+  });
+
+  // ── File head / tail ──
+  drawIcon('fileHeadBtn',(c,W,H)=>{
+    btnBg(c,W,H,8,bg,bd);
+    c.fillStyle=ac;
+    c.fillRect(W/2-12,H/2-8,2,16);
+    c.beginPath();c.moveTo(W/2-9,H/2-8);c.lineTo(W/2-9,H/2+8);c.lineTo(W/2+9,H/2);c.fill();
+  });
+  drawIcon('fileTailBtn',(c,W,H)=>{
+    btnBg(c,W,H,8,bg,bd);
+    c.fillStyle=ac;
+    c.fillRect(W/2+10,H/2-8,2,16);
+    c.beginPath();c.moveTo(W/2+9,H/2-8);c.lineTo(W/2+9,H/2+8);c.lineTo(W/2-9,H/2);c.fill();
+  });
+
+  // ── Back/Fwd 0.1 ──
+  drawIcon('back01Btn',(c,W,H)=>{
+    btnBg(c,W,H,50,bg,bd);
+    c.fillStyle=tx;c.font="bold 9px 'Space Mono',monospace";c.textAlign='center';
+    c.fillText('-.1',W/2,H/2+4);c.textAlign='left';
+  });
+  drawIcon('fwd01Btn',(c,W,H)=>{
+    btnBg(c,W,H,50,bg,bd);
+    c.fillStyle=tx;c.font="bold 9px 'Space Mono',monospace";c.textAlign='center';
+    c.fillText('+.1',W/2,H/2+4);c.textAlign='left';
+  });
+
+  // ── Back/Fwd N sec ──
+  const skLabel = String(skipSec);
+  drawIcon('backNBtn',(c,W,H)=>{
+    btnBg(c,W,H,50,bg,bd);
+    // chevron left
+    c.strokeStyle=tx;c.lineWidth=2;c.lineCap='round';c.lineJoin='round';
+    c.beginPath();c.moveTo(W/2-2,H/2-6);c.lineTo(W/2-7,H/2);c.lineTo(W/2-2,H/2+6);c.stroke();
+    c.beginPath();c.moveTo(W/2+3,H/2-6);c.lineTo(W/2-2,H/2);c.lineTo(W/2+3,H/2+6);c.stroke();
+    c.fillStyle=ac;c.font="bold 8px 'Space Mono',monospace";c.textAlign='center';
+    c.fillText(skLabel,W/2+5,H/2+3);c.textAlign='left';
+  });
+  drawIcon('fwdNBtn',(c,W,H)=>{
+    btnBg(c,W,H,50,bg,bd);
+    c.strokeStyle=tx;c.lineWidth=2;c.lineCap='round';c.lineJoin='round';
+    c.beginPath();c.moveTo(W/2+2,H/2-6);c.lineTo(W/2+7,H/2);c.lineTo(W/2+2,H/2+6);c.stroke();
+    c.beginPath();c.moveTo(W/2-3,H/2-6);c.lineTo(W/2+2,H/2);c.lineTo(W/2-3,H/2+6);c.stroke();
+    c.fillStyle=ac;c.font="bold 8px 'Space Mono',monospace";c.textAlign='center';
+    c.fillText(skLabel,W/2-5,H/2+3);c.textAlign='left';
+  });
+
+  // ── Play / Pause ──
+  drawIcon('playBtn',(c,W,H)=>{
+    // circle bg
+    c.beginPath();c.arc(W/2,H/2,W/2-1,0,Math.PI*2);
+    c.fillStyle=ac;c.fill();
+    // inner glow
+    c.beginPath();c.arc(W/2,H/2,W/2-4,0,Math.PI*2);
+    c.fillStyle='rgba(255,255,255,.1)';c.fill();
+    if(playing){
+      // pause bars
+      c.fillStyle='#0a0a0f';
+      c.fillRect(W/2-8,H/2-9,5,18);
+      c.fillRect(W/2+3,H/2-9,5,18);
+    } else {
+      // play triangle — optical center
+      c.fillStyle='#0a0a0f';
+      c.beginPath();c.moveTo(W/2-6,H/2-10);c.lineTo(W/2-6,H/2+10);c.lineTo(W/2+11,H/2);c.fill();
+    }
+  });
+}
+
+// Initial draw
+drawAllButtons(false);
+
+// Redraw play button on state change
+const _origUpdatePlayBtn = updatePlayBtn;
+function updatePlayBtn(){
+  _origUpdatePlayBtn();
+  drawIcon('playBtn',(c,W,H)=>{
+    const ac='#00e5ff';
+    c.beginPath();c.arc(W/2,H/2,W/2-1,0,Math.PI*2);c.fillStyle=ac;c.fill();
+    c.beginPath();c.arc(W/2,H/2,W/2-4,0,Math.PI*2);c.fillStyle='rgba(255,255,255,.1)';c.fill();
+    if(isPlaying){
+      c.fillStyle='#0a0a0f';c.fillRect(W/2-8,H/2-9,5,18);c.fillRect(W/2+3,H/2-9,5,18);
+    } else {
+      c.fillStyle='#0a0a0f';
+      c.beginPath();c.moveTo(W/2-6,H/2-10);c.lineTo(W/2-6,H/2+10);c.lineTo(W/2+11,H/2);c.fill();
+    }
+  });
+}
+// Redraw skip buttons when skip sec changes
+const _origSetSk = setSk;
+function setSk(v){
+  _origSetSk(v);
+  drawAllButtons(isPlaying);
+}
+
+// Wire header file buttons
+document.getElementById('folderBtn').addEventListener('click',()=>document.getElementById('folderInput').click());
+document.getElementById('fileBtn').addEventListener('click',()=>document.getElementById('fileInput').click());
+
+// Wave zoom buttons
+document.getElementById('wzoomIn').addEventListener('click',()=>doZoom(1.4,.5));
+document.getElementById('wzoomOut').addEventListener('click',()=>doZoom(1/1.4,.5));
 
 // Generate PWA home screen icon dynamically as PNG
 (function(){
