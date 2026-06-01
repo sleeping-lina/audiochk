@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>AudioCheck</title>
 <!-- PWA home screen icon -->
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='100' fill='%230a0a0f'/%3E%3Ccircle cx='256' cy='256' r='180' fill='none' stroke='%2300e5ff' stroke-width='20'/%3E%3Cpolygon points='210,170 210,342 370,256' fill='%2300e5ff'/%3E%3Crect x='120' y='310' width='272' height='8' rx='4' fill='%23ff4081'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" id="appIcon" href="">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="AudioChk">
+<meta name="apple-mobile-web-app-title" content="Audio Check">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+JP:wght@300;400;700&display=swap');
 :root{
@@ -366,9 +366,11 @@ function setSrc(file){
 // ═══ LOAD ═════════════════════════════════════
 // Waveform decode constants
 const WSAMP=1800;
-const CHUNK_BYTES=2*1024*1024; // 2MB
-const SIL_THRESH=0.015;        // amplitude below this = silence
-const SIL_MIN_SEC=0.3;         // minimum silence duration
+const SIL_THRESH=0.015;   // amplitude below this = silence
+const SIL_MIN_SEC=0.3;    // minimum silence duration
+// Low sample rate for OfflineAudioContext — reduces memory dramatically
+// 2000 Hz is enough for waveform/silence detection (not playback quality)
+const WAVE_SAMPLE_RATE=2000;
 
 async function load(file){
   showLd(true);
@@ -426,69 +428,63 @@ async function load(file){
   saveLastSession(playlist.map(p=>p.name),plIdx);
 }
 
-// ── Chunked waveform decode ──────────────────
-// Key fix: normalize each chunk's peaks relative to its own max,
-// then scale back by the raw max so silences are correctly detected.
+// ── Waveform decode via OfflineAudioContext at low sample rate ──────
+// Using 2000Hz sample rate: a 1-hour file uses only ~27MB RAM.
+// This avoids the chunking approach where codec priming silence at
+// chunk boundaries caused false silence detection everywhere.
 async function buildWaveform(file){
-  const totalChunks=Math.ceil(file.size/CHUNK_BYTES);
-  const ptsPerChunk=Math.max(4,Math.round(WSAMP/totalChunks));
+  if(curFileName!==file.name) return;
 
-  // Phase 1: decode all chunks, collect raw peak arrays + durations
-  const chunks=[]; // {peaks:Float32Array, dur:number, rawMax:number}
+  let ab;
+  try{ ab=await file.arrayBuffer(); }
+  catch(e){ throw new Error('arrayBuffer failed: '+e.message); }
 
-  for(let ci=0;ci<totalChunks;ci++){
-    if(curFileName!==file.name) return; // file changed, abort
-    const sliceStart=ci*CHUNK_BYTES;
-    const sliceEnd=Math.min(file.size,sliceStart+CHUNK_BYTES);
-    let ab;
-    try{ ab=await file.slice(sliceStart,sliceEnd).arrayBuffer(); }
-    catch(e){ chunks.push(null); await tick(); continue; }
+  if(curFileName!==file.name) return; // file changed while reading
 
-    let actx=new(window.AudioContext||window.webkitAudioContext)();
-    let buf=null;
-    try{ buf=await actx.decodeAudioData(ab); }
-    catch(e){/* partial frame at boundary */}
-    finally{ actx.close().catch(()=>{}); actx=null; ab=null; }
-
-    if(!buf){ chunks.push(null); await tick(); continue; }
-
-    const ch=buf.getChannelData(0);
-    const step=Math.max(1,Math.floor(ch.length/ptsPerChunk));
-    const peaks=new Float32Array(ptsPerChunk);
-    let rawMax=0;
-    for(let i=0;i<ptsPerChunk;i++){
-      let mx=0; const b=i*step;
-      for(let j=0;j<step&&b+j<ch.length;j++){const v=Math.abs(ch[b+j]);if(v>mx)mx=v;}
-      peaks[i]=mx;
-      if(mx>rawMax) rawMax=mx;
-    }
-    chunks.push({peaks,dur:buf.duration,rawMax});
-    buf=null;
-
-    // Progressive stitch and draw
-    stitchWave(chunks);
-    if(!isPlaying) drawWave(audioEl.currentTime);
-    await tick();
+  // Step 1: decode at native sample rate to get PCM
+  let nativeBuf=null;
+  let actx=new(window.AudioContext||window.webkitAudioContext)();
+  try{
+    nativeBuf=await actx.decodeAudioData(ab);
+  }finally{
+    actx.close().catch(()=>{});
+    actx=null;
+    ab=null; // release compressed data immediately
   }
+  if(!nativeBuf) throw new Error('decodeAudioData failed');
+  if(curFileName!==file.name){ nativeBuf=null; return; }
 
-  stitchWave(chunks);
-  extractSilence();
-}
+  // Step 2: resample to WAVE_SAMPLE_RATE using OfflineAudioContext
+  // This dramatically reduces the PCM buffer size in memory
+  const nativeDur=nativeBuf.duration;
+  const targetSamples=Math.ceil(nativeDur*WAVE_SAMPLE_RATE);
+  let offCtx=new OfflineAudioContext(1, targetSamples, WAVE_SAMPLE_RATE);
+  let src=offCtx.createBufferSource();
+  src.buffer=nativeBuf;
+  src.connect(offCtx.destination);
+  src.start(0);
+  nativeBuf=null; // release native PCM — offCtx has its own copy
 
-function stitchWave(chunks){
-  const valid=chunks.filter(Boolean);
-  if(!valid.length) return;
-  const totalPts=valid.reduce((s,c)=>s+c.peaks.length,0);
+  let rendered=null;
+  try{ rendered=await offCtx.startRendering(); }
+  finally{ offCtx=null; src=null; }
+  if(!rendered) throw new Error('offline render failed');
+  if(curFileName!==file.name){ rendered=null; return; }
+
+  // Step 3: downsample rendered buffer to WSAMP points
+  const ch=rendered.getChannelData(0);
+  const step=Math.max(1,Math.floor(ch.length/WSAMP));
   waveData=new Float32Array(WSAMP);
-  let outIdx=0;
-  for(const ch of valid){
-    for(let i=0;i<ch.peaks.length;i++){
-      const idx=Math.min(WSAMP-1,Math.floor((outIdx/totalPts)*WSAMP));
-      // Use raw amplitude (NOT normalized) so silence threshold works correctly
-      waveData[idx]=Math.max(waveData[idx],ch.peaks[i]);
-      outIdx++;
+  for(let i=0;i<WSAMP;i++){
+    let mx=0; const b=i*step;
+    for(let j=0;j<step&&b+j<ch.length;j++){
+      const v=Math.abs(ch[b+j]); if(v>mx) mx=v;
     }
+    waveData[i]=mx;
   }
+  rendered=null; // release low-rate PCM
+
+  extractSilence();
 }
 
 function extractSilence(){
@@ -859,7 +855,7 @@ function setSpd(s){
   setPitch(audioEl);
   document.querySelectorAll('.spb').forEach(b=>b.classList.toggle('on',parseFloat(b.dataset.speed)===s));
   document.getElementById('customSpeed').value=s;
-  document.getElementById('spdCur').textContent='×'+s;
+  document.getElementById('spdCur').textContent='×'+(Number.isInteger(s)?s.toFixed(1):s);
   updateScHighlight();
   showToast('×'+s);
   savePrefs();
@@ -1022,12 +1018,46 @@ function setSpd(s,silent){
   audioEl.playbackRate=s;setPitch(audioEl);
   document.querySelectorAll('.spb').forEach(b=>b.classList.toggle('on',parseFloat(b.dataset.speed)===s));
   document.getElementById('customSpeed').value=s;
-  document.getElementById('spdCur').textContent='×'+s;
+  document.getElementById('spdCur').textContent='×'+(Number.isInteger(s)?s.toFixed(1):s);
   updateScHighlight();
   if(!silent) showToast('×'+s);
   savePrefs();
 }
 drawWavePlaceholder();drawSeek(0);renderMarkers();
+
+// Generate PWA home screen icon dynamically as PNG
+(function(){
+  try{
+    const cv=document.createElement('canvas');
+    cv.width=180;cv.height=180;
+    const c=cv.getContext('2d');
+    // background
+    c.fillStyle='#0a0a0f';
+    c.roundRect?c.beginPath():null;
+    if(c.roundRect){c.roundRect(0,0,180,180,32);c.fill();}
+    else{c.fillRect(0,0,180,180);}
+    // waveform bars (decorative)
+    const bars=[0.3,0.6,0.9,0.7,1.0,0.8,0.5,0.4,0.7,0.9,0.6,0.3];
+    bars.forEach((h,i)=>{
+      const x=14+i*13,bh=h*50;
+      c.fillStyle='#1e3a4a';
+      c.fillRect(x,90-bh,9,bh*2);
+    });
+    // play button circle
+    c.fillStyle='rgba(0,229,255,0.15)';
+    c.beginPath();c.arc(90,90,52,0,Math.PI*2);c.fill();
+    c.strokeStyle='#00e5ff';c.lineWidth=3;
+    c.beginPath();c.arc(90,90,52,0,Math.PI*2);c.stroke();
+    // play triangle
+    c.fillStyle='#00e5ff';
+    c.beginPath();c.moveTo(76,66);c.lineTo(76,114);c.lineTo(116,90);c.closePath();c.fill();
+    // pink line at bottom
+    c.fillStyle='#ff4081';
+    c.fillRect(20,148,140,5);
+    const url=cv.toDataURL('image/png');
+    document.getElementById('appIcon').href=url;
+  }catch(e){}
+})();
 </script>
 </body>
 </html>
