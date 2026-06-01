@@ -46,6 +46,18 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
 .seek-wrap{flex-shrink:0;background:var(--sf);border-bottom:1px solid var(--bd);
   touch-action:none;user-select:none;-webkit-user-select:none;overflow:hidden}
 #seekCanvas{display:block;width:100%}
+/* silence detect */
+.sil-section{flex-shrink:0;background:var(--sf);border-bottom:1px solid var(--bd)}
+.sil-header{display:flex;align-items:center;padding:3px 8px;cursor:pointer;gap:6px}
+.sil-lbl{font-family:'Space Mono',monospace;font-size:9px;color:var(--dm);letter-spacing:1px}
+.sil-status{font-family:'Space Mono',monospace;font-size:10px;color:var(--a3)}
+.sil-row{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.sil-row:last-child{margin-bottom:0}
+.sil-ctl-lbl{font-size:9px;color:var(--dm);font-family:'Space Mono',monospace;white-space:nowrap;min-width:76px}
+.sil-val{font-family:'Space Mono',monospace;font-size:10px;color:var(--tx);min-width:44px;text-align:right}
+.sil-row input[type=range]{flex:1;height:3px;-webkit-appearance:none;border-radius:2px;background:var(--bd);outline:none}
+.sil-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--a2)}
+
 /* speed */
 .spd-section{flex-shrink:0;background:var(--sf);border-bottom:1px solid var(--bd)}
 .spd-header{display:flex;align-items:center;padding:3px 8px;cursor:pointer;gap:6px}
@@ -157,6 +169,39 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   <span id="zoomInfo">×5.0</span>
 </div>
 <div class="seek-wrap" id="seekWrap"><canvas id="seekCanvas"></canvas></div>
+<!-- Live silence detection panel -->
+<div class="sil-section" id="silSection">
+  <div class="sil-header" id="silHeader">
+    <span class="sil-lbl">SILENCE DETECT</span>
+    <span class="sil-status" id="silStatus">停止中</span>
+    <span class="spd-arrow" id="silArrow">▲</span>
+  </div>
+  <div class="spd-body" id="silBody">
+    <div class="spd-inner">
+      <div class="sil-row">
+        <span class="sil-ctl-lbl">感度（閾値）</span>
+        <input type="range" id="silThr" min="0.004" max="0.08" step="0.002" value="0.02">
+        <span class="sil-val" id="silThrV">0.020</span>
+      </div>
+      <div class="sil-row">
+        <span class="sil-ctl-lbl">最短無音秒数</span>
+        <input type="range" id="silMin" min="0.1" max="5" step="0.1" value="1.0">
+        <span class="sil-val" id="silMinV">1.0秒</span>
+      </div>
+      <div class="sil-row" style="justify-content:space-between;align-items:center">
+        <span class="sil-ctl-lbl" style="white-space:nowrap">自動マーク</span>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+          <input type="checkbox" id="silAutoMark" checked style="width:14px;height:14px">
+          <span style="font-size:9px;color:var(--dm);font-family:'Space Mono',monospace">ON=無音検出時に自動追加</span>
+        </label>
+      </div>
+      <div class="sil-row" style="justify-content:center">
+        <span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--dm)">現在の無音：</span>
+        <span style="font-family:'Space Mono',monospace;font-size:14px;color:var(--a2);font-weight:700" id="silCurDur">0.0s</span>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="spd-section">
   <div class="spd-header" id="spdHeader">
     <span class="spd-lbl">SPEED</span>
@@ -296,6 +341,10 @@ async function load(file){
   isPlaying=false; redrawPlayBtn(); cancelAnimationFrame(raf);
   hist=[]; redoSt=[]; curMkIdx=-1;
   waveData=null; silReg=[]; duration=0;
+  rtLevels=new Float32Array(RT_LEVELS); rtLevelIdx=0;
+  resetRTSilence();
+  document.getElementById('silStatus').textContent='停止中';
+  document.getElementById('silCurDur').textContent='0.0s';
   document.getElementById('fileName').textContent=file.name;
   document.getElementById('timeTotal').textContent='/ --:--:--';
   drawWave(0); drawSeek(0);
@@ -321,52 +370,108 @@ async function load(file){
   buildWaveform(file).then(()=>{ drawWave(audioEl.currentTime); drawSeek(audioEl.currentTime); saveMk(); }).catch(()=>{});
 }
 
-async function buildWaveform(file){
-  if(curFileName!==file.name) return;
+// ── Realtime silence detection via Web Audio API ─────────────
+// (no pre-decode needed — works on any length file)
+let waCtx=null, waAnalyser=null, waSrc=null, waReady=false;
+let waBuf=null;
+let silThr=0.02, silMinSec=1.0, silAutoMark=true;
+let rtInSil=false, rtSilStart=0;
+// Live level ring buffer for waveform display (last N frames)
+const RT_LEVELS=200;
+let rtLevels=new Float32Array(RT_LEVELS);
+let rtLevelIdx=0;
 
-  // Limit decode size to prevent OOM on long files.
-  // At 128kbps MP3: 1MB ≈ 62s, 10MB ≈ 620s (~10min)
-  // We decode up to 10MB which covers ~10min; for longer files
-  // the waveform covers only the first portion but silence detection still works.
-  const MAX_DECODE = 10 * 1024 * 1024; // 10 MB
-  const slice = file.size > MAX_DECODE ? file.slice(0, MAX_DECODE) : file;
-  const decodedFraction = Math.min(1, slice.size / file.size);
+function ensureWAGraph(){
+  if(waReady) return;
+  waCtx=new(window.AudioContext||window.webkitAudioContext)();
+  waSrc=waCtx.createMediaElementSource(audioEl);
+  waAnalyser=waCtx.createAnalyser();
+  waAnalyser.fftSize=1024;
+  waBuf=new Float32Array(waAnalyser.fftSize);
+  waSrc.connect(waAnalyser);
+  waAnalyser.connect(waCtx.destination);
+  waReady=true;
+}
+function resetRTSilence(){ rtInSil=false; }
 
-  let ab;
-  try { ab = await slice.arrayBuffer(); }
-  catch(e) { return; }
-  if(curFileName!==file.name) return;
+function rtLoop(){
+  if(!isPlaying||!waReady) return;
+  if(waCtx.state==='suspended') waCtx.resume();
+  waAnalyser.getFloatTimeDomainData(waBuf);
+  // RMS
+  let sum=0; for(let i=0;i<waBuf.length;i++) sum+=waBuf[i]*waBuf[i];
+  const rms=Math.sqrt(sum/waBuf.length);
+  // ring buffer
+  rtLevels[rtLevelIdx%RT_LEVELS]=rms; rtLevelIdx++;
 
-  let actx=new(window.AudioContext||window.webkitAudioContext)();
-  let buf=null;
-  try{ buf=await actx.decodeAudioData(ab); }
-  catch(e){ /* decode failed */ }
-  finally{ actx.close().catch(()=>{}); actx=null; ab=null; }
-  if(!buf||curFileName!==file.name) return;
-
-  const ch=buf.getChannelData(0), total=ch.length;
-  // Number of waveform points for decoded portion
-  const decodedPts = Math.floor(WSAMP * decodedFraction);
-  const step=Math.max(1,Math.floor(total/decodedPts));
-  waveData=new Float32Array(WSAMP); // rest stays 0
-  for(let i=0;i<decodedPts;i++){
-    let mx=0,b=i*step;
-    for(let j=0;j<step&&b+j<total;j++){ const v=Math.abs(ch[b+j]); if(v>mx)mx=v; }
-    waveData[i]=mx;
+  const t=audioEl.currentTime;
+  if(rms<silThr){
+    if(!rtInSil){ rtInSil=true; rtSilStart=t; }
+    document.getElementById('silCurDur').textContent=(t-rtSilStart).toFixed(1)+'s';
+    document.getElementById('silStatus').textContent='無音中…';
+  } else {
+    if(rtInSil){
+      rtInSil=false;
+      const dur=t-rtSilStart;
+      document.getElementById('silCurDur').textContent=dur.toFixed(1)+'s';
+      document.getElementById('silStatus').textContent='音あり';
+      if(dur>=silMinSec){
+        // push to silReg for display
+        silReg.push({start:rtSilStart, end:t, dur});
+        silReg.sort((a,b)=>a.start-b.start);
+        // auto mark at silence start
+        if(silAutoMark){
+          saveH();
+          markers.push({time:rtSilStart, note:'無音 '+dur.toFixed(1)+'s'});
+          markers.sort((a,b)=>a.time-b.time);
+          renderMarkers(); saveMk();
+          showToast('🔖 無音 '+dur.toFixed(1)+'s @ '+fmtMs(rtSilStart));
+        }
+      }
+    } else {
+      document.getElementById('silStatus').textContent='音あり';
+    }
   }
-  buf=null;
+  requestAnimationFrame(rtLoop);
+}
 
-  // Silence detection on decoded portion
-  silReg=[];
-  const decodedDur = buf===null ? (decodedFraction*duration) : buf?.duration || (decodedFraction*duration);
-  const sps = (decodedFraction*duration) / decodedPts;
-  let ss=null;
-  for(let i=0;i<=decodedPts;i++){
-    const sil=i<decodedPts&&waveData[i]<SIL_THRESH;
-    if(sil){if(ss===null)ss=i;}
-    else if(ss!==null){ const d=(i-ss)*sps; if(d>=SIL_MIN)silReg.push({start:ss*sps,end:i*sps,dur:d}); ss=null; }
+// ── Live waveform overlay (drawn on top of block wave) ────────
+function drawLiveWave(){
+  if(!isPlaying||!waReady) return;
+  const cv=document.getElementById('waveCanvas'), wa=document.getElementById('waveArea');
+  const dpr=Math.min(window.devicePixelRatio||1,2), W=wa.clientWidth||320, H=72;
+  // draw over existing wave
+  const c=cv.getContext('2d');
+  // clear just the top half for live bars
+  c.clearRect(0,0,W,H);
+  // redraw background
+  c.fillStyle='#0d0d16'; c.fillRect(0,0,W,H);
+  const mid=H/2, bw=W/RT_LEVELS;
+  // threshold lines
+  const ty=mid-Math.min(mid-2, silThr*6*mid);
+  c.strokeStyle='rgba(255,64,129,.3)'; c.lineWidth=1;
+  c.beginPath(); c.moveTo(0,ty); c.lineTo(W,ty); c.moveTo(0,H-ty); c.lineTo(W,H-ty); c.stroke();
+  // bars
+  for(let i=0;i<RT_LEVELS;i++){
+    const idx=(rtLevelIdx+i)%RT_LEVELS;
+    const v=Math.min(1,rtLevels[idx]*6), h=v*mid;
+    c.fillStyle=rtLevels[idx]<silThr?'rgba(255,64,129,.55)':'rgba(0,229,255,.7)';
+    c.fillRect(i*bw, mid-h, Math.max(1,bw-0.5), h*2||1);
+  }
+  c.fillStyle='#2a2a3d'; c.fillRect(0,mid-.5,W,1);
+  // markers
+  const{sf,ef}=getZoomWin();
+  const startT=sf*duration, span=(ef-sf)*duration;
+  for(const m of markers){
+    if(m.time<startT||m.time>startT+span) continue;
+    const mx=((m.time-startT)/span)*W;
+    c.strokeStyle='#ff4081'; c.lineWidth=1.5; c.beginPath(); c.moveTo(mx,0); c.lineTo(mx,H); c.stroke();
+    c.fillStyle='#ff4081'; c.beginPath(); c.moveTo(mx-3,0); c.lineTo(mx+3,0); c.lineTo(mx,6); c.fill();
   }
 }
+
+// buildWaveform is now a no-op (realtime detection handles everything)
+async function buildWaveform(file){ /* realtime only — no pre-decode */ }
 
 // ── Playlist ──────────────────────────────────
 function renderPL(){
@@ -537,24 +642,32 @@ document.getElementById('wzoomOut').addEventListener('click',()=>doZoom(1/1.4,.5
 function curT(){return audioEl.currentTime||0;}
 function play(){
   if(!objURL)return;
+  ensureWAGraph();
+  if(waCtx&&waCtx.state==='suspended') waCtx.resume();
   audioEl.playbackRate=playbackRate; setPitch(audioEl);
   const p=audioEl.play();
-  if(p)p.then(()=>{isPlaying=true;redrawPlayBtn();loop();}).catch(e=>showToast('再生失敗:'+e.message));
-  else{isPlaying=true;redrawPlayBtn();loop();}
+  if(p)p.then(()=>{isPlaying=true;redrawPlayBtn();loop();rtLoop();}).catch(e=>showToast('再生失敗:'+e.message));
+  else{isPlaying=true;redrawPlayBtn();loop();rtLoop();}
 }
 function stop(){
   audioEl.pause(); isPlaying=false; redrawPlayBtn(); cancelAnimationFrame(raf);
+  resetRTSilence();
+  document.getElementById('silStatus').textContent='停止中';
+  document.getElementById('silCurDur').textContent='0.0s';
   drawWave(curT()); drawSeek(curT()); updateTime(curT());
 }
 function seekTo(t){
   if(!objURL)return;
   audioEl.currentTime=Math.max(0,Math.min(duration||0,t));
+  resetRTSilence();
   if(!isPlaying){drawWave(audioEl.currentTime);updateTime(audioEl.currentTime);drawSeek(audioEl.currentTime);}
   hlMk(audioEl.currentTime);
 }
 function loop(){
   if(!isPlaying)return;
-  const t=curT(); drawWave(t); updateTime(t); drawSeek(t); chkSil(t); hlMk(t);
+  const t=curT();
+  if(waReady) drawLiveWave(); else drawWave(t);
+  updateTime(t); drawSeek(t); chkSil(t); hlMk(t);
   if(zoomLv>1.5){const f=duration>0?t/duration:0,hs=1/(2*zoomLv);if(f<zoomCtr-hs*.4||f>zoomCtr+hs*.4)zoomCtr=Math.max(hs,Math.min(1-hs,f));}
   raf=requestAnimationFrame(loop);
 }
@@ -878,6 +991,23 @@ function showLd(on){const b=document.getElementById('lbar');b.style.width=on?'65
 let tT=null;
 function showToast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');clearTimeout(tT);tT=setTimeout(()=>el.classList.remove('show'),2000);}
 window.addEventListener('resize',()=>{drawWave(curT());drawSeek(curT());drawAllBtns();});
+
+// ── Silence detection UI wiring ───────────────
+document.getElementById('silHeader').addEventListener('click',()=>{
+  const b=document.getElementById('silBody'), a=document.getElementById('silArrow');
+  b.classList.toggle('open'); a.classList.toggle('open',b.classList.contains('open'));
+});
+document.getElementById('silThr').addEventListener('input',function(){
+  silThr=parseFloat(this.value);
+  document.getElementById('silThrV').textContent=silThr.toFixed(3);
+});
+document.getElementById('silMin').addEventListener('input',function(){
+  silMinSec=parseFloat(this.value);
+  document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒';
+});
+document.getElementById('silAutoMark').addEventListener('change',function(){
+  silAutoMark=this.checked;
+});
 
 // ── Init ──────────────────────────────────────
 loadPrefs();
