@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AudioCheck</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+JP:wght@300;400;700&display=swap');
+:root{
+  --bg:#0a0a0f;--surface:#13131a;--surface2:#1c1c28;--border:#2a2a3d;
+  --accent:#00e5ff;--accent2:#ff4081;--accent3:#69ff47;
+  --text:#e8e8f0;--dim:#6b6b88;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans JP',sans-serif;font-weight:300;
+  display:flex;flex-direction:column;height:100dvh;max-width:640px;margin:0 auto}
+
+/* HEADER */
+header{display:flex;align-items:center;gap:7px;padding:6px 10px;
+  border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
+.logo{font-family:'Space Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:2px;white-space:nowrap}
+.fname{flex:1;font-size:10px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.hbtn{background:var(--surface2);border:1px solid var(--border);border-radius:6px;
+  font-size:15px;width:30px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.hbtn:active{opacity:.6}
+#fileInput,#folderInput,#importData{display:none}
+
+/* PLAYLIST */
+#playlist{background:var(--surface2);border-bottom:1px solid var(--border);
+  max-height:0;overflow:hidden;transition:max-height .25s;flex-shrink:0}
+#playlist.open{max-height:110px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.pl-item{display:flex;align-items:center;gap:6px;padding:5px 10px;cursor:pointer;
+  border-bottom:1px solid var(--border);font-size:11px}
+.pl-item.active{background:rgba(0,229,255,.08);border-left:3px solid var(--accent)}
+.pl-num{font-family:'Space Mono',monospace;font-size:9px;color:var(--dim);min-width:18px}
+.pl-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* WAVEFORM */
+.wave-wrap{position:relative;background:var(--surface);border-bottom:1px solid var(--border);
+  flex-shrink:0;touch-action:none;user-select:none;-webkit-user-select:none}
+#waveCanvas{display:block;width:100%;height:78px}
+
+/* INFO */
+.info{display:flex;align-items:center;gap:5px;padding:3px 10px;
+  background:var(--surface2);border-bottom:1px solid var(--border);
+  font-family:'Space Mono',monospace;font-size:10px;flex-shrink:0}
+#timeDisp{color:var(--accent);font-size:12px}
+#timeTotal{color:var(--dim)}
+#silInfo{color:var(--accent3);font-size:9px}
+#zoomInfo{color:var(--dim);font-size:9px;margin-left:auto}
+
+/* SEEK (Audipo style) */
+.seek-wrap{flex-shrink:0;background:var(--surface);border-bottom:1px solid var(--border);
+  touch-action:none;user-select:none;-webkit-user-select:none;overflow:hidden}
+#seekCanvas{display:block;width:100%}
+
+/* SPEED */
+.speed-wrap{padding:4px 10px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+.speed-row{display:flex;gap:3px;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.speed-row::-webkit-scrollbar{display:none}
+.spb{background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--dim);
+  font-family:'Space Mono',monospace;font-size:10px;padding:4px 6px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.spb.on{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700}
+.spb:active{opacity:.7}
+.sp-cust{display:flex;align-items:center;gap:2px;flex-shrink:0;margin-left:3px}
+.sp-cust label{font-size:9px;color:var(--dim)}
+#customSpeed{width:40px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;
+  color:var(--text);font-family:'Space Mono',monospace;font-size:10px;padding:2px 4px;text-align:center}
+
+/* CONTROLS */
+.ctrl-wrap{flex-shrink:0;background:var(--surface);border-bottom:1px solid var(--border);padding:5px 6px}
+.ctrl-row{display:flex;align-items:center;justify-content:center;gap:5px;margin-bottom:4px}
+.ctrl-row:last-child{margin-bottom:0}
+
+/* transport buttons */
+.tb{background:var(--surface2);border:1px solid var(--border);border-radius:50%;
+  color:var(--text);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-family:'Space Mono',monospace;flex-shrink:0;line-height:1}
+.tb:active{opacity:.6;transform:scale(.93)}
+.tb.xs{width:30px;height:30px;font-size:10px}
+.tb.sm{width:36px;height:36px;font-size:12px}
+.tb.md{width:42px;height:42px;font-size:14px}
+.tb.lg{width:54px;height:54px;font-size:22px;background:var(--accent);border-color:var(--accent);color:#000}
+.tb.ghost{background:transparent;border-color:var(--border);color:var(--dim)}
+
+/* mark button */
+.mkbtn{background:var(--accent2);border:1px solid var(--accent2);border-radius:8px;
+  color:#fff;display:flex;align-items:center;justify-content:center;flex-direction:column;
+  gap:1px;cursor:pointer;flex:1;height:40px;max-width:80px;padding:2px 4px}
+.mkbtn:active{opacity:.6;transform:scale(.94)}
+.mkbtn .mi{font-size:14px;line-height:1}
+.mkbtn .ml{font-size:8px;color:rgba(255,255,255,.7);font-family:'Space Mono',monospace;white-space:nowrap}
+
+/* undo/redo */
+.udbtn{background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+  color:var(--text);display:flex;align-items:center;justify-content:center;flex-direction:column;
+  gap:1px;cursor:pointer;flex:1;height:40px;max-width:80px;padding:2px 4px}
+.udbtn:active{opacity:.6;transform:scale(.94)}
+.udbtn .mi{font-size:14px;line-height:1}
+.udbtn .ml{font-size:8px;color:var(--dim);font-family:'Space Mono',monospace;white-space:nowrap}
+
+/* SKIP row */
+.skip-row{display:flex;align-items:center;justify-content:center;gap:4px;
+  padding:3px 10px 4px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+.skip-row label{font-family:'Space Mono',monospace;font-size:9px;color:var(--dim)}
+.sksb{background:var(--surface2);border:1px solid var(--border);border-radius:5px;
+  color:var(--text);font-family:'Space Mono',monospace;font-size:12px;
+  width:28px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.sksb:active{opacity:.6}
+#skipSec{width:36px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;
+  color:var(--text);font-family:'Space Mono',monospace;font-size:11px;padding:2px;text-align:center}
+
+/* MARKERS */
+.mk-section{flex:1;overflow-y:auto;background:var(--bg);-webkit-overflow-scrolling:touch;min-height:0}
+.mk-header{display:flex;align-items:center;padding:5px 10px 4px;font-family:'Space Mono',monospace;
+  font-size:9px;color:var(--dim);letter-spacing:1px;border-bottom:1px solid var(--border);
+  position:sticky;top:0;background:var(--bg);z-index:10}
+.mk-actions{display:flex;gap:4px;margin-left:auto}
+.smbtn{background:var(--surface2);border:1px solid var(--border);border-radius:5px;
+  color:var(--dim);font-size:9px;font-family:'Space Mono',monospace;padding:2px 6px;cursor:pointer;white-space:nowrap}
+.smbtn:active{opacity:.6}
+.smbtn.danger{border-color:var(--accent2);color:var(--accent2)}
+.mk-item{display:flex;align-items:center;gap:6px;padding:8px 10px;
+  border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}
+.mk-item:active,.mk-item.current{background:rgba(0,229,255,.07)}
+.mk-item.current .m-time{color:var(--accent)}
+.m-num{font-family:'Space Mono',monospace;font-size:9px;color:var(--accent2);min-width:16px}
+.m-time{font-family:'Space Mono',monospace;font-size:11px;color:var(--text);white-space:nowrap}
+.m-note{background:transparent;border:none;color:var(--dim);
+  font-family:'Noto Sans JP',sans-serif;font-size:10px;outline:none;flex:1;min-width:0}
+.m-del{color:var(--dim);font-size:13px;padding:2px 4px;cursor:pointer;border-radius:4px;flex-shrink:0}
+.m-del:active{background:rgba(255,64,129,.2);color:var(--accent2)}
+.mk-empty{text-align:center;padding:22px 20px;color:var(--dim);font-size:11px;line-height:2}
+
+/* IO */
+.io-bar{display:flex;gap:4px;padding:5px 10px;background:var(--surface);
+  border-top:1px solid var(--border);flex-shrink:0}
+.iobtn{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;
+  color:var(--dim);font-size:10px;font-family:'Space Mono',monospace;
+  padding:5px;cursor:pointer;text-align:center}
+.iobtn:active{opacity:.6}
+
+#toast{position:fixed;bottom:52px;left:50%;transform:translateX(-50%) translateY(10px);
+  background:var(--surface2);border:1px solid var(--accent);color:var(--accent);
+  font-family:'Space Mono',monospace;font-size:10px;padding:5px 12px;border-radius:20px;
+  opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap;z-index:200}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#loadBar{position:fixed;top:0;left:0;height:2px;background:var(--accent);width:0%;transition:width .3s;z-index:300}
+</style>
+</head>
+<body>
+<div id="loadBar"></div>
+
+<header>
+  <span class="logo">AUDIOCHK</span>
+  <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
+  <div style="display:flex;gap:4px;flex-shrink:0">
+    <div class="hbtn" id="prevFileBtnH" title="前のファイル">⏮</div>
+    <div class="hbtn" id="nextFileBtnH" title="次のファイル">⏭</div>
+    <div class="hbtn" onclick="document.getElementById('folderInput').click()" title="フォルダ">📁</div>
+    <div class="hbtn" onclick="document.getElementById('fileInput').click()" title="ファイル">🎵</div>
+  </div>
+  <input type="file" id="fileInput"
+    accept=".mp3,.m4a,.aac,.wav,.ogg,.flac,.opus,.caf,audio/mpeg,audio/mp4,audio/x-m4a,audio/aac,audio/wav,audio/ogg,audio/flac,audio/opus,audio/x-caf">
+  <input type="file" id="folderInput" webkitdirectory multiple>
+  <input type="file" id="importData" accept=".json">
+</header>
+
+<audio id="audioEl" playsinline webkit-playsinline preload="auto" style="display:none"></audio>
+
+<div id="playlist"></div>
+<div class="wave-wrap" id="waveArea"><canvas id="waveCanvas"></canvas></div>
+
+<div class="info">
+  <span id="timeDisp">00:00:00.0</span>
+  <span id="timeTotal">/ --:--:--</span>
+  <span style="color:var(--border)">|</span>
+  <span id="silInfo"></span>
+  <span id="zoomInfo">×3.0</span>
+</div>
+
+<div class="seek-wrap" id="seekWrap"><canvas id="seekCanvas"></canvas></div>
+
+<div class="speed-wrap">
+  <div class="speed-row">
+    <button class="spb" data-speed="0.5">×0.5</button>
+    <button class="spb" data-speed="0.75">×0.75</button>
+    <button class="spb on" data-speed="1.0">×1.0</button>
+    <button class="spb" data-speed="1.25">×1.25</button>
+    <button class="spb" data-speed="1.5">×1.5</button>
+    <button class="spb" data-speed="2.0">×2.0</button>
+    <div class="sp-cust"><label>×</label>
+      <input type="number" id="customSpeed" value="1.0" min="0.1" max="4.0" step="0.05">
+    </div>
+  </div>
+</div>
+
+<div class="ctrl-wrap">
+  <!-- Row1: undo / MARK / redo -->
+  <div class="ctrl-row">
+    <div class="udbtn" id="undoBtn"><span class="mi">↩</span><span class="ml">取消</span></div>
+    <div class="mkbtn" id="markBtn"><span class="mi">🔖</span><span class="ml">マーク追加</span></div>
+    <div class="udbtn" id="redoBtn"><span class="mi">↪</span><span class="ml">やり直し</span></div>
+  </div>
+  <!-- Row2: transport -->
+  <div class="ctrl-row">
+    <div class="tb ghost xs" id="fileHeadBtn">⏮</div>
+    <div class="tb sm" id="back01Btn" style="font-size:10px">-.1</div>
+    <div class="tb md" id="backNBtn">«<span id="backLbl">5</span></div>
+    <div class="tb lg" id="playBtn">▶</div>
+    <div class="tb md" id="fwdNBtn"><span id="fwdLbl">5</span>»</div>
+    <div class="tb sm" id="fwd01Btn" style="font-size:10px">.1+</div>
+    <div class="tb ghost xs" id="fileTailBtn">⏭</div>
+  </div>
+</div>
+
+<!-- SKIP -->
+<div class="skip-row">
+  <label>SKIP</label>
+  <div class="sksb" id="skipMinusBtn">−</div>
+  <input type="number" id="skipSec" value="5" min="1" max="60">
+  <label>秒</label>
+  <div class="sksb" id="skipPlusBtn">＋</div>
+</div>
+
+<!-- MARKERS -->
+<div class="mk-section">
+  <div class="mk-header">
+    MARKERS
+    <div class="mk-actions">
+      <button class="smbtn" id="prevMrkBtn">◀ prev</button>
+      <button class="smbtn" id="nextMrkBtn">next ▶</button>
+      <button class="smbtn danger" id="clearAllBtn">全削除</button>
+    </div>
+  </div>
+  <div id="markerList"></div>
+</div>
+
+<div class="io-bar">
+  <button class="iobtn" onclick="exportMarkers()">▼ EXPORT</button>
+  <button class="iobtn" onclick="document.getElementById('importData').click()">▲ IMPORT</button>
+  <button class="iobtn" onclick="togglePlaylist()">☰ LIST</button>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+// ═══ AUDIO ELEMENT ════════════════════════════
+const audioEl = document.getElementById('audioEl');
+function setPitch(el){ el.preservesPitch=true; el.mozPreservesPitch=true; el.webkitPreservesPitch=true; }
+setPitch(audioEl);
+
+// ═══ STATE ════════════════════════════════════
+let isPlaying=false, playbackRate=1.0, duration=0;
+let currentObjectURL=null, currentFileName='';
+let markers=[], history=[], redoStack=[];
+let waveData=null, silenceRegions=[], raf=null;
+let playlist=[], playlistIdx=-1;
+let skipSec=5;
+let zoomLevel=3.0, zoomCenter=1/6;
+let currentMarkerIdx=-1; // for list highlight
+
+// Seek layout constants
+const LEFT_PAD=46, ROW_H=26;
+let SEEK_ROWS=12;
+
+// ═══ AUDIO EVENTS ═════════════════════════════
+audioEl.addEventListener('ended',()=>{ isPlaying=false; updatePlayBtn(); cancelAnimationFrame(raf); });
+audioEl.addEventListener('error',()=>{ const c=audioEl.error?audioEl.error.code:'?'; showToast('エラー code='+c); });
+
+// ═══ FILE INPUTS ══════════════════════════════
+const AUDIO_EXTS=/\.(mp3|m4a|aac|wav|ogg|flac|opus|webm|caf)$/i;
+
+document.getElementById('fileInput').addEventListener('change',function(){
+  const f=this.files[0]; if(!f)return;
+  playlist=[{name:f.name,file:f}]; playlistIdx=0;
+  _setSrc(f); _load(f); renderPlaylist(); this.value='';
+});
+document.getElementById('folderInput').addEventListener('change',function(){
+  const files=Array.from(this.files)
+    .filter(f=>AUDIO_EXTS.test(f.name)||f.type.startsWith('audio/'))
+    .sort((a,b)=>a.name.localeCompare(b.name,'ja'));
+  if(!files.length){showToast('音声ファイルなし');return;}
+  playlist=files.map(f=>({name:f.name,file:f})); playlistIdx=0;
+  renderPlaylist(); document.getElementById('playlist').classList.add('open');
+  _setSrc(files[0]); _load(files[0]); this.value='';
+});
+
+function _setSrc(file){
+  if(currentObjectURL) URL.revokeObjectURL(currentObjectURL);
+  currentObjectURL=URL.createObjectURL(file);
+  audioEl.src=currentObjectURL; audioEl.load(); setPitch(audioEl);
+}
+
+// ── Load file: metadata + waveform via OfflineAudioContext with chunked decode ──
+async function _load(file){
+  showLoad(true);
+  currentFileName=file.name;
+  playlistIdx=playlist.findIndex(p=>p.file===file);
+
+  isPlaying=false; updatePlayBtn(); cancelAnimationFrame(raf);
+  markers=[]; history=[]; redoStack=[]; currentMarkerIdx=-1;
+  renderMarkers();
+
+  // Keep current zoom level across file changes (don't reset)
+  document.getElementById('fileName').textContent=file.name;
+  document.getElementById('timeTotal').textContent='/ --:--:--';
+  waveData=null; silenceRegions=[];
+  drawWave(0); drawSeek(0);
+
+  // Get duration from audio element
+  await new Promise(res=>{
+    if(audioEl.readyState>=1){res();return;}
+    audioEl.addEventListener('loadedmetadata',res,{once:true});
+    audioEl.addEventListener('error',res,{once:true});
+  });
+  duration=isFinite(audioEl.duration)?audioEl.duration:0;
+  document.getElementById('timeTotal').textContent='/ '+fmtMs(duration);
+
+  // Decode waveform — use chunked approach to avoid OOM on long files
+  try{ await decodeWaveform(file); }
+  catch(e){ console.warn('waveform skip:',e); drawWave(0); drawSeek(0); }
+
+  showLoad(false); showToast(file.name); renderPlaylist();
+}
+
+// Waveform decode: downsample via OfflineAudioContext in chunks to avoid memory crash
+const WSAMP=2000; // total waveform points
+async function decodeWaveform(file){
+  // Read a limited slice for very large files to prevent OOM
+  // Strategy: read full file but use low sample rate OfflineAudioContext
+  const ab=await file.arrayBuffer();
+  const tmpCtx=new (window.AudioContext||window.webkitAudioContext)();
+  let buf;
+  try{
+    buf=await tmpCtx.decodeAudioData(ab);
+  }finally{
+    tmpCtx.close().catch(()=>{});
+  }
+  if(!duration) duration=buf.duration;
+  const ch=buf.getChannelData(0);
+  const step=Math.max(1,Math.floor(ch.length/WSAMP));
+  waveData=new Float32Array(WSAMP);
+  for(let i=0;i<WSAMP;i++){
+    let mx=0,b=i*step;
+    for(let j=0;j<step&&b+j<ch.length;j++){const v=Math.abs(ch[b+j]);if(v>mx)mx=v;}
+    waveData[i]=mx;
+  }
+  // silence regions
+  silenceRegions=[];
+  const sps=duration/WSAMP; let ss=null;
+  for(let i=0;i<=WSAMP;i++){
+    const sil=i<WSAMP&&waveData[i]<0.015;
+    if(sil){if(ss===null)ss=i;}
+    else if(ss!==null){const d=(i-ss)*sps;if(d>=0.3)silenceRegions.push({start:ss*sps,end:i*sps,dur:d});ss=null;}
+  }
+  drawWave(audioEl.currentTime);
+  drawSeek(audioEl.currentTime);
+}
+
+// ═══ PLAYLIST ══════════════════════════════════
+function renderPlaylist(){
+  document.getElementById('playlist').innerHTML=playlist.map((item,i)=>`
+    <div class="pl-item ${i===playlistIdx?'active':''}" onclick="plTap(${i})">
+      <span class="pl-num">${i+1}</span>
+      <span class="pl-name">${esc(item.name)}</span>
+    </div>`).join('');
+}
+function plTap(idx){const f=playlist[idx].file;playlistIdx=idx;_setSrc(f);_load(f);}
+function togglePlaylist(){document.getElementById('playlist').classList.toggle('open');}
+function prevFile(){
+  if(playlistIdx>0){const f=playlist[--playlistIdx].file;_setSrc(f);_load(f);renderPlaylist();}
+  else showToast('最初のファイル');
+}
+function nextFile(){
+  if(playlistIdx<playlist.length-1){const f=playlist[++playlistIdx].file;_setSrc(f);_load(f);renderPlaylist();}
+  else showToast('最後のファイル');
+}
+document.getElementById('prevFileBtnH').addEventListener('click',prevFile);
+document.getElementById('nextFileBtnH').addEventListener('click',nextFile);
+
+// ═══ DRAW WAVEFORM ════════════════════════════
+function drawWave(ct){
+  const canvas=document.getElementById('waveCanvas');
+  const area=document.getElementById('waveArea');
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  const W=area.clientWidth||320,H=78;
+  canvas.width=W*dpr;canvas.height=H*dpr;
+  canvas.style.width=W+'px';canvas.style.height=H+'px';
+  const c=canvas.getContext('2d');c.scale(dpr,dpr);
+  c.fillStyle='#0d0d16';c.fillRect(0,0,W,H);
+  if(!waveData||!duration)return;
+
+  const hs=1/(2*zoomLevel);
+  let sf=Math.max(0,zoomCenter-hs),ef=Math.min(1,zoomCenter+hs);
+  if(sf<0){ef-=sf;sf=0;}if(ef>1){sf-=ef-1;ef=1;}
+  sf=Math.max(0,sf);ef=Math.min(1,ef);
+  const startT=sf*duration,span=(ef-sf)*duration,mid=H/2;
+  const playedX=((ct-startT)/span)*W;
+
+  // silence
+  for(const sr of silenceRegions){
+    if(sr.end<startT||sr.start>startT+span)continue;
+    const sx=((sr.start-startT)/span)*W,ex=((sr.end-startT)/span)*W;
+    c.fillStyle='rgba(255,64,129,.09)';c.fillRect(sx,0,ex-sx,H);
+    const lx=Math.max(2,Math.min(W-24,(sx+ex)/2-7));
+    c.fillStyle='rgba(255,64,129,.7)';
+    c.font="9px 'Space Mono',monospace";c.fillText(sr.dur.toFixed(1)+'s',lx,H-2);
+  }
+  // bars
+  const si=Math.floor(sf*WSAMP),ei=Math.ceil(ef*WSAMP);
+  const barW=Math.max(1,W/(ei-si));
+  for(let i=si;i<ei;i++){
+    const x=((i+.5)/WSAMP-sf)/(ef-sf)*W;
+    const amp=waveData[i]*mid*.9;
+    c.fillStyle=x<playedX?'#00b8d4':'#1e3a4a';
+    c.fillRect(x-barW/2,mid-amp,barW,amp*2||1);
+  }
+  c.fillStyle='#2a2a3d';c.fillRect(0,mid-.5,W,1);
+  // markers
+  for(const m of markers){
+    if(m.time<startT||m.time>startT+span)continue;
+    const mx=((m.time-startT)/span)*W;
+    c.strokeStyle='#ff4081';c.lineWidth=1.5;
+    c.beginPath();c.moveTo(mx,0);c.lineTo(mx,H);c.stroke();
+    c.fillStyle='#ff4081';
+    c.beginPath();c.moveTo(mx-3,0);c.lineTo(mx+3,0);c.lineTo(mx,6);c.fill();
+  }
+  // playhead
+  if(ct>=startT&&ct<=startT+span){
+    const px=((ct-startT)/span)*W;
+    c.strokeStyle='#00e5ff';c.lineWidth=2;
+    c.beginPath();c.moveTo(px,0);c.lineTo(px,H);c.stroke();
+  }
+}
+
+// ═══ DRAW SEEK (Audipo) ════════════════════════
+function computeRows(){
+  if(!duration)return 10;
+  if(duration>5400)return 16;
+  if(duration>3600)return 15;
+  if(duration>1800)return 14;
+  if(duration>600)return 12;
+  if(duration>180)return 10;
+  return 8;
+}
+function drawSeek(ct){
+  SEEK_ROWS=computeRows();
+  const canvas=document.getElementById('seekCanvas');
+  const wrap=document.getElementById('seekWrap');
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  const W=wrap.clientWidth||320;
+  const trackW=W-LEFT_PAD-4;
+  const totalH=SEEK_ROWS*ROW_H;
+  canvas.width=W*dpr;canvas.height=totalH*dpr;
+  canvas.style.width=W+'px';canvas.style.height=totalH+'px';
+  const c=canvas.getContext('2d');c.scale(dpr,dpr);
+  c.fillStyle='#0d0d16';c.fillRect(0,0,W,totalH);
+
+  if(!duration){
+    c.fillStyle='#555577';c.font="11px sans-serif";c.textAlign='center';
+    c.fillText('ファイルを開いてください',W/2,totalH/2);c.textAlign='left';return;
+  }
+  const spr=duration/SEEK_ROWS; // seconds per row
+
+  for(let row=0;row<SEEK_ROWS;row++){
+    const rs=row*spr, re=(row+1)*spr;
+    const ry=row*ROW_H;
+    const lineY=ry+ROW_H*0.75; // line position in row
+
+    // time label
+    c.fillStyle='#4a4a66';
+    c.font="9px 'Space Mono',monospace";c.textAlign='right';
+    c.fillText(fmtShort(rs),LEFT_PAD-2,lineY+3);c.textAlign='left';
+
+    // track bar
+    const pf=ct<rs?0:ct>re?1:(ct-rs)/spr;
+    if(pf>0){c.fillStyle='#005f7a';c.fillRect(LEFT_PAD,lineY-1,trackW*pf,2);}
+    c.fillStyle='#1a2e3a';c.fillRect(LEFT_PAD+trackW*pf,lineY-1,trackW*(1-pf),2);
+
+    // silence overlay
+    for(const sr of silenceRegions){
+      if(sr.end<rs||sr.start>re)continue;
+      const s=Math.max(rs,sr.start),e=Math.min(re,sr.end);
+      const sx=LEFT_PAD+((s-rs)/spr)*trackW;
+      const ex=LEFT_PAD+((e-rs)/spr)*trackW;
+      c.fillStyle='rgba(255,64,129,.15)';c.fillRect(sx,ry+2,ex-sx,ROW_H-4);
+    }
+
+    // markers: ▼ sits ON the line (not floating above)
+    for(const m of markers){
+      if(m.time<rs||m.time>=re)continue;
+      const mx=LEFT_PAD+((m.time-rs)/spr)*trackW;
+      c.fillStyle='#ff4081';
+      // triangle centered on line
+      c.beginPath();
+      c.moveTo(mx-5,lineY-9);c.lineTo(mx+5,lineY-9);c.lineTo(mx,lineY-1);
+      c.fill();
+    }
+
+    // playhead: dot only (no vertical line)
+    if(ct>=rs&&ct<re){
+      const px=LEFT_PAD+((ct-rs)/spr)*trackW;
+      c.fillStyle='#00e5ff';
+      c.beginPath();c.arc(px,lineY,4,0,Math.PI*2);c.fill();
+    }
+  }
+}
+
+// Seek canvas interaction — also sync waveform
+function seekFromPos(cx,cy){
+  if(!duration)return;
+  const W=document.getElementById('seekWrap').clientWidth||320;
+  const trackW=W-LEFT_PAD-4;
+  const spr=duration/SEEK_ROWS;
+  const row=Math.floor(cy/ROW_H);
+  if(row<0||row>=SEEK_ROWS)return;
+  const frac=Math.max(0,Math.min(1,(cx-LEFT_PAD)/trackW));
+  const t=Math.max(0,Math.min(duration,(row+frac)*spr));
+  // sync waveform center to seeked position
+  zoomCenter=Math.max(1/(2*zoomLevel),Math.min(1-1/(2*zoomLevel),t/duration));
+  seekTo(t);
+}
+const seekCanvas=document.getElementById('seekCanvas');
+let seekDrag=false;
+function evXY(e){const r=seekCanvas.getBoundingClientRect();const s=e.touches?e.touches[0]:e;return{cx:s.clientX-r.left,cy:s.clientY-r.top};}
+seekCanvas.addEventListener('click',e=>{const{cx,cy}=evXY(e);seekFromPos(cx,cy);});
+seekCanvas.addEventListener('touchstart',e=>{seekDrag=true;e.preventDefault();const{cx,cy}=evXY(e);seekFromPos(cx,cy);},{passive:false});
+seekCanvas.addEventListener('touchmove',e=>{if(seekDrag){e.preventDefault();const{cx,cy}=evXY(e);seekFromPos(cx,cy);}},{passive:false});
+seekCanvas.addEventListener('touchend',()=>{seekDrag=false;});
+
+// ═══ WAVEFORM GESTURES ════════════════════════
+const waveArea=document.getElementById('waveArea');
+let pinching=false,lastPD=0,t0x=0,t0c=0,swipeMoved=false;
+waveArea.addEventListener('touchstart',e=>{
+  if(e.touches.length===2){pinching=true;lastPD=pd(e);e.preventDefault();}
+  else{t0x=e.touches[0].clientX;t0c=zoomCenter;swipeMoved=false;}
+},{passive:false});
+waveArea.addEventListener('touchmove',e=>{
+  if(e.touches.length===2&&pinching){
+    e.preventDefault();
+    const r=waveArea.getBoundingClientRect();
+    const cx=((e.touches[0].clientX+e.touches[1].clientX)/2-r.left)/r.width;
+    zoom(pd(e)/lastPD,cx);lastPD=pd(e);
+  }else if(e.touches.length===1&&!pinching){
+    e.preventDefault();swipeMoved=true;
+    const dx=e.touches[0].clientX-t0x;
+    const r=waveArea.getBoundingClientRect();
+    const hs=1/(2*zoomLevel);
+    zoomCenter=Math.max(hs,Math.min(1-hs,t0c+(-dx/r.width)/zoomLevel));
+    drawWave(audioEl.currentTime);
+  }
+},{passive:false});
+waveArea.addEventListener('touchend',e=>{if(e.touches.length<2)setTimeout(()=>{pinching=false;},80);});
+waveArea.addEventListener('click',e=>{
+  if(!duration||pinching||swipeMoved)return;
+  const r=waveArea.getBoundingClientRect();
+  const ratio=(e.clientX-r.left)/r.width;
+  const hs=1/(2*zoomLevel);
+  let sf=Math.max(0,zoomCenter-hs),ef=Math.min(1,zoomCenter+hs);
+  if(sf<0){ef-=sf;sf=0;}if(ef>1){sf-=ef-1;ef=1;}
+  seekTo((sf+ratio*(ef-sf))*duration);
+});
+waveArea.addEventListener('wheel',e=>{
+  e.preventDefault();
+  if(e.shiftKey){
+    const hs=1/(2*zoomLevel);
+    zoomCenter=Math.max(hs,Math.min(1-hs,zoomCenter+(e.deltaY>0?.05:-.05)/zoomLevel));
+    drawWave(audioEl.currentTime);
+  }else{
+    const r=waveArea.getBoundingClientRect();
+    zoom(e.deltaY>0?.8:1.25,(e.clientX-r.left)/r.width);
+  }
+},{passive:false});
+function pd(e){const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;return Math.sqrt(dx*dx+dy*dy);}
+function zoom(scale,cr){
+  const hs=1/(2*zoomLevel);
+  let sf=Math.max(0,zoomCenter-hs),ef=Math.min(1,zoomCenter+hs);
+  if(sf<0){ef-=sf;sf=0;}if(ef>1){sf-=ef-1;ef=1;}
+  const focal=sf+cr*(ef-sf);
+  const nz=Math.max(1,Math.min(200,zoomLevel*scale));
+  const nh=1/(2*nz);
+  zoomCenter=Math.max(nh,Math.min(1-nh,focal));
+  zoomLevel=nz;
+  document.getElementById('zoomInfo').textContent='×'+(nz>=10?nz.toFixed(0):nz.toFixed(1));
+  drawWave(audioEl.currentTime);
+}
+
+// ═══ PLAYBACK ═════════════════════════════════
+function curT(){return audioEl.currentTime||0;}
+function playAudio(){
+  if(!currentObjectURL)return;
+  audioEl.playbackRate=playbackRate; setPitch(audioEl);
+  const p=audioEl.play();
+  if(p)p.then(()=>{isPlaying=true;updatePlayBtn();loop();}).catch(e=>showToast('再生失敗:'+e.message));
+  else{isPlaying=true;updatePlayBtn();loop();}
+}
+function stopAudio(){
+  audioEl.pause();isPlaying=false;updatePlayBtn();cancelAnimationFrame(raf);
+  drawWave(curT());drawSeek(curT());updateTime(curT());
+}
+function seekTo(t){
+  if(!currentObjectURL)return;
+  const cl=Math.max(0,Math.min(duration||0,t));
+  audioEl.currentTime=cl;
+  if(!isPlaying){drawWave(cl);updateTime(cl);drawSeek(cl);}
+  highlightCurrentMarker(cl);
+}
+function loop(){
+  if(!isPlaying)return;
+  const t=curT();
+  drawWave(t);updateTime(t);drawSeek(t);
+  checkSilence(t);highlightCurrentMarker(t);
+  if(zoomLevel>1.5){
+    const f=duration>0?t/duration:0,hs=1/(2*zoomLevel);
+    if(f<zoomCenter-hs*.4||f>zoomCenter+hs*.4)
+      zoomCenter=Math.max(hs,Math.min(1-hs,f));
+  }
+  raf=requestAnimationFrame(loop);
+}
+function updatePlayBtn(){document.getElementById('playBtn').textContent=isPlaying?'⏸':'▶';}
+function updateTime(t){document.getElementById('timeDisp').textContent=fmtMs(t);}
+function checkSilence(t){
+  const el=document.getElementById('silInfo');
+  for(const sr of silenceRegions){
+    if(t>=sr.start&&t<=sr.end){el.textContent='■ '+sr.dur.toFixed(2)+'s';return;}
+    if(t>sr.end&&t-sr.end<1.5){el.textContent='無音'+sr.dur.toFixed(1)+'s通過';return;}
+  }
+  el.textContent='';
+}
+
+// ═══ CONTROLS ═════════════════════════════════
+document.getElementById('playBtn').addEventListener('click',()=>{if(!currentObjectURL)return;isPlaying?stopAudio():playAudio();});
+document.getElementById('backNBtn').addEventListener('click',()=>seekTo(curT()-skipSec));
+document.getElementById('fwdNBtn').addEventListener('click', ()=>seekTo(curT()+skipSec));
+document.getElementById('back01Btn').addEventListener('click',()=>seekTo(curT()-.1));
+document.getElementById('fwd01Btn').addEventListener('click', ()=>seekTo(curT()+.1));
+document.getElementById('fileHeadBtn').addEventListener('click',()=>seekTo(0));
+document.getElementById('fileTailBtn').addEventListener('click',()=>seekTo(duration));
+document.getElementById('prevMrkBtn').addEventListener('click',()=>{
+  const t=curT(),p=[...markers].filter(m=>m.time<t-.15).pop();
+  if(p){seekTo(p.time);}else showToast('前のマークなし');
+});
+document.getElementById('nextMrkBtn').addEventListener('click',()=>{
+  const t=curT(),n=markers.find(m=>m.time>t+.1);
+  if(n){seekTo(n.time);}else showToast('次のマークなし');
+});
+document.getElementById('skipSec').addEventListener('change',function(){
+  const v=parseInt(this.value);
+  if(!isNaN(v)&&v>=1&&v<=60){skipSec=v;document.getElementById('backLbl').textContent=v;document.getElementById('fwdLbl').textContent=v;}
+});
+document.getElementById('skipMinusBtn').addEventListener('click',()=>{
+  const v=Math.max(1,skipSec-1);
+  skipSec=v;document.getElementById('skipSec').value=v;
+  document.getElementById('backLbl').textContent=v;document.getElementById('fwdLbl').textContent=v;
+});
+document.getElementById('skipPlusBtn').addEventListener('click',()=>{
+  const v=Math.min(60,skipSec+1);
+  skipSec=v;document.getElementById('skipSec').value=v;
+  document.getElementById('backLbl').textContent=v;document.getElementById('fwdLbl').textContent=v;
+});
+
+// ═══ SPEED ════════════════════════════════════
+document.querySelectorAll('.spb').forEach(b=>{
+  b.addEventListener('click',()=>{setSpeed(parseFloat(b.dataset.speed));document.getElementById('customSpeed').value=b.dataset.speed;});
+});
+document.getElementById('customSpeed').addEventListener('change',e=>{
+  const v=parseFloat(e.target.value);if(!isNaN(v)&&v>=0.1&&v<=4.0)setSpeed(v);
+});
+function setSpeed(s){
+  playbackRate=s;
+  document.querySelectorAll('.spb').forEach(b=>b.classList.toggle('on',parseFloat(b.dataset.speed)===s));
+  audioEl.playbackRate=s;setPitch(audioEl);
+  document.getElementById('customSpeed').value=s;
+  showToast('×'+s);
+}
+
+// ═══ MARKERS ══════════════════════════════════
+function addMarker(){
+  if(!currentObjectURL)return;
+  const t=curT();saveHist();
+  markers.push({time:t,note:''});markers.sort((a,b)=>a.time-b.time);
+  renderMarkers();drawWave(t);drawSeek(t);
+  highlightCurrentMarker(t);
+  showToast('🔖 '+fmtMs(t));
+}
+function delMarker(i){saveHist();markers.splice(i,1);renderMarkers();drawWave(curT());drawSeek(curT());}
+function saveHist(){history.push(JSON.parse(JSON.stringify(markers)));redoStack=[];if(history.length>60)history.shift();}
+function undo(){if(!history.length)return;redoStack.push(JSON.parse(JSON.stringify(markers)));markers=history.pop();renderMarkers();drawWave(curT());drawSeek(curT());showToast('取消');}
+function redo(){if(!redoStack.length)return;history.push(JSON.parse(JSON.stringify(markers)));markers=redoStack.pop();renderMarkers();drawWave(curT());drawSeek(curT());showToast('やり直し');}
+
+function highlightCurrentMarker(t){
+  // find the last marker at or before t
+  let idx=-1;
+  for(let i=markers.length-1;i>=0;i--){if(markers[i].time<=t+0.05){idx=i;break;}}
+  if(idx===currentMarkerIdx)return;
+  currentMarkerIdx=idx;
+  // update list highlight
+  document.querySelectorAll('.mk-item').forEach((el,i)=>{
+    el.classList.toggle('current',i===idx);
+  });
+  // scroll into view
+  if(idx>=0){
+    const el=document.getElementById('mi'+idx);
+    if(el) el.scrollIntoView({block:'nearest',behavior:'smooth'});
+  }
+}
+
+function renderMarkers(){
+  const list=document.getElementById('markerList');
+  if(!markers.length){
+    list.innerHTML='<div class="mk-empty">マークなし<br><span style="font-size:9px;opacity:.5">🔖 または M キーで追加</span></div>';
+    return;
+  }
+  list.innerHTML=markers.map((m,i)=>`
+    <div class="mk-item" id="mi${i}" onclick="seekTo(${m.time})">
+      <span class="m-num">#${i+1}</span>
+      <span class="m-time">${fmtMs(m.time)}</span>
+      <input class="m-note" value="${esc(m.note)}" placeholder="メモ..."
+        onclick="event.stopPropagation()" onchange="markers[${i}].note=this.value">
+      <span class="m-del" onclick="event.stopPropagation();delMarker(${i})">×</span>
+    </div>`).join('');
+}
+document.getElementById('markBtn').addEventListener('click',addMarker);
+document.getElementById('undoBtn').addEventListener('click',undo);
+document.getElementById('redoBtn').addEventListener('click',redo);
+document.getElementById('clearAllBtn').addEventListener('click',()=>{
+  if(!markers.length)return;
+  if(confirm('全マーク削除?')){saveHist();markers=[];renderMarkers();drawWave(curT());drawSeek(curT());}
+});
+
+// ═══ EXPORT / IMPORT ══════════════════════════
+function exportMarkers(){
+  if(!markers.length){showToast('マークなし');return;}
+  const blob=new Blob([JSON.stringify({file:currentFileName,duration,markers},null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;
+  a.download=(currentFileName||'audio').replace(/\.[^.]+$/,'')+'_markers.json';
+  a.click();URL.revokeObjectURL(url);showToast('エクスポート完了');
+}
+document.getElementById('importData').addEventListener('change',function(){
+  const file=this.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(!Array.isArray(d.markers))throw 0;
+    saveHist();markers=d.markers;renderMarkers();drawWave(curT());drawSeek(curT());showToast('インポート'+markers.length+'件');}
+    catch{showToast('失敗');}};
+  r.readAsText(file);this.value='';
+});
+
+// ═══ KEYBOARD ═════════════════════════════════
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  switch(e.key){
+    case ' ':e.preventDefault();isPlaying?stopAudio():playAudio();break;
+    case 'm':case 'M':addMarker();break;
+    case 'j':case 'J':seekTo(curT()-skipSec);break;
+    case 'l':case 'L':seekTo(curT()+skipSec);break;
+    case 'ArrowLeft':e.shiftKey?document.getElementById('prevMrkBtn').click():seekTo(curT()-10);break;
+    case 'ArrowRight':e.shiftKey?document.getElementById('nextMrkBtn').click():seekTo(curT()+10);break;
+    case 'z':case 'Z':if(e.ctrlKey||e.metaKey)undo();break;
+    case 'y':case 'Y':if(e.ctrlKey||e.metaKey)redo();break;
+    case '[':setSpeed(Math.max(0.1,+(playbackRate-.1).toFixed(2)));break;
+    case ']':setSpeed(Math.min(4.0,+(playbackRate+.1).toFixed(2)));break;
+    case '+':case '=':zoom(1.25,.5);break;
+    case '-':zoom(.8,.5);break;
+    case 'n':case 'N':nextFile();break;
+    case 'p':case 'P':prevFile();break;
+  }
+});
+
+// ═══ HELPERS ══════════════════════════════════
+function fmtMs(s){
+  if(!isFinite(s)||s<0)return '--:--:--';
+  const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=Math.floor(s%60),ms=Math.floor((s%1)*10);
+  return `${p2(h)}:${p2(m)}:${p2(sc)}.${ms}`;
+}
+function fmtShort(s){
+  if(!isFinite(s)||s<0)return '--:--';
+  const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=Math.floor(s%60);
+  return h>0?`${h}:${p2(m)}:${p2(sc)}`:`${p2(m)}:${p2(sc)}`;
+}
+function p2(n){return String(n).padStart(2,'0');}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;');}
+let lTimer=null;
+function showLoad(on){
+  const b=document.getElementById('loadBar');b.style.width=on?'65%':'100%';
+  clearTimeout(lTimer);if(!on)lTimer=setTimeout(()=>{b.style.width='0%';},350);
+}
+let tTimer=null;
+function showToast(msg){
+  const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');
+  clearTimeout(tTimer);tTimer=setTimeout(()=>el.classList.remove('show'),2000);
+}
+window.addEventListener('resize',()=>{drawWave(curT());drawSeek(curT());});
+// init
+drawWave(0);renderMarkers();drawSeek(0);
+</script>
+</body>
+</html>
