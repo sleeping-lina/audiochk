@@ -133,8 +133,8 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   <span class="logo">AUDIOCHK</span>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
-    <canvas class="cbtn" id="folderBtn" width="32" height="28"></canvas>
-    <canvas class="cbtn" id="fileBtn" width="32" height="28"></canvas>
+    <canvas class="cbtn" id="folderBtn" width="32" height="28" data-w="32" data-h="28"></canvas>
+    <canvas class="cbtn" id="fileBtn" width="32" height="28" data-w="32" data-h="28"></canvas>
   </div>
   <input type="file" id="fileInput" accept=".mp3,.m4a,.aac,.wav,.ogg,.flac,.opus,.caf,audio/mpeg,audio/mp4,audio/x-m4a,audio/aac,audio/wav,audio/ogg,audio/flac,audio/opus">
   <input type="file" id="folderInput" webkitdirectory multiple>
@@ -188,18 +188,18 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 </div>
 <div class="ctrl-wrap">
   <div class="crow">
-    <canvas class="cbtn" id="btnUndo" width="56" height="44"></canvas>
-    <canvas class="cbtn" id="btnMark" width="80" height="44"></canvas>
-    <canvas class="cbtn" id="btnRedo" width="56" height="44"></canvas>
+    <canvas class="cbtn" id="btnUndo" width="56" height="44" data-w="56" data-h="44"></canvas>
+    <canvas class="cbtn" id="btnMark" width="80" height="44" data-w="80" data-h="44"></canvas>
+    <canvas class="cbtn" id="btnRedo" width="56" height="44" data-w="56" data-h="44"></canvas>
   </div>
   <div class="crow">
-    <canvas class="cbtn" id="btnHeadTail0" width="44" height="44"></canvas>
-    <canvas class="cbtn" id="btnBack01" width="34" height="34"></canvas>
-    <canvas class="cbtn" id="btnBackN" width="44" height="44"></canvas>
-    <canvas class="cbtn" id="btnPlay" width="56" height="56"></canvas>
-    <canvas class="cbtn" id="btnFwdN" width="44" height="44"></canvas>
-    <canvas class="cbtn" id="btnFwd01" width="34" height="34"></canvas>
-    <canvas class="cbtn" id="btnHeadTail1" width="44" height="44"></canvas>
+    <canvas class="cbtn" id="btnHeadTail0" width="44" height="44" data-w="44" data-h="44"></canvas>
+    <canvas class="cbtn" id="btnBack01" width="34" height="34" data-w="34" data-h="34"></canvas>
+    <canvas class="cbtn" id="btnBackN" width="44" height="44" data-w="44" data-h="44"></canvas>
+    <canvas class="cbtn" id="btnPlay" width="56" height="56" data-w="56" data-h="56"></canvas>
+    <canvas class="cbtn" id="btnFwdN" width="44" height="44" data-w="44" data-h="44"></canvas>
+    <canvas class="cbtn" id="btnFwd01" width="34" height="34" data-w="34" data-h="34"></canvas>
+    <canvas class="cbtn" id="btnHeadTail1" width="44" height="44" data-w="44" data-h="44"></canvas>
   </div>
 </div>
 <div class="skip-row">
@@ -323,27 +323,46 @@ async function load(file){
 
 async function buildWaveform(file){
   if(curFileName!==file.name) return;
-  const ab=await file.arrayBuffer();
+
+  // Limit decode size to prevent OOM on long files.
+  // At 128kbps MP3: 1MB ≈ 62s, 10MB ≈ 620s (~10min)
+  // We decode up to 10MB which covers ~10min; for longer files
+  // the waveform covers only the first portion but silence detection still works.
+  const MAX_DECODE = 10 * 1024 * 1024; // 10 MB
+  const slice = file.size > MAX_DECODE ? file.slice(0, MAX_DECODE) : file;
+  const decodedFraction = Math.min(1, slice.size / file.size);
+
+  let ab;
+  try { ab = await slice.arrayBuffer(); }
+  catch(e) { return; }
   if(curFileName!==file.name) return;
+
   let actx=new(window.AudioContext||window.webkitAudioContext)();
   let buf=null;
   try{ buf=await actx.decodeAudioData(ab); }
-  finally{ actx.close().catch(()=>{}); actx=null; }
+  catch(e){ /* decode failed */ }
+  finally{ actx.close().catch(()=>{}); actx=null; ab=null; }
   if(!buf||curFileName!==file.name) return;
+
   const ch=buf.getChannelData(0), total=ch.length;
-  const step=Math.max(1,Math.floor(total/WSAMP));
-  waveData=new Float32Array(WSAMP);
-  for(let i=0;i<WSAMP;i++){
+  // Number of waveform points for decoded portion
+  const decodedPts = Math.floor(WSAMP * decodedFraction);
+  const step=Math.max(1,Math.floor(total/decodedPts));
+  waveData=new Float32Array(WSAMP); // rest stays 0
+  for(let i=0;i<decodedPts;i++){
     let mx=0,b=i*step;
     for(let j=0;j<step&&b+j<total;j++){ const v=Math.abs(ch[b+j]); if(v>mx)mx=v; }
     waveData[i]=mx;
   }
   buf=null;
-  // silence detection
+
+  // Silence detection on decoded portion
   silReg=[];
-  const sps=duration/WSAMP; let ss=null;
-  for(let i=0;i<=WSAMP;i++){
-    const sil=i<WSAMP&&waveData[i]<SIL_THRESH;
+  const decodedDur = buf===null ? (decodedFraction*duration) : buf?.duration || (decodedFraction*duration);
+  const sps = (decodedFraction*duration) / decodedPts;
+  let ss=null;
+  for(let i=0;i<=decodedPts;i++){
+    const sil=i<decodedPts&&waveData[i]<SIL_THRESH;
     if(sil){if(ss===null)ss=i;}
     else if(ss!==null){ const d=(i-ss)*sps; if(d>=SIL_MIN)silReg.push({start:ss*sps,end:i*sps,dur:d}); ss=null; }
   }
@@ -719,7 +738,9 @@ function circle(c,x,y,r,fill,stroke,sw){
 
 function drawBtn(id){
   const cv=document.getElementById(id); if(!cv)return;
-  const W=parseInt(cv.getAttribute('width')), H=parseInt(cv.getAttribute('height'));
+  // Use data-w/data-h for logical size — never read cv.width which changes with dpr
+  const W=parseInt(cv.dataset.w||cv.getAttribute('data-w')||'44');
+  const H=parseInt(cv.dataset.h||cv.getAttribute('data-h')||'44');
   const dpr=Math.min(window.devicePixelRatio||1,2);
   cv.width=W*dpr; cv.height=H*dpr; cv.style.width=W+'px'; cv.style.height=H+'px';
   const c=cv.getContext('2d'); c.scale(dpr,dpr);
