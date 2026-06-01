@@ -31,10 +31,6 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
 .wave-wrap{position:relative;background:var(--sf);border-bottom:1px solid var(--bd);
   flex-shrink:0;touch-action:none;user-select:none;-webkit-user-select:none}
 #waveCanvas{display:block;width:100%;height:72px}
-.wave-zoom-btns{position:absolute;left:4px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:3px;z-index:5}
-.wzb{width:26px;height:26px;background:rgba(19,19,26,.88);border:1px solid var(--bd);border-radius:6px;
-  color:var(--ac);font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;-webkit-user-select:none}
-.wzb:active{background:rgba(0,229,255,.2)}
 /* info */
 .info{display:flex;align-items:center;gap:4px;padding:2px 8px;background:var(--s2);
   border-bottom:1px solid var(--bd);font-family:'Space Mono',monospace;font-size:10px;flex-shrink:0}
@@ -60,38 +56,21 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
 
 /* speed */
 .spd-section{flex-shrink:0;background:var(--sf);border-bottom:1px solid var(--bd)}
-.spd-header{display:flex;align-items:center;padding:3px 8px;cursor:pointer;gap:6px}
-.spd-lbl{font-family:'Space Mono',monospace;font-size:9px;color:var(--dm);letter-spacing:1px}
-.spd-cur{font-family:'Space Mono',monospace;font-size:11px;color:var(--ac);font-weight:700}
-.spd-arrow{font-size:9px;color:var(--dm);transition:transform .2s;margin-left:auto}
-.spd-arrow.open{transform:rotate(180deg)}
-.spd-body{max-height:0;overflow:hidden;transition:max-height .2s}
-.spd-body.open{max-height:90px}
-.spd-inner{padding:3px 8px 5px}
+.spd-inner2{padding:4px 8px 5px}
 .spd-row{display:flex;gap:3px;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .spd-row::-webkit-scrollbar{display:none}
-.spb{background:var(--s2);border:1px solid var(--bd);border-radius:4px;color:var(--dm);
-  font-family:'Space Mono',monospace;font-size:10px;padding:4px 6px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.spb{position:relative;background:var(--s2);border:1px solid var(--bd);border-radius:4px;color:var(--dm);
+  font-family:'Space Mono',monospace;font-size:10px;padding:5px 6px 10px;cursor:pointer;white-space:nowrap;flex-shrink:0;min-width:38px;text-align:center}
 .spb.on{background:var(--ac);color:#000;border-color:var(--ac);font-weight:700}
-.spb.sc0{box-shadow:inset 0 0 0 2px rgba(255,64,129,.6)}
-.spb.sc1{box-shadow:inset 0 0 0 2px rgba(105,255,71,.6)}
-.spb.sc2{box-shadow:inset 0 0 0 2px rgba(255,200,0,.6)}
 .spb:active{opacity:.7}
+.sc-num{position:absolute;bottom:2px;right:4px;font-size:7px;color:var(--dm);font-family:'Space Mono',monospace;line-height:1}
+.spb.on .sc-num{color:rgba(0,0,0,.5)}
 .spcust{display:flex;align-items:center;gap:2px;flex-shrink:0;margin-left:3px}
 .spcust label{font-size:9px;color:var(--dm)}
 #customSpeed{width:38px;background:var(--s2);border:1px solid var(--bd);border-radius:4px;
   color:var(--tx);font-family:'Space Mono',monospace;font-size:10px;padding:2px 3px;text-align:center}
-.sc-row{display:flex;align-items:center;gap:4px;margin-top:4px}
-.sc-row label{font-family:'Space Mono',monospace;font-size:9px;color:var(--dm);white-space:nowrap}
-.sc-btn{flex:1;background:var(--s2);border:1px solid var(--bd);border-radius:4px;
-  color:var(--tx);font-family:'Space Mono',monospace;font-size:10px;padding:4px;cursor:pointer;text-align:center;white-space:nowrap}
-.sc-btn.sc0{border-color:rgba(255,64,129,.7);color:rgba(255,130,160,1)}
-.sc-btn.sc1{border-color:rgba(105,255,71,.7);color:rgba(130,255,100,1)}
-.sc-btn.sc2{border-color:rgba(255,200,0,.7);color:rgba(255,210,60,1)}
-.sc-btn:active{opacity:.6}
-.sc-set-btn{background:var(--s2);border:1px solid var(--bd);border-radius:4px;color:var(--dm);
-  font-family:'Space Mono',monospace;font-size:9px;padding:4px 7px;cursor:pointer;white-space:nowrap;flex-shrink:0}
-.sc-set-btn:active{opacity:.6}
+.sil-arrow{font-size:9px;color:var(--dm);margin-left:auto;transition:transform .2s}
+.sil-arrow.open{transform:rotate(180deg)}
 /* controls */
 .ctrl-wrap{flex-shrink:0;background:var(--sf);border-bottom:1px solid var(--bd);padding:5px 8px}
 .crow{display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:4px}
@@ -156,10 +135,6 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="playlist"></div>
 <div class="wave-wrap" id="waveArea">
   <canvas id="waveCanvas"></canvas>
-  <div class="wave-zoom-btns">
-    <div class="wzb" id="wzoomIn">+</div>
-    <div class="wzb" id="wzoomOut">−</div>
-  </div>
 </div>
 <div class="info">
   <span id="timeDisp">00:00:00.0</span>
@@ -174,7 +149,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   <div class="sil-header" id="silHeader">
     <span class="sil-lbl">SILENCE DETECT</span>
     <span class="sil-status" id="silStatus">停止中</span>
-    <span class="spd-arrow" id="silArrow">▲</span>
+    <span class="sil-arrow" id="silArrow">▼</span>
   </div>
   <div class="spd-body" id="silBody">
     <div class="spd-inner">
@@ -203,30 +178,16 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   </div>
 </div>
 <div class="spd-section">
-  <div class="spd-header" id="spdHeader">
-    <span class="spd-lbl">SPEED</span>
-    <span class="spd-cur" id="spdCur">×1.0</span>
-    <span class="spd-arrow" id="spdArrow">▲</span>
-  </div>
-  <div class="spd-body" id="spdBody">
-    <div class="spd-inner">
-      <div class="spd-row">
-        <button class="spb" data-speed="0.5">×0.5</button>
-        <button class="spb" data-speed="0.75">×0.75</button>
-        <button class="spb on" data-speed="1.0">×1.0</button>
-        <button class="spb" data-speed="1.25">×1.25</button>
-        <button class="spb" data-speed="1.5">×1.5</button>
-        <button class="spb" data-speed="2.0">×2.0</button>
-        <div class="spcust"><label>×</label>
-          <input type="number" id="customSpeed" value="1.0" min="0.1" max="4.0" step="0.05">
-        </div>
-      </div>
-      <div class="sc-row">
-        <label>SC:</label>
-        <div class="sc-btn sc0" id="sc0">×0.5</div>
-        <div class="sc-btn sc1" id="sc1">×1.0</div>
-        <div class="sc-btn sc2" id="sc2">×1.5</div>
-        <div class="sc-set-btn" id="scSetBtn">SET</div>
+  <div class="spd-inner2">
+    <div class="spd-row">
+      <button class="spb" data-speed="0.5" data-sc="1">×0.5<span class="sc-num">1</span></button>
+      <button class="spb" data-speed="0.75" data-sc="2">×0.75<span class="sc-num">2</span></button>
+      <button class="spb on" data-speed="1.0" data-sc="3">×1.0<span class="sc-num">3</span></button>
+      <button class="spb" data-speed="1.25" data-sc="4">×1.25<span class="sc-num">4</span></button>
+      <button class="spb" data-speed="1.5" data-sc="5">×1.5<span class="sc-num">5</span></button>
+      <button class="spb" data-speed="2.0" data-sc="6">×2.0<span class="sc-num">6</span></button>
+      <div class="spcust"><label>×</label>
+        <input type="number" id="customSpeed" value="1.0" min="0.1" max="4.0" step="0.05">
       </div>
     </div>
   </div>
@@ -287,8 +248,6 @@ let raf=null;
 let playlist=[], plIdx=-1, skipSec=5;
 let zoomLv=5.0, zoomCtr=0.1;
 let curMkIdx=-1;
-let scSpeeds=[0.5,1.0,1.5];
-let scAssigning=-1;
 const LP=44, RH=22;
 let ROWS=10;
 const WSAMP=1800, SIL_THRESH=0.015, SIL_MIN=0.3;
@@ -299,12 +258,11 @@ audioEl.addEventListener('error',()=>showToast('エラー code='+(audioEl.error?
 // ── LocalStorage ───────────────────────────────
 const LS_PREFS='ac_prefs3';
 function savePrefs(){
-  try{ localStorage.setItem(LS_PREFS,JSON.stringify({scSpeeds,skipSec,playbackRate})); }catch(e){}
+  try{ localStorage.setItem(LS_PREFS,JSON.stringify({skipSec,playbackRate})); }catch(e){}
 }
 function loadPrefs(){
   try{
     const p=JSON.parse(localStorage.getItem(LS_PREFS)||'{}');
-    if(p.scSpeeds?.length===3) scSpeeds=p.scSpeeds;
     if(p.skipSec>0){ skipSec=p.skipSec; document.getElementById('skipSec').value=skipSec; updateSkipLabels(); }
     if(p.playbackRate>0) playbackRate=p.playbackRate;
   }catch(e){}
@@ -435,38 +393,67 @@ function rtLoop(){
   requestAnimationFrame(rtLoop);
 }
 
-// ── Live waveform overlay (drawn on top of block wave) ────────
+// ── Live waveform: bars scroll left, fixed detection line on right ──
+// Layout: historical levels scroll from right to left.
+// A fixed vertical line at 75% from left = "now" (current detection point).
+// Right side (25%) shows a small lookahead buffer.
+const LIVE_LINE_X = 0.75; // detection line position as fraction of width
+
 function drawLiveWave(){
   if(!isPlaying||!waReady) return;
   const cv=document.getElementById('waveCanvas'), wa=document.getElementById('waveArea');
   const dpr=Math.min(window.devicePixelRatio||1,2), W=wa.clientWidth||320, H=72;
-  // draw over existing wave
   const c=cv.getContext('2d');
-  // clear just the top half for live bars
   c.clearRect(0,0,W,H);
-  // redraw background
   c.fillStyle='#0d0d16'; c.fillRect(0,0,W,H);
-  const mid=H/2, bw=W/RT_LEVELS;
+  const mid=H/2;
+  // silence region background (from silReg)
+  const ct=audioEl.currentTime;
+  const visibleSec=(RT_LEVELS/60)*1.5; // approx seconds visible
+  const tPerPx=visibleSec/W;
+  for(const sr of silReg){
+    const relS=sr.start-ct, relE=sr.end-ct;
+    const sx=(LIVE_LINE_X+(relS/visibleSec))*W;
+    const ex=(LIVE_LINE_X+(relE/visibleSec))*W;
+    if(ex<0||sx>W) continue;
+    c.fillStyle='rgba(255,64,129,.15)';
+    c.fillRect(Math.max(0,sx),0,Math.min(W,ex)-Math.max(0,sx),H);
+  }
   // threshold lines
-  const ty=mid-Math.min(mid-2, silThr*6*mid);
-  c.strokeStyle='rgba(255,64,129,.3)'; c.lineWidth=1;
-  c.beginPath(); c.moveTo(0,ty); c.lineTo(W,ty); c.moveTo(0,H-ty); c.lineTo(W,H-ty); c.stroke();
-  // bars
+  const thrH=Math.min(mid-2, silThr*8*mid);
+  c.strokeStyle='rgba(255,64,129,.35)'; c.lineWidth=1;
+  c.beginPath(); c.moveTo(0,mid-thrH); c.lineTo(W,mid-thrH);
+  c.moveTo(0,mid+thrH); c.lineTo(W,mid+thrH); c.stroke();
+  // bars: newest = at LIVE_LINE_X, older = further left
+  const bw=Math.max(1,(W*LIVE_LINE_X)/RT_LEVELS);
   for(let i=0;i<RT_LEVELS;i++){
-    const idx=(rtLevelIdx+i)%RT_LEVELS;
-    const v=Math.min(1,rtLevels[idx]*6), h=v*mid;
-    c.fillStyle=rtLevels[idx]<silThr?'rgba(255,64,129,.55)':'rgba(0,229,255,.7)';
-    c.fillRect(i*bw, mid-h, Math.max(1,bw-0.5), h*2||1);
+    // i=RT_LEVELS-1 is newest, i=0 is oldest
+    const age=RT_LEVELS-1-i; // 0=newest
+    const x=(LIVE_LINE_X*W)-(age+1)*bw;
+    if(x+bw<0) continue;
+    const dataIdx=(rtLevelIdx-1-age+RT_LEVELS*10)%RT_LEVELS;
+    const rms=rtLevels[dataIdx];
+    const h=Math.min(mid,rms*8*mid)||1;
+    c.fillStyle=rms<silThr?'rgba(255,64,129,.65)':'rgba(0,229,255,.75)';
+    c.fillRect(x, mid-h, bw-0.5, h*2);
   }
   c.fillStyle='#2a2a3d'; c.fillRect(0,mid-.5,W,1);
-  // markers
-  const{sf,ef}=getZoomWin();
-  const startT=sf*duration, span=(ef-sf)*duration;
+  // detection line (fixed vertical) — "now"
+  const lineX=LIVE_LINE_X*W;
+  c.strokeStyle='rgba(0,229,255,.9)'; c.lineWidth=2;
+  c.beginPath(); c.moveTo(lineX,0); c.lineTo(lineX,H); c.stroke();
+  // "now" triangle
+  c.fillStyle='rgba(0,229,255,.9)';
+  c.beginPath(); c.moveTo(lineX-4,0); c.lineTo(lineX+4,0); c.lineTo(lineX,6); c.fill();
+  // markers relative to current time (recent ones visible)
   for(const m of markers){
-    if(m.time<startT||m.time>startT+span) continue;
-    const mx=((m.time-startT)/span)*W;
-    c.strokeStyle='#ff4081'; c.lineWidth=1.5; c.beginPath(); c.moveTo(mx,0); c.lineTo(mx,H); c.stroke();
-    c.fillStyle='#ff4081'; c.beginPath(); c.moveTo(mx-3,0); c.lineTo(mx+3,0); c.lineTo(mx,6); c.fill();
+    const relT=m.time-ct;
+    const mx=lineX+(relT/visibleSec)*W;
+    if(mx<0||mx>W) continue;
+    c.strokeStyle='#ff4081'; c.lineWidth=1.5;
+    c.beginPath(); c.moveTo(mx,0); c.lineTo(mx,H); c.stroke();
+    c.fillStyle='#ff4081';
+    c.beginPath(); c.moveTo(mx-3,0); c.lineTo(mx+3,0); c.lineTo(mx,6); c.fill();
   }
 }
 
@@ -635,8 +622,7 @@ function doZoom(scale,cr){
   document.getElementById('zoomInfo').textContent='×'+(nz>=10?nz.toFixed(0):nz.toFixed(1));
   drawWave(audioEl.currentTime);
 }
-document.getElementById('wzoomIn').addEventListener('click',()=>doZoom(1.4,.5));
-document.getElementById('wzoomOut').addEventListener('click',()=>doZoom(1/1.4,.5));
+
 
 // ── Playback ──────────────────────────────────
 function curT(){return audioEl.currentTime||0;}
@@ -713,42 +699,22 @@ function updateSkipLabels(){
 }
 
 // ── Speed ──────────────────────────────────────
-document.getElementById('spdHeader').addEventListener('click',()=>{
-  const b=document.getElementById('spdBody'),a=document.getElementById('spdArrow');
-  b.classList.toggle('open'); a.classList.toggle('open',b.classList.contains('open'));
-});
+// Speed buttons — simple, no SC panel
 document.querySelectorAll('.spb').forEach(b=>{
-  b.addEventListener('click',()=>{
-    if(scAssigning>=0){ scSpeeds[scAssigning]=parseFloat(b.dataset.speed); updateScBtns(); savePrefs(); showToast('SC'+(scAssigning+1)+'=×'+b.dataset.speed); scAssigning=-1; document.getElementById('scSetBtn').textContent='SET'; document.querySelectorAll('.spb').forEach(x=>x.style.outline=''); return; }
-    setSpd(parseFloat(b.dataset.speed));
-  });
+  b.addEventListener('click',()=>setSpd(parseFloat(b.dataset.speed)));
 });
-document.getElementById('customSpeed').addEventListener('change',e=>{const v=parseFloat(e.target.value);if(!isNaN(v)&&v>=0.1&&v<=4.0)setSpd(v);});
-for(let i=0;i<3;i++){
-  document.getElementById('sc'+i).addEventListener('click',(()=>{const idx=i;return()=>{if(scAssigning>=0){showToast('速度ボタンを選んでください');return;}setSpd(scSpeeds[idx]);};})());
-}
-document.getElementById('scSetBtn').addEventListener('click',()=>{
-  if(scAssigning>=0){scAssigning=-1;document.getElementById('scSetBtn').textContent='SET';document.querySelectorAll('.spb').forEach(x=>x.style.outline='');showToast('キャンセル');return;}
-  const slot=prompt('SCスロット番号 (1, 2, 3)'); const idx=parseInt(slot)-1;
-  if(idx<0||idx>2||isNaN(idx)){showToast('キャンセル');return;}
-  scAssigning=idx; document.getElementById('scSetBtn').textContent='取消';
-  document.querySelectorAll('.spb').forEach(x=>x.style.outline='2px solid rgba(0,229,255,.5)');
-  showToast('SC'+(idx+1)+'に割り当てる速度を選択');
+document.getElementById('customSpeed').addEventListener('change',e=>{
+  const v=parseFloat(e.target.value); if(!isNaN(v)&&v>=0.1&&v<=4.0) setSpd(v);
 });
+// Shortcut keys 1-6 mapped to the 6 speed buttons in order
+const SPD_BUTTONS=()=>Array.from(document.querySelectorAll('.spb[data-speed]'));
 function setSpd(s){
-  playbackRate=s; audioEl.playbackRate=s; setPitch(audioEl);
+  playbackRate=s;
+  audioEl.playbackRate=s; setPitch(audioEl);
   document.querySelectorAll('.spb').forEach(b=>b.classList.toggle('on',parseFloat(b.dataset.speed)===s));
   document.getElementById('customSpeed').value=s;
-  const label='×'+(Number.isInteger(s)?s.toFixed(1):s);
-  document.getElementById('spdCur').textContent=label;
-  updateScHighlight(); showToast(label); savePrefs();
-}
-function updateScBtns(){
-  for(let i=0;i<3;i++){ const s=scSpeeds[i]; document.getElementById('sc'+i).textContent='×'+(Number.isInteger(s)?s.toFixed(1):s); }
-  updateScHighlight();
-}
-function updateScHighlight(){
-  document.querySelectorAll('.spb').forEach(b=>{ b.classList.remove('sc0','sc1','sc2'); for(let i=0;i<3;i++) if(parseFloat(b.dataset.speed)===scSpeeds[i])b.classList.add('sc'+i); });
+  showToast('×'+(Number.isInteger(s)?s.toFixed(1):s));
+  savePrefs();
 }
 
 // ── Markers ───────────────────────────────────
@@ -819,9 +785,10 @@ document.addEventListener('keydown',e=>{
     case ']':setSpd(Math.min(4.0,+(playbackRate+.1).toFixed(2)));break;
     case '+':case '=':doZoom(1.25,.5);break;
     case '-':doZoom(.8,.5);break;
-    case '1':setSpd(scSpeeds[0]);break;
-    case '2':setSpd(scSpeeds[1]);break;
-    case '3':setSpd(scSpeeds[2]);break;
+    case '1':case '2':case '3':case '4':case '5':case '6':{
+      const btns=SPD_BUTTONS(); const idx=parseInt(e.key)-1;
+      if(btns[idx]) setSpd(parseFloat(btns[idx].dataset.speed)); break;
+    }
     case 'n':case 'N':nextFile();break;
     case 'p':case 'P':prevFile();break;
   }
@@ -995,7 +962,9 @@ window.addEventListener('resize',()=>{drawWave(curT());drawSeek(curT());drawAllB
 // ── Silence detection UI wiring ───────────────
 document.getElementById('silHeader').addEventListener('click',()=>{
   const b=document.getElementById('silBody'), a=document.getElementById('silArrow');
-  b.classList.toggle('open'); a.classList.toggle('open',b.classList.contains('open'));
+  const opening=b.classList.toggle('open');
+  // ▼ = closed (click to open), ▲ = open (click to close)
+  a.textContent=opening?'▲':'▼';
 });
 document.getElementById('silThr').addEventListener('input',function(){
   silThr=parseFloat(this.value);
@@ -1011,12 +980,10 @@ document.getElementById('silAutoMark').addEventListener('change',function(){
 
 // ── Init ──────────────────────────────────────
 loadPrefs();
-updateScBtns();
 // apply loaded speed silently
 audioEl.playbackRate=playbackRate; setPitch(audioEl);
 document.querySelectorAll('.spb').forEach(b=>b.classList.toggle('on',parseFloat(b.dataset.speed)===playbackRate));
 document.getElementById('customSpeed').value=playbackRate;
-document.getElementById('spdCur').textContent='×'+(Number.isInteger(playbackRate)?playbackRate.toFixed(1):playbackRate);
 drawAllBtns();
 drawWave(0); drawSeek(0); renderMarkers();
 </script>
