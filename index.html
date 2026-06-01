@@ -69,8 +69,9 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
 .spcust label{font-size:9px;color:var(--dm)}
 #customSpeed{width:38px;background:var(--s2);border:1px solid var(--bd);border-radius:4px;
   color:var(--tx);font-family:'Space Mono',monospace;font-size:10px;padding:2px 3px;text-align:center}
-.sil-arrow{font-size:9px;color:var(--dm);margin-left:auto;transition:transform .2s}
-.sil-arrow.open{transform:rotate(180deg)}
+.sil-arrow{font-size:9px;color:var(--dm);margin-left:auto}
+.sil-body{max-height:0;overflow:hidden;transition:max-height .25s}
+.sil-body.open{max-height:140px}
 /* controls */
 .ctrl-wrap{flex-shrink:0;background:var(--sf);border-bottom:1px solid var(--bd);padding:5px 8px}
 .crow{display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:4px}
@@ -151,7 +152,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
     <span class="sil-status" id="silStatus">停止中</span>
     <span class="sil-arrow" id="silArrow">▼</span>
   </div>
-  <div class="spd-body" id="silBody">
+  <div class="sil-body" id="silBody">
     <div class="spd-inner">
       <div class="sil-row">
         <span class="sil-ctl-lbl">感度（閾値）</span>
@@ -393,63 +394,72 @@ function rtLoop(){
   requestAnimationFrame(rtLoop);
 }
 
-// ── Live waveform: bars scroll left, fixed detection line on right ──
-// Layout: historical levels scroll from right to left.
-// A fixed vertical line at 75% from left = "now" (current detection point).
-// Right side (25%) shows a small lookahead buffer.
-const LIVE_LINE_X = 0.75; // detection line position as fraction of width
+// ── Live waveform ────────────────────────────────────────────
+// Center line fixed at W/2 = "now".
+// Bars flow right→left: newest bar touches the center line from left.
+// visibleSec = how many seconds fit in the left half (history).
+const RT_SEC = 8; // seconds of history shown on left side
 
 function drawLiveWave(){
   if(!isPlaying||!waReady) return;
   const cv=document.getElementById('waveCanvas'), wa=document.getElementById('waveArea');
   const dpr=Math.min(window.devicePixelRatio||1,2), W=wa.clientWidth||320, H=72;
+  // resize if needed
+  if(cv.width!==W*dpr){ cv.width=W*dpr; cv.height=H*dpr; cv.style.width=W+'px'; cv.style.height=H+'px'; }
   const c=cv.getContext('2d');
-  c.clearRect(0,0,W,H);
+  c.setTransform(dpr,0,0,dpr,0,0);
   c.fillStyle='#0d0d16'; c.fillRect(0,0,W,H);
-  const mid=H/2;
-  // silence region background (from silReg)
+  const mid=H/2, lineX=W/2;
+
+  // Silence regions: map past silences relative to current time
+  // Left half = past RT_SEC seconds, right half = future (empty)
   const ct=audioEl.currentTime;
-  const visibleSec=(RT_LEVELS/60)*1.5; // approx seconds visible
-  const tPerPx=visibleSec/W;
+  const secPerPx=RT_SEC/(W/2); // seconds per pixel on left side
   for(const sr of silReg){
     const relS=sr.start-ct, relE=sr.end-ct;
-    const sx=(LIVE_LINE_X+(relS/visibleSec))*W;
-    const ex=(LIVE_LINE_X+(relE/visibleSec))*W;
-    if(ex<0||sx>W) continue;
-    c.fillStyle='rgba(255,64,129,.15)';
-    c.fillRect(Math.max(0,sx),0,Math.min(W,ex)-Math.max(0,sx),H);
+    // past is negative relT → left of center
+    const sx=lineX + relS/secPerPx;
+    const ex=lineX + relE/secPerPx;
+    if(ex<0||sx>lineX) continue; // only draw past (left of center)
+    c.fillStyle='rgba(255,64,129,.08)'; // very subtle
+    c.fillRect(Math.max(0,sx),0,Math.min(lineX,ex)-Math.max(0,sx),H);
   }
-  // threshold lines
+
+  // Threshold lines (horizontal)
   const thrH=Math.min(mid-2, silThr*8*mid);
-  c.strokeStyle='rgba(255,64,129,.35)'; c.lineWidth=1;
+  c.strokeStyle='rgba(255,64,129,.25)'; c.lineWidth=1;
   c.beginPath(); c.moveTo(0,mid-thrH); c.lineTo(W,mid-thrH);
   c.moveTo(0,mid+thrH); c.lineTo(W,mid+thrH); c.stroke();
-  // bars: newest = at LIVE_LINE_X, older = further left
-  const bw=Math.max(1,(W*LIVE_LINE_X)/RT_LEVELS);
-  for(let i=0;i<RT_LEVELS;i++){
-    // i=RT_LEVELS-1 is newest, i=0 is oldest
-    const age=RT_LEVELS-1-i; // 0=newest
-    const x=(LIVE_LINE_X*W)-(age+1)*bw;
+
+  // Bars: newest at center, older further left
+  // Each bar = RT_SEC/RT_LEVELS seconds wide
+  const bw=Math.max(1,(W/2)/RT_LEVELS);
+  for(let age=0;age<RT_LEVELS;age++){
+    // age=0 is newest (rightmost), age=RT_LEVELS-1 is oldest (leftmost)
+    const x=lineX-(age+1)*bw;
     if(x+bw<0) continue;
-    const dataIdx=(rtLevelIdx-1-age+RT_LEVELS*10)%RT_LEVELS;
+    const dataIdx=(rtLevelIdx-1-age+RT_LEVELS*100)%RT_LEVELS;
     const rms=rtLevels[dataIdx];
-    const h=Math.min(mid,rms*8*mid)||1;
-    c.fillStyle=rms<silThr?'rgba(255,64,129,.65)':'rgba(0,229,255,.75)';
-    c.fillRect(x, mid-h, bw-0.5, h*2);
+    const h=Math.max(1,Math.min(mid-1,rms*8*mid));
+    c.fillStyle=rms<silThr?'rgba(255,64,129,.5)':'rgba(0,229,255,.7)';
+    c.fillRect(x, mid-h, Math.max(1,bw-0.5), h*2);
   }
+
+  // Center line
   c.fillStyle='#2a2a3d'; c.fillRect(0,mid-.5,W,1);
-  // detection line (fixed vertical) — "now"
-  const lineX=LIVE_LINE_X*W;
+
+  // Fixed detection line at center
   c.strokeStyle='rgba(0,229,255,.9)'; c.lineWidth=2;
   c.beginPath(); c.moveTo(lineX,0); c.lineTo(lineX,H); c.stroke();
-  // "now" triangle
   c.fillStyle='rgba(0,229,255,.9)';
   c.beginPath(); c.moveTo(lineX-4,0); c.lineTo(lineX+4,0); c.lineTo(lineX,6); c.fill();
-  // markers relative to current time (recent ones visible)
+
+  // Markers (past only, left of center)
   for(const m of markers){
     const relT=m.time-ct;
-    const mx=lineX+(relT/visibleSec)*W;
-    if(mx<0||mx>W) continue;
+    if(relT>0) continue; // future markers skip
+    const mx=lineX+relT/secPerPx;
+    if(mx<0) continue;
     c.strokeStyle='#ff4081'; c.lineWidth=1.5;
     c.beginPath(); c.moveTo(mx,0); c.lineTo(mx,H); c.stroke();
     c.fillStyle='#ff4081';
@@ -507,7 +517,7 @@ function drawWave(ct){
     for(const sr of silReg){ if(bs<sr.end&&be>sr.start){inSil=true;break;} }
     const played=be<=ct, isCur=(ct>=bs&&ct<be);
     if(inSil){
-      c.fillStyle=played?'rgba(255,64,129,.55)':'rgba(255,64,129,.22)';
+      c.fillStyle=played?'rgba(255,64,129,.35)':'rgba(255,64,129,.12)';
       c.fillRect(bx,2,bw,H-4);
     } else if(waveData){
       const wi=Math.min(WSAMP-1,Math.floor((bs/duration)*WSAMP));
@@ -630,10 +640,19 @@ function play(){
   if(!objURL)return;
   ensureWAGraph();
   if(waCtx&&waCtx.state==='suspended') waCtx.resume();
+  // Set rate before AND after play() — iOS sometimes resets it on play()
   audioEl.playbackRate=playbackRate; setPitch(audioEl);
   const p=audioEl.play();
-  if(p)p.then(()=>{isPlaying=true;redrawPlayBtn();loop();rtLoop();}).catch(e=>showToast('再生失敗:'+e.message));
-  else{isPlaying=true;redrawPlayBtn();loop();rtLoop();}
+  if(p){
+    p.then(()=>{
+      // Re-apply rate after play() resolves (iOS resets it)
+      audioEl.playbackRate=playbackRate; setPitch(audioEl);
+      isPlaying=true; redrawPlayBtn(); loop(); rtLoop();
+    }).catch(e=>showToast('再生失敗:'+e.message));
+  } else {
+    audioEl.playbackRate=playbackRate; setPitch(audioEl);
+    isPlaying=true; redrawPlayBtn(); loop(); rtLoop();
+  }
 }
 function stop(){
   audioEl.pause(); isPlaying=false; redrawPlayBtn(); cancelAnimationFrame(raf);
