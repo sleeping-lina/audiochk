@@ -132,6 +132,11 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   <input type="file" id="importData" accept=".json">
 </header>
 <audio id="audioEl" playsinline webkit-playsinline preload="auto" style="display:none"></audio>
+<!-- Hidden focus trap: keeps keyboard focus for hardware keyboard/controller -->
+<input id="focusTrap" type="text" inputmode="none" readonly
+  style="position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;
+  border:none;outline:none;background:transparent;color:transparent;z-index:-1"
+  aria-hidden="true">
 <div id="playlist"></div>
 <div class="wave-wrap" id="waveArea">
   <canvas id="waveCanvas"></canvas>
@@ -1219,8 +1224,31 @@ document.querySelectorAll('.spb').forEach(b=>b.classList.toggle('on',parseFloat(
 document.getElementById('customSpeed').value=playbackRate;
 drawAllBtns();
 drawWave(0); drawSeek(0); renderMarkers();
-// Focus body so keyboard shortcuts work immediately (important for 8BitDo)
-setTimeout(()=>document.body.focus(), 300);
+// ── Focus trap for hardware keyboard (8BitDo etc.) ──────────
+// iOS Safari only fires keydown when an element has focus.
+// We use a hidden readonly input (inputmode=none = no virtual keyboard)
+// and re-focus it after every interaction.
+const focusTrap = document.getElementById('focusTrap');
+
+function grabFocus(){
+  // Small delay to let the current event finish, then grab focus
+  setTimeout(()=>{ focusTrap.focus({preventScroll:true}); }, 50);
+}
+
+// Re-grab focus after any tap on the page
+document.addEventListener('pointerup', grabFocus);
+document.addEventListener('touchend',  grabFocus, {passive:true});
+
+// Forward keydown from focusTrap to our handler
+focusTrap.addEventListener('keydown', e=>{
+  // Prevent the input from doing anything with the key
+  e.preventDefault();
+  e.stopPropagation();
+  onKey(e);
+});
+
+// Initial focus grab
+setTimeout(grabFocus, 400);
 </script>
 </body>
 </html>
