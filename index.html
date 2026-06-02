@@ -251,7 +251,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   <div style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;margin:20px;max-width:360px;width:calc(100% - 40px);padding:16px">
     <div style="display:flex;align-items:center;margin-bottom:12px">
       <span style="font-family:'Space Mono',monospace;font-size:11px;color:#00e5ff;letter-spacing:1px">COLOR SETTINGS</span>
-      <button onclick="document.getElementById('colorModal').style.display='none'" style="margin-left:auto;background:transparent;border:none;color:#6b6b88;font-size:18px;cursor:pointer">×</button>
+      <button onclick="document.getElementById('colorModal').style.display='none';setTimeout(()=>grabFocus({}),100)" style="margin-left:auto;background:transparent;border:none;color:#6b6b88;font-size:18px;cursor:pointer">×</button>
     </div>
     <div id="colorRows">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
@@ -284,7 +284,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   <div style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;margin:20px auto;max-width:360px;padding:16px">
     <div style="display:flex;align-items:center;margin-bottom:12px">
       <span style="font-family:'Space Mono',monospace;font-size:11px;color:#00e5ff;letter-spacing:1px">SHORTCUTS</span>
-      <button onclick="document.getElementById('helpModal').style.display='none'" style="margin-left:auto;background:transparent;border:none;color:#6b6b88;font-size:18px;cursor:pointer">×</button>
+      <button onclick="document.getElementById('helpModal').style.display='none';setTimeout(()=>grabFocus({}),100)" style="margin-left:auto;background:transparent;border:none;color:#6b6b88;font-size:18px;cursor:pointer">×</button>
     </div>
     <table style="width:100%;border-collapse:collapse;font-family:'Space Mono',monospace;font-size:11px">
       <tr style="background:rgba(0,229,255,.05)"><td colspan="2" style="padding:4px;color:#6b6b88;font-size:9px">── キーボード ─────────────────</td></tr>
@@ -1392,12 +1392,17 @@ drawWave(0); drawSeek(0); renderMarkers();
 // and re-focus it after every interaction.
 const focusTrap = document.getElementById('focusTrap');
 
-function grabFocus(){
-  // Small delay to let the current event finish, then grab focus
+function grabFocus(e){
+  // Don't steal focus when a modal is open or when user taps an input/button
+  const modalOpen = document.getElementById('colorModal').style.display!=='none' ||
+                    document.getElementById('helpModal').style.display!=='none';
+  if(modalOpen) return;
+  const tag = e && e.target && e.target.tagName;
+  if(tag==='INPUT'||tag==='BUTTON'||tag==='SELECT'||tag==='TEXTAREA') return;
   setTimeout(()=>{ focusTrap.focus({preventScroll:true}); }, 50);
 }
 
-// Re-grab focus after any tap on the page
+// Re-grab focus after taps (but not when modal is open)
 document.addEventListener('pointerup', grabFocus);
 document.addEventListener('touchend',  grabFocus, {passive:true});
 
