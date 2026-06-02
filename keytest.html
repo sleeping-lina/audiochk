@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Key Test</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0a0f;color:#eee;font-family:monospace;padding:16px;font-size:13px;
+  -webkit-user-select:none;user-select:none}
+h2{color:#00e5ff;margin-bottom:8px;font-size:14px}
+p{color:#888;font-size:11px;margin-bottom:12px}
+#display{background:#1a1a1a;border:2px solid #00e5ff;border-radius:8px;
+  padding:20px;margin-bottom:10px;font-size:28px;text-align:center;
+  color:#00e5ff;min-height:70px;transition:background .1s}
+#display.hit{background:#003a4a}
+#focus{background:#1c1c28;border:1px solid #2a2a3d;border-radius:6px;
+  color:#eee;font-size:14px;padding:10px;width:100%;margin-bottom:8px;cursor:pointer}
+#log{background:#0d0d14;padding:10px;border-radius:6px;font-size:11px;
+  line-height:1.8;max-height:260px;overflow-y:auto;white-space:pre-wrap;
+  border:1px solid #1c1c28}
+#focusState{font-size:10px;color:#6b6b88;text-align:center;margin-bottom:6px}
+</style>
+</head>
+<body>
+<h2>🎮 8BitDo Key Tester</h2>
+<p>① 下のボタンをタップ → ② コントローラーのボタンを押す</p>
+
+<button id="focus" onclick="doFocus()">▶ タップしてフォーカス取得</button>
+<div id="focusState">フォーカス: 未取得</div>
+<div id="display">—</div>
+<div id="log">待機中...</div>
+
+<script>
+const disp=document.getElementById('display');
+const logEl=document.getElementById('log');
+const focusState=document.getElementById('focusState');
+let n=0;
+
+function L(s){
+  n++;
+  logEl.textContent=n+': '+s+'\n'+logEl.textContent;
+}
+
+function doFocus(){
+  document.getElementById('focus').blur();
+  document.body.focus();
+  focusState.textContent='フォーカス: 取得済み ✓';
+  focusState.style.color='#00e5ff';
+  L('フォーカス取得');
+}
+
+// track focus
+document.addEventListener('focusin', e=>{
+  focusState.textContent='フォーカス: '+e.target.tagName+(e.target.id?' #'+e.target.id:'');
+  focusState.style.color='#69ff47';
+});
+document.addEventListener('focusout', e=>{
+  focusState.textContent='フォーカス解除: '+e.target.tagName;
+  focusState.style.color='#ff4081';
+});
+
+function handleKey(source, e){
+  // DO NOT call e.preventDefault() here — we want to see everything raw
+  const info=[
+    source,
+    'key='+JSON.stringify(e.key),
+    'code='+e.code,
+    'kc='+e.keyCode,
+    'shift='+e.shiftKey,
+    'ctrl='+e.ctrlKey,
+    'meta='+e.metaKey,
+    'target='+e.target.tagName
+  ].join(' ');
+  disp.textContent=e.key+' ('+e.code+')';
+  disp.classList.add('hit');
+  setTimeout(()=>disp.classList.remove('hit'),150);
+  L(info);
+}
+
+// Listen everywhere
+document.addEventListener('keydown', e=>handleKey('doc↓',e));
+document.addEventListener('keyup',   e=>handleKey('doc↑',e));
+window.addEventListener('keydown',   e=>handleKey('win↓',e));
+
+// auto-focus
+setTimeout(doFocus, 300);
+L('UA: '+navigator.userAgent.slice(0,70));
+</script>
+</body>
+</html>
