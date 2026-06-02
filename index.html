@@ -118,7 +118,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 #lbar{position:fixed;top:0;left:0;height:2px;background:var(--ac);width:0%;transition:width .3s;z-index:300}
 </style>
 </head>
-<body>
+<body tabindex="0">
 <div id="lbar"></div>
 <header>
   <span class="logo">AUDIOCHK</span>
@@ -267,8 +267,14 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
       <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">0</td><td style="padding:5px 4px;color:#e8e8f0">速度リセット (×1.0)</td></tr>
       <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">1 〜 6</td><td style="padding:5px 4px;color:#e8e8f0">倍速切替 ×0.25〜×2.0</td></tr>
       <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">[ / ]</td><td style="padding:5px 4px;color:#e8e8f0">前 / 次のマークへ</td></tr>
+      <tr style="border-bottom:1px solid #2a2a3d;background:rgba(0,229,255,.03)"><td colspan="2" style="padding:4px 4px;color:#6b6b88;font-size:9px">── 8BitDo micro ──────────────</td></tr>
+      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">A / Start</td><td style="padding:5px 4px;color:#e8e8f0">再生 / 一時停止</td></tr>
+      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">B</td><td style="padding:5px 4px;color:#e8e8f0">マーク追加</td></tr>
+      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">Select</td><td style="padding:5px 4px;color:#e8e8f0">マーク削除</td></tr>
+      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">← →</td><td style="padding:5px 4px;color:#e8e8f0">−N秒 / +N秒</td></tr>
+      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">L1 / R1</td><td style="padding:5px 4px;color:#e8e8f0">前 / 次のマーク</td></tr>
+      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">L2 / R2</td><td style="padding:5px 4px;color:#e8e8f0">前 / 次のファイル</td></tr>
       <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">⌘/Ctrl+← →</td><td style="padding:5px 4px;color:#e8e8f0">前 / 次のファイルへ</td></tr>
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">+ / −</td><td style="padding:5px 4px;color:#e8e8f0">波形ズームイン/アウト</td></tr>
       <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">Ctrl+Z / Y</td><td style="padding:5px 4px;color:#e8e8f0">取り消し / やり直し</td></tr>
     </table>
   </div>
@@ -866,43 +872,65 @@ document.getElementById('importData').addEventListener('change',function(){
 });
 
 // ── Keyboard ──────────────────────────────────
-document.addEventListener('keydown',e=>{
-  if(e.target.tagName==='INPUT') return;
-  // Cmd/Ctrl + arrow = prev/next file
-  if((e.ctrlKey||e.metaKey)&&e.key==='ArrowLeft'){e.preventDefault();prevFile();return;}
-  if((e.ctrlKey||e.metaKey)&&e.key==='ArrowRight'){e.preventDefault();nextFile();return;}
-  if(e.ctrlKey||e.metaKey){
-    if(e.key==='z'||e.key==='Z'){undo();return;}
-    if(e.key==='y'||e.key==='Y'){redo();return;}
+// 8BitDo micro key mapping reference (keyboard mode):
+//   A/Start/Enter → play/pause   B/Escape → mark   Select/Backspace → delete mark
+//   L1/[ → prev mark   R1/] → next mark   ←→ → seek   L2/PageUp → prev file   R2/PageDown → next file
+//   1-6 → speed   0 → speed reset
+
+function handleKey(key, shift, ctrl, meta){
+  const mod=ctrl||meta;
+  // Cmd/Ctrl + arrows = file nav
+  if(mod&&key==='ArrowLeft'){prevFile();return;}
+  if(mod&&key==='ArrowRight'){nextFile();return;}
+  if(mod){
+    if(key==='z'||key==='Z'){undo();return;}
+    if(key==='y'||key==='Y'){redo();return;}
     return;
   }
-  switch(e.key){
-    case ' ':e.preventDefault();isPlaying?stop():play();break;
-    case 'm':case 'M':addMk();break;
-    case 'Backspace':{
-      // delete nearest marker to current time
+  switch(key){
+    // Play/pause: Space, Enter (8BitDo A/Start)
+    case ' ':case 'Enter':isPlaying?stop():play();break;
+    // Mark add: M, b, B (8BitDo B button)
+    case 'm':case 'M':case 'b':case 'B':addMk();break;
+    // Delete nearest mark: Backspace, Delete, Escape (8BitDo Select)
+    case 'Backspace':case 'Delete':case 'Escape':{
       const t=curT();
-      let best=-1,bestD=0.5; // within 0.5s
+      let best=-1,bestD=0.5;
       markers.forEach((m,i)=>{const d=Math.abs(m.time-t);if(d<bestD){bestD=d;best=i;}});
       if(best>=0) delMk(best);
       break;
     }
+    // Seek: arrows (also prevents page scroll)
     case 'ArrowLeft':
-      e.shiftKey?seekTo(curT()-.1):seekTo(curT()-skipSec); break;
+      shift?seekTo(curT()-.1):seekTo(curT()-skipSec); break;
     case 'ArrowRight':
-      e.shiftKey?seekTo(curT()+.1):seekTo(curT()+skipSec); break;
+      shift?seekTo(curT()+.1):seekTo(curT()+skipSec); break;
+    // File nav: PageUp/PageDown (8BitDo L2/R2)
+    case 'PageUp':prevFile();break;
+    case 'PageDown':nextFile();break;
+    // Speed
     case '0':setSpd(1.0);break;
     case '1':case '2':case '3':case '4':case '5':case '6':{
-      // 1→×0.25, 2→×0.5, 3→×0.75, 4→×1.25, 5→×1.5, 6→×2.0 (skip 1.0)
       const spdMap={'1':0.25,'2':0.5,'3':0.75,'4':1.25,'5':1.5,'6':2.0};
-      setSpd(spdMap[e.key]); break;
+      setSpd(spdMap[key]); break;
     }
-    case '[':document.getElementById('prevMrkBtn').click();break;
-    case ']':document.getElementById('nextMrkBtn').click();break;
-    case '+':case '=':doZoom(1.25,.5);break;
-    case '-':doZoom(.8,.5);break;
+    // Marker nav: [ ] (8BitDo L1/R1)
+    case '[':case 'PageUp':document.getElementById('prevMrkBtn').click();break;
+    case ']':case 'PageDown':document.getElementById('nextMrkBtn').click();break;
   }
-});;
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT') return;
+  // Prevent default for keys that scroll the page
+  const scrollKeys=['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' ','PageUp','PageDown'];
+  if(scrollKeys.includes(e.key)) e.preventDefault();
+  handleKey(e.key, e.shiftKey, e.ctrlKey, e.metaKey);
+});
+
+// Ensure body keeps focus for keyboard events on iOS
+// (tap anywhere to re-focus if keys stop working)
+document.body.addEventListener('click',()=>{ document.body.focus(); });
 
 // ── Canvas Button Drawing ─────────────────────
 const C={bg:'#1c1c28',bd:'#2a2a3d',ac:'#00e5ff',a2:'#ff4081',tx:'#e8e8f0',dm:'#6b6b88'};
@@ -1201,6 +1229,8 @@ document.querySelectorAll('.spb').forEach(b=>b.classList.toggle('on',parseFloat(
 document.getElementById('customSpeed').value=playbackRate;
 drawAllBtns();
 drawWave(0); drawSeek(0); renderMarkers();
+// Focus body so keyboard shortcuts work immediately (important for 8BitDo)
+setTimeout(()=>document.body.focus(), 300);
 </script>
 </body>
 </html>
