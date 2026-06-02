@@ -877,60 +877,50 @@ document.getElementById('importData').addEventListener('change',function(){
 //   L1/[ → prev mark   R1/] → next mark   ←→ → seek   L2/PageUp → prev file   R2/PageDown → next file
 //   1-6 → speed   0 → speed reset
 
-function handleKey(key, shift, ctrl, meta){
-  const mod=ctrl||meta;
-  // Cmd/Ctrl + arrows = file nav
-  if(mod&&key==='ArrowLeft'){prevFile();return;}
-  if(mod&&key==='ArrowRight'){nextFile();return;}
+function onKey(e){
+  // ignore when typing in input fields
+  const tag=e.target.tagName;
+  if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT') return;
+
+  const key=e.key, shift=e.shiftKey, mod=e.ctrlKey||e.metaKey;
+
+  // prevent browser default for navigation/scroll keys
+  if([' ','ArrowLeft','ArrowRight','ArrowUp','ArrowDown',
+      'PageUp','PageDown','[',']','Backspace'].includes(key))
+    e.preventDefault();
+
+  // Cmd/Ctrl combos
   if(mod){
-    if(key==='z'||key==='Z'){undo();return;}
-    if(key==='y'||key==='Y'){redo();return;}
+    if(key==='ArrowLeft')         {prevFile();}
+    else if(key==='ArrowRight')   {nextFile();}
+    else if(key==='z'||key==='Z') {undo();}
+    else if(key==='y'||key==='Y') {redo();}
     return;
   }
-  switch(key){
-    // Play/pause: Space, Enter (8BitDo A/Start)
-    case ' ':case 'Enter':isPlaying?stop():play();break;
-    // Mark add: M, b, B (8BitDo B button)
-    case 'm':case 'M':case 'b':case 'B':addMk();break;
-    // Delete nearest mark: Backspace, Delete, Escape (8BitDo Select)
-    case 'Backspace':case 'Delete':case 'Escape':{
-      const t=curT();
-      let best=-1,bestD=0.5;
-      markers.forEach((m,i)=>{const d=Math.abs(m.time-t);if(d<bestD){bestD=d;best=i;}});
-      if(best>=0) delMk(best);
-      break;
-    }
-    // Seek: arrows (also prevents page scroll)
-    case 'ArrowLeft':
-      shift?seekTo(curT()-.1):seekTo(curT()-skipSec); break;
-    case 'ArrowRight':
-      shift?seekTo(curT()+.1):seekTo(curT()+skipSec); break;
-    // File nav: PageUp/PageDown (8BitDo L2/R2)
-    case 'PageUp':prevFile();break;
-    case 'PageDown':nextFile();break;
-    // Speed
-    case '0':setSpd(1.0);break;
-    case '1':case '2':case '3':case '4':case '5':case '6':{
-      const spdMap={'1':0.25,'2':0.5,'3':0.75,'4':1.25,'5':1.5,'6':2.0};
-      setSpd(spdMap[key]); break;
-    }
-    // Marker nav: [ ] (8BitDo L1/R1)
-    case '[':case 'PageUp':document.getElementById('prevMrkBtn').click();break;
-    case ']':case 'PageDown':document.getElementById('nextMrkBtn').click();break;
+
+  // plain keys — Space and Enter both toggle play/pause
+  if(key===' '||key==='Enter')    {isPlaying?stop():play();}
+  else if(key==='m'||key==='M')   {addMk();}
+  else if(key==='Backspace'||key==='Delete'){
+    const t=curT(); let best=-1,bestD=0.5;
+    markers.forEach((mk,i)=>{const d=Math.abs(mk.time-t);if(d<bestD){bestD=d;best=i;}});
+    if(best>=0) delMk(best);
+  }
+  else if(key==='ArrowLeft')  {shift?seekTo(curT()-.1):seekTo(curT()-skipSec);}
+  else if(key==='ArrowRight') {shift?seekTo(curT()+.1):seekTo(curT()+skipSec);}
+  else if(key==='PageUp')     {prevFile();}
+  else if(key==='PageDown')   {nextFile();}
+  else if(key==='[')          {document.getElementById('prevMrkBtn').click();}
+  else if(key===']')          {document.getElementById('nextMrkBtn').click();}
+  else if(key==='0')          {setSpd(1.0);}
+  else if(key>='1'&&key<='6') {
+    const map={'1':0.25,'2':0.5,'3':0.75,'4':1.25,'5':1.5,'6':2.0};
+    if(map[key]) setSpd(map[key]);
   }
 }
-
-document.addEventListener('keydown',e=>{
-  if(e.target.tagName==='INPUT') return;
-  // Prevent default for keys that scroll the page
-  const scrollKeys=['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' ','PageUp','PageDown'];
-  if(scrollKeys.includes(e.key)) e.preventDefault();
-  handleKey(e.key, e.shiftKey, e.ctrlKey, e.metaKey);
-});
-
-// Ensure body keeps focus for keyboard events on iOS
-// (tap anywhere to re-focus if keys stop working)
-document.body.addEventListener('click',()=>{ document.body.focus(); });
+// Listen on both document and window to maximize coverage on iOS Safari
+document.addEventListener('keydown', onKey);
+window.addEventListener('keydown', onKey);
 
 // ── Canvas Button Drawing ─────────────────────
 const C={bg:'#1c1c28',bd:'#2a2a3d',ac:'#00e5ff',a2:'#ff4081',tx:'#e8e8f0',dm:'#6b6b88'};
