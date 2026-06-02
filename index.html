@@ -36,7 +36,7 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
   border-bottom:1px solid var(--bd);font-family:'Space Mono',monospace;font-size:10px;flex-shrink:0}
 #timeDisp{color:var(--ac);font-size:11px}
 #timeTotal{color:var(--dm)}
-#silInfo{color:var(--a3);font-size:9px}
+#silInfo{color:var(--a3);font-size:12px;font-weight:700}
 #zoomInfo{color:var(--dm);font-size:9px;margin-left:auto}
 /* seek */
 .seek-wrap{flex-shrink:0;background:var(--sf);border-bottom:1px solid var(--bd);
@@ -88,7 +88,8 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 #skipSec{width:36px;background:var(--s2);border:1px solid var(--bd);border-radius:4px;
   color:var(--tx);font-family:'Space Mono',monospace;font-size:10px;padding:2px;text-align:center}
 /* markers */
-.mk-sec{flex:1;overflow-y:auto;background:var(--bg);-webkit-overflow-scrolling:touch;min-height:0}
+.mk-sec{flex:1;overflow-y:auto;background:var(--bg);-webkit-overflow-scrolling:touch;min-height:0;transition:flex .2s}
+.mk-sec.collapsed{flex:0;max-height:32px;overflow:hidden}
 .mk-hdr{display:flex;align-items:center;padding:4px 8px;font-family:'Space Mono',monospace;
   font-size:9px;color:var(--dm);letter-spacing:1px;border-bottom:1px solid var(--bd);
   position:sticky;top:0;background:var(--bg);z-index:10}
@@ -226,8 +227,11 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   <div class="skb" id="skPlus">＋</div>
 </div>
 <div class="mk-sec">
-  <div class="mk-hdr">MARKERS
-    <div class="mk-acts">
+  <div class="mk-hdr" id="mkHdr" onclick="toggleMkList()" style="cursor:pointer">
+    MARKERS
+    <span id="mkCount" style="color:var(--dm);margin-left:4px"></span>
+    <span id="mkArrow" style="font-size:9px;color:var(--dm);margin-left:4px">▼</span>
+    <div class="mk-acts" onclick="event.stopPropagation()">
       <button class="smbtn" id="prevMrkBtn">◀ prev</button>
       <button class="smbtn" id="nextMrkBtn">next ▶</button>
       <button class="smbtn danger" id="clearAllBtn">全削除</button>
@@ -336,12 +340,20 @@ const WSAMP=1800, SIL_THRESH=0.015, SIL_MIN=0.3;
 
 audioEl.addEventListener('ended',()=>{ isPlaying=false; redrawPlayBtn(); cancelAnimationFrame(raf); });
 audioEl.addEventListener('error',()=>showToast('エラー code='+(audioEl.error?audioEl.error.code:'?')));
-// iOS sometimes resets playbackRate — catch it via ratechange
-audioEl.addEventListener('ratechange',()=>{
-  if(isPlaying && Math.abs(audioEl.playbackRate-playbackRate)>0.01){
-    audioEl.playbackRate=playbackRate;
-    setPitch(audioEl);
-  }
+// Monitor playbackRate — iOS can reset it silently
+// Use play event and a periodic check during playback
+audioEl.addEventListener('play',()=>{
+  // Re-apply after play starts (iOS resets on play)
+  setTimeout(()=>{
+    if(Math.abs(audioEl.playbackRate-playbackRate)>0.01){
+      audioEl.playbackRate=playbackRate; setPitch(audioEl);
+    }
+  },100);
+  setTimeout(()=>{
+    if(Math.abs(audioEl.playbackRate-playbackRate)>0.01){
+      audioEl.playbackRate=playbackRate; setPitch(audioEl);
+    }
+  },500);
 });
 
 // ── LocalStorage ───────────────────────────────
@@ -495,8 +507,8 @@ function drawLiveWave(){
   const c=cv.getContext('2d'); c.scale(dpr,dpr);
   c.fillStyle='#0d0d16'; c.fillRect(0,0,W,H);
   const mid=H/2, ct=audioEl.currentTime;
-  const lineX=W/2;
-  const secPerPx=RT_SEC/(W/2); // same for bars, silences, markers
+  const lineX=Math.floor(W*0.85);
+  const secPerPx=RT_SEC/(W*0.85); // seconds per pixel — history fills left 85%
 
   // helper: audioTime → pixel x
   const toPx=t=>lineX+(t-ct)/secPerPx;
@@ -795,7 +807,11 @@ function redrawPlayBtn(){ drawBtn('btnPlay'); }
 function updateTime(t){document.getElementById('timeDisp').textContent=fmtMs(t);}
 function chkSil(t){
   const el=document.getElementById('silInfo');
-  for(const sr of silReg){if(t>=sr.start&&t<=sr.end){el.textContent='■ '+sr.dur.toFixed(2)+'s';return;} if(t>sr.end&&t-sr.end<1.5){el.textContent='無音'+sr.dur.toFixed(1)+'s通過';return;}}
+  for(const sr of silReg){
+    if(t>=sr.start&&t<=sr.end){el.textContent='■ '+sr.dur.toFixed(2)+'s';return;}
+    if(t>sr.end&&t-sr.end<5){el.textContent='無音 '+sr.dur.toFixed(2)+'s 通過';return;}
+  }
+  if(rtInSil){el.textContent='■ '+(t-rtSilStart).toFixed(1)+'s…';return;}
   el.textContent='';
 }
 
@@ -869,16 +885,43 @@ function hlMk(t){
 }
 function renderMarkers(){
   const list=document.getElementById('markerList');
-  if(!markers.length){list.innerHTML='<div class="mk-empty">マークなし<br><span style="font-size:9px;opacity:.5">🔖 または M キーで追加</span></div>';return;}
+  const cnt=document.getElementById('mkCount');
+  if(cnt) cnt.textContent=markers.length?'('+markers.length+')':'';
+  if(!markers.length){
+    list.innerHTML='<div class="mk-empty">マークなし<br><span style="font-size:9px;opacity:.5">🔖 または M キーで追加</span></div>';
+    return;
+  }
   list.innerHTML=markers.map((m,i)=>`
-    <div class="mk-item" id="mi${i}" onclick="seekTo(${m.time})">
-      <span class="m-num">#${i+1}</span>
-      <span class="m-time">${fmtMs(m.time)}</span>
-      <input class="m-note" value="${esc(m.note)}" placeholder="メモ..." onclick="event.stopPropagation()" onchange="markers[${i}].note=this.value;saveMk()">
-      <span class="m-del" onclick="event.stopPropagation();delMk(${i})">×</span>
+    <div class="mk-item" id="mi${i}" data-idx="${i}" data-time="${m.time}">
+      <span class="m-num" data-idx="${i}">#${i+1}</span>
+      <span class="m-time" data-idx="${i}">${fmtMs(m.time)}</span>
+      <input class="m-note" data-idx="${i}" value="${esc(m.note)}" placeholder="メモ...">
+      <span class="m-del" data-idx="${i}">×</span>
     </div>`).join('');
 }
+// Event delegation — no inline handlers (fixes iOS crash)
+document.getElementById('markerList').addEventListener('click',e=>{
+  const del=e.target.closest('.m-del');
+  if(del){e.stopPropagation();delMk(parseInt(del.dataset.idx));return;}
+  // don't seek when clicking note input
+  if(e.target.classList.contains('m-note')) return;
+  const item=e.target.closest('.mk-item');
+  if(item) seekTo(parseFloat(item.dataset.time));
+});
+document.getElementById('markerList').addEventListener('change',e=>{
+  if(e.target.classList.contains('m-note')){
+    const idx=parseInt(e.target.dataset.idx);
+    if(!isNaN(idx)&&markers[idx]){markers[idx].note=e.target.value;saveMk();}
+  }
+});
 document.getElementById('btnMark').addEventListener('click',addMk);
+// Marker list collapse
+let mkListOpen=true;
+function toggleMkList(){
+  mkListOpen=!mkListOpen;
+  document.querySelector('.mk-sec').classList.toggle('collapsed',!mkListOpen);
+  document.getElementById('mkArrow').textContent=mkListOpen?'▼':'▶';
+}
 document.getElementById('btnPrevMk').addEventListener('click',()=>document.getElementById('prevMrkBtn').click());
 document.getElementById('btnNextMk').addEventListener('click',()=>document.getElementById('nextMrkBtn').click());
 document.getElementById('btnUndo').addEventListener('click',undo);
@@ -913,7 +956,7 @@ document.getElementById('importData').addEventListener('change',function(){
 
 function onKey(e){
   const tag=e.target.tagName;
-  if((tag==='INPUT'&&e.target.id!=='ft')||tag==='TEXTAREA'||tag==='SELECT') return;
+  if((tag==='INPUT'&&e.target.id!=='focusTrap')||tag==='TEXTAREA'||tag==='SELECT') return;
 
   const key=e.key, code=e.code, shift=e.shiftKey, mod=e.ctrlKey||e.metaKey;
 
@@ -975,9 +1018,9 @@ function onKey(e){
     if(map[d]) setSpd(map[d]);
   }
 }
-// Listen on both document and window to maximize coverage on iOS Safari
-document.addEventListener('keydown', onKey);
-window.addEventListener('keydown', onKey);
+// Listen on both document and window
+document.addEventListener('keydown', onKey, true);  // capture phase
+window.addEventListener('keydown', onKey, true);
 
 // ── Canvas Button Drawing ─────────────────────
 const C={bg:'#1c1c28',bd:'#2a2a3d',ac:'#00e5ff',a2:'#ff4081',tx:'#e8e8f0',dm:'#6b6b88'};
@@ -1225,6 +1268,7 @@ let colorSilFill='rgba(255,140,80,0.15)', colorMarkLine='#ffdd00';
 function buildColorPanel(){
   const rows=document.getElementById('colorRows');
   if(!rows) return;
+  // always rebuild to avoid stale event listeners
   const items=[
     {label:'アクセント (波形・ライン)',id:'cpAc',val:colorAc},
     {label:'マーク色',               id:'cpA2',val:colorA2},
@@ -1293,11 +1337,10 @@ document.addEventListener('touchend',  grabFocus, {passive:true});
 
 // Forward keydown from focusTrap to our handler
 focusTrap.addEventListener('keydown', e=>{
-  // Prevent the input from doing anything with the key
   e.preventDefault();
   e.stopPropagation();
   onKey(e);
-});
+}, true);  // useCapture=true for reliability on iOS
 
 // Initial focus grab
 setTimeout(grabFocus, 400);
