@@ -255,6 +255,13 @@ const WSAMP=1800, SIL_THRESH=0.015, SIL_MIN=0.3;
 
 audioEl.addEventListener('ended',()=>{ isPlaying=false; redrawPlayBtn(); cancelAnimationFrame(raf); });
 audioEl.addEventListener('error',()=>showToast('エラー code='+(audioEl.error?audioEl.error.code:'?')));
+// iOS resets playbackRate after seek/play — re-enforce on every timeupdate
+audioEl.addEventListener('timeupdate',()=>{
+  if(isPlaying && Math.abs(audioEl.playbackRate-playbackRate)>0.01){
+    audioEl.playbackRate=playbackRate;
+    setPitch(audioEl);
+  }
+});
 
 // ── LocalStorage ───────────────────────────────
 const LS_PREFS='ac_prefs3';
@@ -300,7 +307,7 @@ async function load(file){
   isPlaying=false; redrawPlayBtn(); cancelAnimationFrame(raf);
   hist=[]; redoSt=[]; curMkIdx=-1;
   waveData=null; silReg=[]; duration=0;
-  rtLevels=new Float32Array(RT_LEVELS); rtLevelIdx=0;
+  rtBuf=[];
   resetRTSilence();
   document.getElementById('silStatus').textContent='停止中';
   document.getElementById('silCurDur').textContent='0.0s';
@@ -329,16 +336,15 @@ async function load(file){
   buildWaveform(file).then(()=>{ drawWave(audioEl.currentTime); drawSeek(audioEl.currentTime); saveMk(); }).catch(()=>{});
 }
 
-// ── Realtime silence detection via Web Audio API ─────────────
-// (no pre-decode needed — works on any length file)
+// ── Realtime silence detection ────────────────────────────────
 let waCtx=null, waAnalyser=null, waSrc=null, waReady=false;
 let waBuf=null;
 let silThr=0.02, silMinSec=1.0, silAutoMark=true;
 let rtInSil=false, rtSilStart=0;
-// Live level ring buffer for waveform display (last N frames)
-const RT_LEVELS=200;
-let rtLevels=new Float32Array(RT_LEVELS);
-let rtLevelIdx=0;
+// Timestamped ring buffer: each entry = {rms, t}
+const RT_MAX=600;  // max entries stored
+let rtBuf=[];      // [{rms, t}] — push to end, trim from front
+const RT_SEC=8;    // seconds of history visible on screen
 
 function ensureWAGraph(){
   if(waReady) return;
@@ -351,19 +357,20 @@ function ensureWAGraph(){
   waAnalyser.connect(waCtx.destination);
   waReady=true;
 }
-function resetRTSilence(){ rtInSil=false; }
+function resetRTSilence(){ rtInSil=false; rtBuf=[]; }
 
 function rtLoop(){
   if(!isPlaying||!waReady) return;
   if(waCtx.state==='suspended') waCtx.resume();
   waAnalyser.getFloatTimeDomainData(waBuf);
-  // RMS
   let sum=0; for(let i=0;i<waBuf.length;i++) sum+=waBuf[i]*waBuf[i];
   const rms=Math.sqrt(sum/waBuf.length);
-  // ring buffer
-  rtLevels[rtLevelIdx%RT_LEVELS]=rms; rtLevelIdx++;
-
   const t=audioEl.currentTime;
+
+  // push timestamped sample
+  rtBuf.push({rms,t});
+  if(rtBuf.length>RT_MAX) rtBuf.shift();
+
   if(rms<silThr){
     if(!rtInSil){ rtInSil=true; rtSilStart=t; }
     document.getElementById('silCurDur').textContent=(t-rtSilStart).toFixed(1)+'s';
@@ -375,13 +382,11 @@ function rtLoop(){
       document.getElementById('silCurDur').textContent=dur.toFixed(1)+'s';
       document.getElementById('silStatus').textContent='音あり';
       if(dur>=silMinSec){
-        // push to silReg for display
-        silReg.push({start:rtSilStart, end:t, dur});
+        silReg.push({start:rtSilStart,end:t,dur});
         silReg.sort((a,b)=>a.start-b.start);
-        // auto mark at silence start
         if(silAutoMark){
           saveH();
-          markers.push({time:rtSilStart, note:'無音 '+dur.toFixed(1)+'s'});
+          markers.push({time:rtSilStart,note:'無音 '+dur.toFixed(1)+'s'});
           markers.sort((a,b)=>a.time-b.time);
           renderMarkers(); saveMk();
           showToast('🔖 無音 '+dur.toFixed(1)+'s @ '+fmtMs(rtSilStart));
@@ -395,74 +400,78 @@ function rtLoop(){
 }
 
 // ── Live waveform ────────────────────────────────────────────
-// Center line fixed at W/2 = "now".
-// Bars flow right→left: newest bar touches the center line from left.
-// visibleSec = how many seconds fit in the left half (history).
-const RT_SEC = 8; // seconds of history shown on left side
+// All elements use the SAME time→pixel mapping:
+//   px = lineX + (audioTime - ct) / secPerPx
+// lineX=W/2, left=past, right=future(current silence growing)
+// secPerPx = RT_SEC / (W/2)  →  left half shows RT_SEC of history
 
 function drawLiveWave(){
   if(!isPlaying||!waReady) return;
   const cv=document.getElementById('waveCanvas'), wa=document.getElementById('waveArea');
   const dpr=Math.min(window.devicePixelRatio||1,2), W=wa.clientWidth||320, H=72;
-  // resize if needed
-  if(cv.width!==W*dpr){ cv.width=W*dpr; cv.height=H*dpr; cv.style.width=W+'px'; cv.style.height=H+'px'; }
-  const c=cv.getContext('2d');
-  c.setTransform(dpr,0,0,dpr,0,0);
+  cv.width=W*dpr; cv.height=H*dpr; cv.style.width=W+'px'; cv.style.height=H+'px';
+  const c=cv.getContext('2d'); c.scale(dpr,dpr);
   c.fillStyle='#0d0d16'; c.fillRect(0,0,W,H);
-  const mid=H/2, lineX=W/2;
+  const mid=H/2, ct=audioEl.currentTime;
+  const lineX=W/2;
+  const secPerPx=RT_SEC/(W/2); // same for bars, silences, markers
 
-  // Silence regions: map past silences relative to current time
-  // Left half = past RT_SEC seconds, right half = future (empty)
-  const ct=audioEl.currentTime;
-  const secPerPx=RT_SEC/(W/2); // seconds per pixel on left side
+  // helper: audioTime → pixel x
+  const toPx=t=>lineX+(t-ct)/secPerPx;
+
+  // ── Silence regions (same toPx mapping) ──
   for(const sr of silReg){
-    const relS=sr.start-ct, relE=sr.end-ct;
-    // past is negative relT → left of center
-    const sx=lineX + relS/secPerPx;
-    const ex=lineX + relE/secPerPx;
-    if(ex<0||sx>lineX) continue; // only draw past (left of center)
-    c.fillStyle='rgba(255,64,129,.08)'; // very subtle
-    c.fillRect(Math.max(0,sx),0,Math.min(lineX,ex)-Math.max(0,sx),H);
+    const sx=toPx(sr.start), ex=toPx(sr.end);
+    if(ex<0||sx>W) continue;
+    c.fillStyle='rgba(255,140,80,.12)'; // orange tint, very subtle
+    c.fillRect(Math.max(0,sx),0,Math.min(W,ex)-Math.max(0,sx),H);
+  }
+  // Currently growing silence (right of center)
+  if(rtInSil){
+    const sx=toPx(rtSilStart), ex=lineX; // silence started in past, "now" is edge
+    if(sx<lineX){
+      c.fillStyle='rgba(255,140,80,.18)';
+      c.fillRect(Math.max(0,sx),0,lineX-Math.max(0,sx),H);
+    }
   }
 
-  // Threshold lines (horizontal)
-  const thrH=Math.min(mid-2, silThr*8*mid);
-  c.strokeStyle='rgba(255,64,129,.25)'; c.lineWidth=1;
+  // ── Threshold lines ──
+  const thrH=Math.min(mid-2,silThr*8*mid);
+  c.strokeStyle='rgba(255,140,80,.3)'; c.lineWidth=1;
   c.beginPath(); c.moveTo(0,mid-thrH); c.lineTo(W,mid-thrH);
   c.moveTo(0,mid+thrH); c.lineTo(W,mid+thrH); c.stroke();
 
-  // Bars: newest at center, older further left
-  // Each bar = RT_SEC/RT_LEVELS seconds wide
-  const bw=Math.max(1,(W/2)/RT_LEVELS);
-  for(let age=0;age<RT_LEVELS;age++){
-    // age=0 is newest (rightmost), age=RT_LEVELS-1 is oldest (leftmost)
-    const x=lineX-(age+1)*bw;
-    if(x+bw<0) continue;
-    const dataIdx=(rtLevelIdx-1-age+RT_LEVELS*100)%RT_LEVELS;
-    const rms=rtLevels[dataIdx];
+  // ── Waveform bars from timestamped buffer ──
+  // Each bar's x position = toPx(entry.t)
+  // Bar width = time span between adjacent samples → pixels
+  const pxPerSample=(1/60)/secPerPx; // approx px per ~60fps sample
+  const bw=Math.max(1,pxPerSample);
+  for(let i=0;i<rtBuf.length;i++){
+    const{rms,t}=rtBuf[i];
+    const x=toPx(t);
+    if(x+bw<0||x>lineX+4) continue; // only draw up to slightly past center
     const h=Math.max(1,Math.min(mid-1,rms*8*mid));
-    c.fillStyle=rms<silThr?'rgba(255,64,129,.5)':'rgba(0,229,255,.7)';
-    c.fillRect(x, mid-h, Math.max(1,bw-0.5), h*2);
+    c.fillStyle=rms<silThr?'rgba(255,140,80,.7)':'rgba(0,229,255,.75)';
+    c.fillRect(x-bw/2,mid-h,bw,h*2);
   }
 
-  // Center line
+  // ── Center line ──
   c.fillStyle='#2a2a3d'; c.fillRect(0,mid-.5,W,1);
 
-  // Fixed detection line at center
+  // ── Detection line (center, fixed) ──
   c.strokeStyle='rgba(0,229,255,.9)'; c.lineWidth=2;
   c.beginPath(); c.moveTo(lineX,0); c.lineTo(lineX,H); c.stroke();
   c.fillStyle='rgba(0,229,255,.9)';
   c.beginPath(); c.moveTo(lineX-4,0); c.lineTo(lineX+4,0); c.lineTo(lineX,6); c.fill();
 
-  // Markers (past only, left of center)
+  // ── Markers (toPx mapping, show ±RT_SEC) ──
   for(const m of markers){
-    const relT=m.time-ct;
-    if(relT>0) continue; // future markers skip
-    const mx=lineX+relT/secPerPx;
-    if(mx<0) continue;
-    c.strokeStyle='#ff4081'; c.lineWidth=1.5;
+    const mx=toPx(m.time);
+    if(mx<0||mx>W) continue;
+    // markers: yellow to distinguish from silence (orange) and audio (cyan)
+    c.strokeStyle='#ffdd00'; c.lineWidth=1.5;
     c.beginPath(); c.moveTo(mx,0); c.lineTo(mx,H); c.stroke();
-    c.fillStyle='#ff4081';
+    c.fillStyle='#ffdd00';
     c.beginPath(); c.moveTo(mx-3,0); c.lineTo(mx+3,0); c.lineTo(mx,6); c.fill();
   }
 }
@@ -671,9 +680,14 @@ function seekTo(t){
 function loop(){
   if(!isPlaying)return;
   const t=curT();
+  // Always track playhead in zoomCtr so static wave stays correct after pause
+  if(duration>0){
+    const f=t/duration, hs=1/(2*zoomLv);
+    if(f<zoomCtr-hs*.4||f>zoomCtr+hs*.4)
+      zoomCtr=Math.max(hs,Math.min(1-hs,f));
+  }
   if(waReady) drawLiveWave(); else drawWave(t);
   updateTime(t); drawSeek(t); chkSil(t); hlMk(t);
-  if(zoomLv>1.5){const f=duration>0?t/duration:0,hs=1/(2*zoomLv);if(f<zoomCtr-hs*.4||f>zoomCtr+hs*.4)zoomCtr=Math.max(hs,Math.min(1-hs,f));}
   raf=requestAnimationFrame(loop);
 }
 function redrawPlayBtn(){ drawBtn('btnPlay'); }
