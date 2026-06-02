@@ -57,7 +57,7 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
 /* speed */
 .spd-section{flex-shrink:0;background:var(--sf);border-bottom:1px solid var(--bd)}
 .spd-inner2{padding:4px 8px 5px}
-.spd-row{display:flex;gap:3px;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.spd-row{display:flex;gap:3px;align-items:center;justify-content:center;flex-wrap:wrap}
 .spd-row::-webkit-scrollbar{display:none}
 .spb{background:var(--s2);border:1px solid var(--bd);border-radius:4px;color:var(--dm);
   font-family:'Space Mono',monospace;font-size:10px;padding:5px 6px;cursor:pointer;white-space:nowrap;flex-shrink:0;min-width:38px;text-align:center}
@@ -228,14 +228,14 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   <div class="mk-hdr" id="mkHdr" onclick="toggleMkList()" style="cursor:pointer">
     MARKERS
     <span id="mkCount" style="color:var(--dm);margin-left:4px"></span>
-    <span id="mkArrow" style="font-size:9px;color:var(--ac);margin-left:4px">▼</span>
+    <span id="mkArrow" style="font-size:9px;color:var(--ac);margin-left:4px">▲</span>
     <div class="mk-acts" onclick="event.stopPropagation()">
       <button class="smbtn" id="prevMrkBtn">◀ prev</button>
       <button class="smbtn" id="nextMrkBtn">next ▶</button>
       <button class="smbtn danger" id="clearAllBtn">全削除</button>
     </div>
   </div>
-  <div id="markerList"></div>
+  <div id="markerList" class="collapsed"></div>
 </div>
 <div class="io-bar">
   <button class="iobtn" id="exportBtn" style="border-color:rgba(0,229,255,.3);color:rgba(0,229,255,.8)">▼ EXPORT</button>
@@ -247,8 +247,8 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="toast"></div>
 
 <!-- Color panel modal -->
-<div id="colorModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;overflow-y:auto">
-  <div style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;margin:20px auto;max-width:360px;padding:16px">
+<div id="colorModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:center;justify-content:center">
+  <div style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;margin:20px;max-width:360px;width:calc(100% - 40px);padding:16px">
     <div style="display:flex;align-items:center;margin-bottom:12px">
       <span style="font-family:'Space Mono',monospace;font-size:11px;color:#00e5ff;letter-spacing:1px">COLOR SETTINGS</span>
       <button onclick="document.getElementById('colorModal').style.display='none'" style="margin-left:auto;background:transparent;border:none;color:#6b6b88;font-size:18px;cursor:pointer">×</button>
@@ -402,8 +402,7 @@ document.getElementById('folderInput').addEventListener('change',function(){
   const files=Array.from(this.files).filter(f=>AEXTS.test(f.name)||f.type.startsWith('audio/')).sort((a,b)=>a.name.localeCompare(b.name,'ja'));
   if(!files.length){ showToast('音声ファイルなし'); return; }
   playlist=files.map(f=>({name:f.name,file:f})); plIdx=0;
-  renderPL(); showPlToggle(true); document.getElementById('playlist').classList.add('open');
-  document.getElementById('plToggleBtn').textContent='▲';
+  renderPL(); showPlToggle(true); document.getElementById('plToggleBtn').textContent='▼';
   setSrc(files[0]); load(files[0]); this.value='';
 });
 function setSrc(file){
@@ -533,18 +532,20 @@ function drawLiveWave(){
   // helper: audioTime → pixel x
   const toPx=t=>lineX+(t-ct)/secPerPx;
 
+  // Pre-compute sil color components once (avoid conflict with loop var 'sr')
+  const[scR,scG,scB]=(colorSilBar.match(/\d+/g)||['255','140','80']).slice(0,3).map(Number);
+
   // ── Silence regions (same toPx mapping) ──
-  for(const sr of silReg){
-    const sx=toPx(sr.start), ex=toPx(sr.end);
+  for(const silItem of silReg){
+    const sx=toPx(silItem.start), ex=toPx(silItem.end);
     if(ex<0||sx>W) continue;
     const rx=Math.max(0,sx), rw=Math.min(W,ex)-rx;
     c.fillStyle=colorSilFill;
     c.fillRect(rx,0,rw,H);
-    // duration label
     if(rw>18){
-      c.fillStyle=`rgba(${sr},${sg},${sb},.9)`;
+      c.fillStyle=`rgba(${scR},${scG},${scB},.9)`;
       c.font="bold 12px 'Space Mono',monospace";
-      const lx2=rx+rw/2; if(lx2>4&&lx2<lineX-4){ c.fillText(sr.dur.toFixed(1)+'s', lx2-12, H-3); }
+      const lx2=rx+rw/2; if(lx2>4&&lx2<lineX-4){ c.fillText(silItem.dur.toFixed(1)+'s', lx2-12, H-3); }
     }
   }
   // Currently growing silence
@@ -552,21 +553,14 @@ function drawLiveWave(){
     const sx=toPx(rtSilStart), ex=lineX;
     if(sx<lineX){
       const rx=Math.max(0,sx), rw=lineX-rx;
-      const[gr,gg,gb]=(colorSilBar.match(/\d+/g)||['255','140','80']).map(Number);c.fillStyle=`rgba(${gr},${gg},${gb},0.18)`;
+      c.fillStyle=`rgba(${scR},${scG},${scB},0.18)`;
       c.fillRect(rx,0,rw,H);
-      const grow=ct-rtSilStart;
-      if(rw>18){
-        c.fillStyle='rgba(255,160,80,.85)';
-        c.font="8px 'Space Mono',monospace";
-        c.fillText(grow.toFixed(1)+'s', Math.max(2,Math.min(W-28,rx+rw/2-8)), H-3);
-      }
     }
   }
 
   // ── Threshold lines ──
   const thrH=Math.min(mid-2,silThr*8*mid);
-  const[sr,sg,sb]=(colorSilBar.match(/\d+/g)||['255','140','80']).map(Number);
-  c.strokeStyle=`rgba(${sr},${sg},${sb},.3)`; c.lineWidth=1;
+  c.strokeStyle=`rgba(${scR},${scG},${scB},.3)`; c.lineWidth=1;
   c.beginPath(); c.moveTo(0,mid-thrH); c.lineTo(W,mid-thrH);
   c.moveTo(0,mid+thrH); c.lineTo(W,mid+thrH); c.stroke();
 
@@ -588,9 +582,9 @@ function drawLiveWave(){
   c.fillStyle='#2a2a3d'; c.fillRect(0,mid-.5,W,1);
 
   // ── Detection line (center, fixed) ──
-  c.strokeStyle=colorAc+'cc'; c.lineWidth=2;
+  c.strokeStyle=colorAc; c.lineWidth=2;
   c.beginPath(); c.moveTo(lineX,0); c.lineTo(lineX,H); c.stroke();
-  c.fillStyle=colorAc+'cc';
+  c.fillStyle=colorAc;
   c.beginPath(); c.moveTo(lineX-4,0); c.lineTo(lineX+4,0); c.lineTo(lineX,6); c.fill();
 
   // ── Markers ──
@@ -615,7 +609,7 @@ function drawLiveWave(){
       const durStr=lastSil.dur.toFixed(1)+'s';
       let fs=Math.min(H*0.55, rightW*0.45);
       c.font=`bold ${Math.floor(fs)}px 'Space Mono',monospace`;
-      const[rp,gp,bp]=(colorSilBar.match(/\d+/g)||['255','140','80']).map(Number);c.fillStyle=`rgba(${rp},${gp},${bp},.65)`;
+      c.fillStyle=`rgba(${scR},${scG},${scB},.65)`;
       c.textAlign='center';
       c.fillText(durStr, lineX+2+rightW/2, mid+fs*0.35);
       c.textAlign='left';
@@ -966,10 +960,11 @@ document.getElementById('markerList').addEventListener('click',e=>{
 
 document.getElementById('btnMark').addEventListener('click',addMk);
 // Marker list collapse
-let mkListOpen=true;
+let mkListOpen=false;
 function toggleMkList(){
   mkListOpen=!mkListOpen;
   document.getElementById('markerList').classList.toggle('collapsed',!mkListOpen);
+  // ▼ = list visible (open), ▲ = list hidden (closed)
   document.getElementById('mkArrow').textContent=mkListOpen?'▼':'▲';
 }
 document.getElementById('btnPrevMk').addEventListener('click',()=>document.getElementById('prevMrkBtn').click());
@@ -1130,14 +1125,14 @@ function drawBtn(id){
     c.fillStyle='#fff';
     // left-pointing chevron (prev marker)
     c.beginPath();c.moveTo(cx+2,cy-7);c.lineTo(cx-5,cy);c.lineTo(cx+2,cy+7);c.fill();
-    c.fillStyle='rgba(255,255,255,.5)';c.font="6px 'Space Mono',monospace";c.textAlign='center';
-    c.fillText('◀MK',cx,H-4);c.textAlign='left';
+    c.fillStyle='rgba(255,255,255,.8)';c.font="7px 'Space Mono',monospace";c.textAlign='center';
+    c.fillText('PREV',cx,H-4);c.textAlign='left';
   } else if(id==='btnNextMk'){
     roundRect(c,0,0,W,H,8,C.a2,C.a2);
     c.fillStyle='#fff';
     c.beginPath();c.moveTo(cx-2,cy-7);c.lineTo(cx+5,cy);c.lineTo(cx-2,cy+7);c.fill();
-    c.fillStyle='rgba(255,255,255,.5)';c.font="6px 'Space Mono',monospace";c.textAlign='center';
-    c.fillText('MK▶',cx,H-4);c.textAlign='left';
+    c.fillStyle='rgba(255,255,255,.8)';c.font="7px 'Space Mono',monospace";c.textAlign='center';
+    c.fillText('NEXT',cx,H-4);c.textAlign='left';
   } else if(id==='folderBtn'){
     roundRect(c,0,0,W,H,6,'#0d1f2a','rgba(0,229,255,.3)');
     c.fillStyle='rgba(0,229,255,.8)';
@@ -1325,25 +1320,26 @@ function buildColorPanel(){
   // Inputs are pre-built in HTML; just wire events once
   if(document.getElementById('cpAc')._wired) return;
   document.getElementById('cpAc')._wired=true;
-  document.getElementById('cpAc').addEventListener('change',e=>{
-    colorAc=e.target.value; C.ac=colorAc;
-    document.documentElement.style.setProperty('--ac',colorAc);
-    drawAllBtns(); showToast('色変更');
-  });
-  document.getElementById('cpA2').addEventListener('change',e=>{
-    colorMarkLine=e.target.value; C.a2=e.target.value;
-    drawAllBtns(); showToast('色変更');
-  });
-  document.getElementById('cpSil').addEventListener('change',e=>{
-    const[r,g,b]=hexToRgb(e.target.value);
-    colorSilBar=`rgba(${r},${g},${b},1)`;
-    colorSilFill=`rgba(${r},${g},${b},0.15)`;
-    showToast('色変更');
-  });
-  document.getElementById('cpMk').addEventListener('change',e=>{
-    colorA2=e.target.value; C.a2=colorA2;
-    document.documentElement.style.setProperty('--a2',colorA2);
-    drawAllBtns(); showToast('色変更');
+  function applyColor(id,val){
+    if(id==='cpAc'){
+      colorAc=val; C.ac=val;
+      document.documentElement.style.setProperty('--ac',val);
+    } else if(id==='cpA2'){
+      colorMarkLine=val; // marker line color
+    } else if(id==='cpSil'){
+      const[r,g,b]=hexToRgb(val);
+      colorSilBar=`rgba(${r},${g},${b},1)`;
+      colorSilFill=`rgba(${r},${g},${b},0.15)`;
+    } else if(id==='cpMk'){
+      colorA2=val; C.a2=val;
+      document.documentElement.style.setProperty('--a2',val);
+    }
+    drawAllBtns();
+  }
+  ['cpAc','cpA2','cpSil','cpMk'].forEach(id=>{
+    const el=document.getElementById(id);
+    el.addEventListener('input', e=>applyColor(id,e.target.value));
+    el.addEventListener('change',e=>applyColor(id,e.target.value));
   });
 }
 function resetColors(){
