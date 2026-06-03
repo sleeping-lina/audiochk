@@ -146,11 +146,15 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   <canvas id="waveCanvas"></canvas>
 </div>
 <div class="info">
-  <span id="timeDisp">00:00:00.0</span>
+  <span id="timeDisp" onclick="openTimeInput()" style="cursor:pointer;border-bottom:1px solid rgba(0,229,255,.3)">00:00:00.0</span>
   <span id="timeTotal">/ --:--:--</span>
   <span style="color:var(--bd);margin:0 2px">|</span>
-  <span id="silInfo"></span>
-  <span id="zoomInfo">×5.0</span>
+  <span id="silInfo" style="flex:1"></span>
+  <div style="display:flex;align-items:center;gap:1px;flex-shrink:0">
+    <button onclick="doZoom(1/1.4,.5)" style="background:transparent;border:none;color:var(--dm);font-size:13px;cursor:pointer;padding:2px 4px;line-height:1">−</button>
+    <span id="zoomInfo" style="font-family:'Space Mono',monospace;font-size:9px;color:var(--dm);min-width:32px;text-align:center">×5.0</span>
+    <button onclick="doZoom(1.4,.5)" style="background:transparent;border:none;color:var(--dm);font-size:13px;cursor:pointer;padding:2px 4px;line-height:1">＋</button>
+  </div>
 </div>
 <div class="seek-wrap" id="seekWrap"><canvas id="seekCanvas"></canvas></div>
 <!-- Live silence detection panel -->
@@ -342,15 +346,35 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
       <span style="font-family:'Space Mono',monospace;font-size:11px;color:#00e5ff;letter-spacing:1px">PLAYBACK SETTINGS</span>
       <button onclick="closeCtrlModal()" style="margin-left:auto;background:transparent;border:none;color:#6b6b88;font-size:20px;cursor:pointer;padding:0 4px">×</button>
     </div>
-    <div style="font-family:'Space Mono',monospace;font-size:9px;color:#6b6b88;margin-bottom:8px;letter-spacing:1px">SPEED PRESETS (×1.0以外、1〜6キー対応)</div>
-    <div id="spdPresets" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px"></div>
-    <div style="font-family:'Space Mono',monospace;font-size:9px;color:#6b6b88;margin-bottom:8px;letter-spacing:1px">SKIP 秒数</div>
+    <div style="background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:8px;padding:10px;margin-bottom:12px">
+      <div style="font-family:'Space Mono',monospace;font-size:9px;color:rgba(0,229,255,.7);margin-bottom:10px;letter-spacing:1px">SPEED PRESETS  <span style="color:#6b6b88;font-size:8px">1〜6キー対応</span></div>
+      <div id="spdPresets" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"></div>
+    </div>
+    <div style="background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:8px;padding:10px">
+      <div style="font-family:'Space Mono',monospace;font-size:9px;color:rgba(0,229,255,.7);margin-bottom:8px;letter-spacing:1px">SKIP 秒数</div>
     <div style="display:flex;align-items:center;gap:8px">
       <button onclick="adjSkip(-1)" style="width:36px;height:36px;background:#1c1c28;border:1px solid #2a2a3d;border-radius:6px;color:#e8e8f0;font-size:18px;cursor:pointer">−</button>
       <input type="number" id="skipSecM" min="1" max="60" value="5"
         style="flex:1;background:#1c1c28;border:1px solid #2a2a3d;border-radius:6px;color:#e8e8f0;font-family:'Space Mono',monospace;font-size:16px;padding:6px;text-align:center">
       <button onclick="adjSkip(1)"  style="width:36px;height:36px;background:#1c1c28;border:1px solid #2a2a3d;border-radius:6px;color:#e8e8f0;font-size:18px;cursor:pointer">＋</button>
       <span style="font-family:'Space Mono',monospace;font-size:10px;color:#6b6b88">秒</span>
+    </div>
+    </div><!-- end skip section -->
+  </div>
+</div>
+
+<!-- Time input modal -->
+<div id="timeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:center;justify-content:center" onclick="closeTimeModal()">
+  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;padding:20px 20px 16px;min-width:260px">
+    <div style="font-family:'Space Mono',monospace;font-size:10px;color:#6b6b88;letter-spacing:1px;margin-bottom:10px">タイムジャンプ (HH:MM:SS)</div>
+    <input id="timeInput" type="text" inputmode="numeric" pattern="[0-9:.]+"
+      placeholder="00:00:00"
+      style="width:100%;background:#0d0d16;border:1px solid #00e5ff;border-radius:8px;
+      color:#00e5ff;font-family:'Space Mono',monospace;font-size:28px;padding:10px;
+      text-align:center;outline:none;letter-spacing:2px;margin-bottom:12px">
+    <div style="display:flex;gap:8px">
+      <button onclick="closeTimeModal()" style="flex:1;padding:10px;background:#1c1c28;border:1px solid #2a2a3d;border-radius:8px;color:#6b6b88;font-family:'Space Mono',monospace;font-size:12px;cursor:pointer">キャンセル</button>
+      <button onclick="commitTimeInput()" style="flex:1;padding:10px;background:rgba(0,229,255,.15);border:1px solid #00e5ff;border-radius:8px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:12px;cursor:pointer">ジャンプ</button>
     </div>
   </div>
 </div>
@@ -515,7 +539,9 @@ function ensureWAGraph(){
 }
 function resetRTSilence(){ rtInSil=false; rtBuf=[]; }
 
+let rtTimerId=null;
 function rtLoop(){
+  rtTimerId=null;
   if(!isPlaying||!waReady) return;
   if(waCtx.state==='suspended') waCtx.resume();
   waAnalyser.getFloatTimeDomainData(waBuf);
@@ -554,7 +580,7 @@ function rtLoop(){
       document.getElementById('silStatus').textContent='音あり';
     }
   }
-  setTimeout(rtLoop, 50); // ~20fps is enough for silence detection
+  if(isPlaying) rtTimerId=setTimeout(rtLoop, 50);
 }
 
 // ── Live waveform ────────────────────────────────────────────
@@ -844,6 +870,7 @@ function doZoom(scale,cr){
 function curT(){return audioEl.currentTime||0;}
 function play(){
   if(!objURL)return;
+  if(isPlaying) stop(); // prevent double-play
   ensureWAGraph();
   if(waCtx&&waCtx.state==='suspended') waCtx.resume();
   // Set rate before AND after play() — iOS sometimes resets it on play()
@@ -861,7 +888,9 @@ function play(){
   }
 }
 function stop(){
-  audioEl.pause(); isPlaying=false; redrawPlayBtn(); cancelAnimationFrame(raf);
+  audioEl.pause(); isPlaying=false; redrawPlayBtn();
+  cancelAnimationFrame(raf); raf=null;
+  if(rtTimerId){ clearTimeout(rtTimerId); rtTimerId=null; }
   resetRTSilence();
   document.getElementById('silStatus').textContent='停止中';
   document.getElementById('silCurDur').textContent='0.0s';
@@ -1299,6 +1328,41 @@ document.getElementById('btnHelp').addEventListener('click',()=>{document.getEle
   }catch(e){}
 })();
 
+// ── Time input modal ──────────────────────────
+function openTimeInput(){
+  if(!objURL) return;
+  const modal=document.getElementById('timeModal');
+  const inp=document.getElementById('timeInput');
+  inp.value=fmtInputTime(curT());
+  modal.style.display='flex';
+  setTimeout(()=>inp.focus(),100);
+}
+function closeTimeModal(){
+  document.getElementById('timeModal').style.display='none';
+  setTimeout(()=>grabFocus({}),100);
+}
+function commitTimeInput(){
+  const v=document.getElementById('timeInput').value.trim();
+  const t=parseTimeInput(v);
+  if(t===null){showToast('形式: 0:00 / 0:00:00');return;}
+  closeTimeModal();
+  seekTo(t);
+  showToast('→ '+fmtMs(t));
+}
+function fmtInputTime(s){
+  const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=Math.floor(s%60);
+  return h>0?`${h}:${p2(m)}:${p2(sc)}`:`${p2(m)}:${p2(sc)}`;
+}
+function parseTimeInput(s){
+  // Accept: SS, MM:SS, H:MM:SS, with optional decimal
+  const p=s.replace(/[^0-9:.]/g,'').split(':').map(Number);
+  if(p.some(isNaN)) return null;
+  if(p.length===1) return p[0];
+  if(p.length===2) return p[0]*60+p[1];
+  if(p.length===3) return p[0]*3600+p[1]*60+p[2];
+  return null;
+}
+
 // ── Helpers ───────────────────────────────────
 function fmtMs(s){if(!isFinite(s)||s<0)return'--:--:--';const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=Math.floor(s%60),ms=Math.floor((s%1)*10);return`${p2(h)}:${p2(m)}:${p2(sc)}.${ms}`;}
 function fmtShort(s){if(!isFinite(s)||s<0)return'--:--';const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=Math.floor(s%60);return h>0?`${h}:${p2(m)}:${p2(sc)}`:`${p2(m)}:${p2(sc)}`;}
@@ -1382,6 +1446,13 @@ function applyColor(id,val){
   drawAllBtns();
   if(!isPlaying) drawWave(audioEl.currentTime);
 }
+// Time input Enter key
+document.getElementById('timeInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){commitTimeInput();}
+  else if(e.key==='Escape'){closeTimeModal();}
+});
+// Add ctrlModal to grabFocus check (already done but double-check timeModal)
+
 function buildColorPanel(){
   if(document.getElementById('cpAc')._wired) return;
   document.getElementById('cpAc')._wired=true;
@@ -1424,7 +1495,7 @@ function renderSpdPresets(){
     const btn=document.querySelector(`.spb[data-speed="${s}"]`);
     const cur=btn?btn.textContent.trim():`×${s}`;
     return `<div style="display:flex;flex-direction:column;gap:3px;align-items:center">
-      <span style="font-family:'Space Mono',monospace;font-size:8px;color:#6b6b88">${i+1}番</span>
+      <span style="font-family:'Space Mono',monospace;font-size:9px;color:#6b6b88">${i+1}</span>
       <input type="number" value="${s}" min="0.1" max="4.0" step="0.05" data-preset="${i}"
         style="width:100%;background:#1c1c28;border:1px solid #2a2a3d;border-radius:5px;
         color:#e8e8f0;font-family:'Space Mono',monospace;font-size:12px;padding:4px;text-align:center"
@@ -1507,9 +1578,11 @@ const focusTrap = document.getElementById('focusTrap');
 function grabFocus(e){
   // Don't steal focus when a modal is open or when user taps an input/button
   const cm=document.getElementById('ctrlModal');
+  const tm=document.getElementById('timeModal');
   const modalOpen = document.getElementById('colorModal').style.display!=='none' ||
                     document.getElementById('helpModal').style.display!=='none' ||
-                    (cm&&cm.style.display!=='none');
+                    (cm&&cm.style.display!=='none') ||
+                    (tm&&tm.style.display!=='none');
   if(modalOpen) return;
   const tag = e && e.target && e.target.tagName;
   if(tag==='INPUT'||tag==='BUTTON'||tag==='SELECT'||tag==='TEXTAREA') return;
