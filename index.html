@@ -126,7 +126,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <header>
   <span class="logo">AUDIOCHK</span>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
-  <span id="plToggleBtn" onclick="togglePlaylist()" style="display:none;font-family:'Space Mono',monospace;font-size:9px;color:var(--ac);cursor:pointer;flex-shrink:0;padding:2px 4px;white-space:nowrap">▼</span>
+  <span id="plToggleBtn" onclick="togglePlaylist()" style="display:none;font-family:'Space Mono',monospace;font-size:11px;color:var(--ac);cursor:pointer;flex-shrink:0;padding:2px 6px;white-space:nowrap">▼</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
     <canvas class="cbtn" id="folderBtn" width="32" height="28" data-w="32" data-h="28"></canvas>
     <canvas class="cbtn" id="fileBtn" width="32" height="28" data-w="32" data-h="28"></canvas>
@@ -181,9 +181,10 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
           <span id="autoMarkLbl" style="font-size:9px;color:var(--dm);font-family:'Space Mono',monospace">OFF</span>
         </div>
       </div>
-      <div class="sil-row" style="justify-content:center">
+      <div class="sil-row" style="justify-content:center;gap:10px">
         <span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--dm)">現在の無音：</span>
         <span style="font-family:'Space Mono',monospace;font-size:14px;color:var(--a2);font-weight:700" id="silCurDur">0.0s</span>
+        <button onclick="resetSilPrefs()" style="background:#1c1c28;border:1px solid #2a2a3d;border-radius:5px;color:#6b6b88;font-family:'Space Mono',monospace;font-size:9px;padding:3px 7px;cursor:pointer">リセット</button>
       </div>
     </div>
   </div>
@@ -225,7 +226,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   <div class="mk-hdr" id="mkHdr" onclick="toggleMkList()" style="cursor:pointer">
     MARKERS
     <span id="mkCount" style="color:var(--dm);margin-left:4px"></span>
-    <span id="mkArrow" style="font-size:9px;color:var(--ac);margin-left:4px">▲</span>
+    <span id="mkArrow" style="font-size:11px;color:var(--ac);margin-left:4px">▲</span>
     <div class="mk-acts" onclick="event.stopPropagation()">
       <button class="smbtn" id="prevMrkBtn">◀ prev</button>
       <button class="smbtn" id="nextMrkBtn">next ▶</button>
@@ -504,7 +505,9 @@ function rtLoop(){
   if(rtBuf.length>RT_MAX) rtBuf.shift();
 
   if(rms<silThr){
-    if(!rtInSil){ rtInSil=true; rtSilStart=Math.max(0,t-(waAnalyser.fftSize/waCtx.sampleRate)); }
+    if(!rtInSil){ rtInSil=true;
+      // For head silence: if within first 0.3s, start from 0
+      rtSilStart=t<0.3?0:Math.max(0,t-(waAnalyser.fftSize/waCtx.sampleRate)); }
     document.getElementById('silCurDur').textContent=(t-rtSilStart).toFixed(1)+'s';
     document.getElementById('silStatus').textContent='無音中…';
   } else {
@@ -605,8 +608,8 @@ function drawLiveWave(){
   c.strokeStyle=colorAc; c.lineWidth=2;
   c.beginPath(); c.moveTo(lineX,0); c.lineTo(lineX,H); c.stroke();
   c.fillStyle=colorAc;
-  // Triangle drawn fully inside canvas (apex at y=7 not y=0)
-  c.beginPath(); c.moveTo(lineX-5,1); c.lineTo(lineX+5,1); c.lineTo(lineX,8); c.fill();
+  // Small triangle at top, fully inside canvas
+  c.beginPath(); c.moveTo(lineX-4,2); c.lineTo(lineX+4,2); c.lineTo(lineX,7); c.fill();
 
   // ── Markers ──
   for(const m of markers){
@@ -1267,6 +1270,7 @@ document.getElementById('fileBtn').addEventListener('click',()=>document.getElem
 document.getElementById('btnColor').addEventListener('click',()=>openColorModal());
 document.getElementById('btnCtrl').addEventListener('click',()=>openCtrlModal());
 document.getElementById('btnHelp').addEventListener('click',()=>{document.getElementById('helpModal').style.display='flex';});
+document.getElementById('btnCtrl').addEventListener('click',()=>openCtrlModal());
 
 // ── PWA Icon ──────────────────────────────────
 (function(){
@@ -1454,6 +1458,14 @@ function adjSilMin(d){
   document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒';
   saveSilPrefs();
 }
+function resetSilPrefs(){
+  silThr=0.010; silMinSec=1.0;
+  document.getElementById('silThr').value=silThr;
+  document.getElementById('silMin').value=silMinSec;
+  document.getElementById('silThrV').textContent=silThr.toFixed(3);
+  document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒';
+  saveSilPrefs(); showToast('リセット完了');
+}
 function saveSilPrefs(){
   try{ localStorage.setItem('ac_silprefs',JSON.stringify({silThr,silMinSec})); }catch(e){}
 }
@@ -1485,7 +1497,8 @@ const focusTrap = document.getElementById('focusTrap');
 function grabFocus(e){
   // Don't steal focus when a modal is open or when user taps an input/button
   const modalOpen = document.getElementById('colorModal').style.display!=='none' ||
-                    document.getElementById('helpModal').style.display!=='none';
+                    document.getElementById('helpModal').style.display!=='none' ||
+                    document.getElementById('ctrlModal').style.display!=='none';
   if(modalOpen) return;
   const tag = e && e.target && e.target.tagName;
   if(tag==='INPUT'||tag==='BUTTON'||tag==='SELECT'||tag==='TEXTAREA') return;
