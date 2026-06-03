@@ -199,7 +199,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
       <button class="spb" data-speed="1.25">×1.25</button>
       <button class="spb" data-speed="1.5">×1.5</button>
       <button class="spb" data-speed="2.0">×2.0</button>
-      <canvas class="cbtn" id="btnCtrl" width="28" height="28" data-w="28" data-h="28" style="flex-shrink:0;margin-left:4px" title="再生設定"></canvas>
+      <button id="btnCtrl" onclick="openCtrlModal()" style="flex-shrink:0;margin-left:4px;width:28px;height:28px;background:#0d1f2a;border:1px solid rgba(0,229,255,.3);border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0" title="再生設定"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="3" stroke="rgba(0,229,255,.8)" stroke-width="1.5"/><circle cx="8" cy="8" r="6.5" stroke="rgba(0,229,255,.4)" stroke-width="1" stroke-dasharray="2 2"/><circle cx="8" cy="1.5" r="1" fill="rgba(0,229,255,.8)"/><circle cx="8" cy="14.5" r="1" fill="rgba(0,229,255,.8)"/><circle cx="1.5" cy="8" r="1" fill="rgba(0,229,255,.8)"/><circle cx="14.5" cy="8" r="1" fill="rgba(0,229,255,.8)"/></svg></button>
     </div>
   </div>
 </div>
@@ -351,6 +351,7 @@ let raf=null;
 let playlist=[], plIdx=-1, skipSec=5;
 let zoomLv=5.0, zoomCtr=0.1;
 let curMkIdx=-1;
+const SPD_PRESETS=[0.25,0.5,0.75,1.25,1.5,2.0]; // non-1.0 speed presets
 const LP=44, RH=22;
 let ROWS=10;
 const WSAMP=1800, SIL_THRESH=0.015, SIL_MIN=0.3;
@@ -1183,18 +1184,6 @@ function drawBtn(id){
     c.fillStyle='rgba(0,229,255,.8)';
     [cx-6,cx-2,cx+2,cx+6].forEach(x=>{ c.fillRect(x-1,cy-3,2,2); });
     c.fillRect(cx-4,cy+1,8,2);
-  } else if(id==='btnCtrl'){
-    roundRect(c,0,0,W,H,6,'#0d1f2a','rgba(0,229,255,.3)');
-    // gear icon
-    c.fillStyle='rgba(0,229,255,.8)';
-    c.beginPath(); c.arc(cx,cy,4,0,Math.PI*2); c.fill();
-    c.fillStyle='#0d1f2a';
-    c.beginPath(); c.arc(cx,cy,2,0,Math.PI*2); c.fill();
-    c.fillStyle='rgba(0,229,255,.8)';
-    for(let a=0;a<8;a++){
-      const ang=a*Math.PI/4, x2=cx+Math.cos(ang)*6, y2=cy+Math.sin(ang)*6;
-      c.fillRect(x2-1,y2-1,2,2);
-    }
   } else if(id==='btnUndo'){
     roundRect(c,0,0,W,H,8,C.bg,C.bd);
     // curved arrow counter-clockwise
@@ -1260,7 +1249,7 @@ function drawBtn(id){
 }
 
 function drawAllBtns(){
-  ['folderBtn','fileBtn','btnColor','btnHelp','btnCtrl',
+  ['folderBtn','fileBtn','btnColor','btnHelp',
    'btnPrevMk','btnUndo','btnMark','btnRedo','btnNextMk',
    'btnHeadTail0','btnBack01','btnBackN','btnPlay','btnFwdN','btnFwd01','btnHeadTail1'].forEach(drawBtn);
 }
@@ -1394,7 +1383,6 @@ function resetColors(){
 }
 
 // ── Ctrl modal (playback settings) ────────────
-const SPD_PRESETS=[0.25,0.5,0.75,1.25,1.5,2.0]; // the 6 non-1.0 speeds
 
 function openCtrlModal(){
   const modal=document.getElementById('ctrlModal');
@@ -1487,9 +1475,6 @@ document.querySelectorAll('.spb').forEach(b=>b.classList.toggle('on',parseFloat(
 drawAllBtns();
 buildColorPanel();
 drawWave(0); drawSeek(0); renderMarkers();
-// Wire btnCtrl here — after openCtrlModal is defined
-document.getElementById('btnCtrl').addEventListener('click',()=>openCtrlModal());
-
 // ── Focus trap for hardware keyboard (8BitDo etc.) ──────────
 // iOS Safari only fires keydown when an element has focus.
 // We use a hidden readonly input (inputmode=none = no virtual keyboard)
@@ -1498,9 +1483,10 @@ const focusTrap = document.getElementById('focusTrap');
 
 function grabFocus(e){
   // Don't steal focus when a modal is open or when user taps an input/button
+  const cm=document.getElementById('ctrlModal');
   const modalOpen = document.getElementById('colorModal').style.display!=='none' ||
                     document.getElementById('helpModal').style.display!=='none' ||
-                    document.getElementById('ctrlModal').style.display!=='none';
+                    (cm&&cm.style.display!=='none');
   if(modalOpen) return;
   const tag = e && e.target && e.target.tagName;
   if(tag==='INPUT'||tag==='BUTTON'||tag==='SELECT'||tag==='TEXTAREA') return;
