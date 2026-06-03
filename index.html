@@ -438,6 +438,8 @@ async function load(file){
   curFileName=file.name;
   plIdx=playlist.findIndex(p=>p.file===file);
   isPlaying=false; redrawPlayBtn(); cancelAnimationFrame(raf);
+  // Reset time display immediately
+  updateTime(0); drawSeek(0);
   hist=[]; redoSt=[]; curMkIdx=-1;
   waveData=null; silReg=[]; duration=0;
   rtBuf=[];
@@ -608,8 +610,7 @@ function drawLiveWave(){
   c.strokeStyle=colorAc; c.lineWidth=2;
   c.beginPath(); c.moveTo(lineX,0); c.lineTo(lineX,H); c.stroke();
   c.fillStyle=colorAc;
-  // Small triangle at top, fully inside canvas
-  c.beginPath(); c.moveTo(lineX-4,2); c.lineTo(lineX+4,2); c.lineTo(lineX,7); c.fill();
+  // No triangle — line only
 
   // ── Markers ──
   for(const m of markers){
@@ -1268,9 +1269,7 @@ function drawAllBtns(){
 document.getElementById('folderBtn').addEventListener('click',()=>document.getElementById('folderInput').click());
 document.getElementById('fileBtn').addEventListener('click',()=>document.getElementById('fileInput').click());
 document.getElementById('btnColor').addEventListener('click',()=>openColorModal());
-document.getElementById('btnCtrl').addEventListener('click',()=>openCtrlModal());
 document.getElementById('btnHelp').addEventListener('click',()=>{document.getElementById('helpModal').style.display='flex';});
-document.getElementById('btnCtrl').addEventListener('click',()=>openCtrlModal());
 
 // ── PWA Icon ──────────────────────────────────
 (function(){
@@ -1488,6 +1487,9 @@ document.querySelectorAll('.spb').forEach(b=>b.classList.toggle('on',parseFloat(
 drawAllBtns();
 buildColorPanel();
 drawWave(0); drawSeek(0); renderMarkers();
+// Wire btnCtrl here — after openCtrlModal is defined
+document.getElementById('btnCtrl').addEventListener('click',()=>openCtrlModal());
+
 // ── Focus trap for hardware keyboard (8BitDo etc.) ──────────
 // iOS Safari only fires keydown when an element has focus.
 // We use a hidden readonly input (inputmode=none = no virtual keyboard)
