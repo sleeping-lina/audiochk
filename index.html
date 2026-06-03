@@ -68,7 +68,10 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
 .spcust label{font-size:9px;color:var(--dm)}
 .sil-arrow{font-size:9px;color:var(--dm);margin-left:auto}
 .sil-body{max-height:0;overflow:hidden;transition:max-height .25s}
-.sil-body.open{max-height:140px}
+.sil-body.open{max-height:160px}
+.sil-adj{background:var(--s2);border:1px solid var(--bd);border-radius:4px;color:var(--tx);
+  font-size:13px;width:24px;height:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0}
+.sil-adj:active{opacity:.6}
 /* controls */
 .ctrl-wrap{flex-shrink:0;background:var(--sf);border-bottom:1px solid var(--bd);padding:5px 8px}
 .crow{display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:4px}
@@ -123,7 +126,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <header>
   <span class="logo">AUDIOCHK</span>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
-  <span id="plToggleBtn" onclick="togglePlaylist()" style="display:none;font-family:'Space Mono',monospace;font-size:10px;color:var(--ac);cursor:pointer;flex-shrink:0;padding:2px 4px;white-space:nowrap">▼</span>
+  <span id="plToggleBtn" onclick="togglePlaylist()" style="display:none;font-family:'Space Mono',monospace;font-size:9px;color:var(--ac);cursor:pointer;flex-shrink:0;padding:2px 4px;white-space:nowrap">▼</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
     <canvas class="cbtn" id="folderBtn" width="32" height="28" data-w="32" data-h="28"></canvas>
     <canvas class="cbtn" id="fileBtn" width="32" height="28" data-w="32" data-h="28"></canvas>
@@ -161,12 +164,12 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
     <div class="spd-inner">
       <div class="sil-row">
         <span class="sil-ctl-lbl">感度（閾値）</span>
-        <input type="range" id="silThr" min="0.004" max="0.08" step="0.002" value="0.02">
-        <span class="sil-val" id="silThrV">0.020</span>
+        <button class="sil-adj" onclick="adjSilThr(-1)">−</button><input type="range" id="silThr" min="0.004" max="0.08" step="0.002" value="0.010"><button class="sil-adj" onclick="adjSilThr(1)">＋</button>
+        <span class="sil-val" id="silThrV">0.010</span>
       </div>
       <div class="sil-row">
         <span class="sil-ctl-lbl">最短無音秒数</span>
-        <input type="range" id="silMin" min="0.1" max="5" step="0.1" value="1.0">
+        <button class="sil-adj" onclick="adjSilMin(-1)">−</button><input type="range" id="silMin" min="0.1" max="5" step="0.1" value="1.0"><button class="sil-adj" onclick="adjSilMin(1)">＋</button>
         <span class="sil-val" id="silMinV">1.0秒</span>
       </div>
       <div class="sil-row" style="justify-content:space-between;align-items:center">
@@ -195,7 +198,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
       <button class="spb" data-speed="1.25">×1.25</button>
       <button class="spb" data-speed="1.5">×1.5</button>
       <button class="spb" data-speed="2.0">×2.0</button>
-      
+      <canvas class="cbtn" id="btnCtrl" width="28" height="28" data-w="28" data-h="28" style="flex-shrink:0;margin-left:4px" title="再生設定"></canvas>
     </div>
   </div>
 </div>
@@ -217,25 +220,19 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
     <canvas class="cbtn" id="btnHeadTail1" width="44" height="44" data-w="44" data-h="44"></canvas>
   </div>
 </div>
-<div class="skip-row">
-  <label>SKIP</label>
-  <div class="skb" id="skMinus">−</div>
-  <input type="number" id="skipSec" value="5" min="1" max="60">
-  <label>秒</label>
-  <div class="skb" id="skPlus">＋</div>
-</div>
+
 <div class="mk-sec">
   <div class="mk-hdr" id="mkHdr" onclick="toggleMkList()" style="cursor:pointer">
     MARKERS
     <span id="mkCount" style="color:var(--dm);margin-left:4px"></span>
-    <span id="mkArrow" style="font-size:9px;color:var(--ac);margin-left:4px">▼</span>
+    <span id="mkArrow" style="font-size:9px;color:var(--ac);margin-left:4px">▲</span>
     <div class="mk-acts" onclick="event.stopPropagation()">
       <button class="smbtn" id="prevMrkBtn">◀ prev</button>
       <button class="smbtn" id="nextMrkBtn">next ▶</button>
       <button class="smbtn danger" id="clearAllBtn">全削除</button>
     </div>
   </div>
-  <div id="markerList" class="collapsed"></div>
+  <div id="markerList"></div>
 </div>
 <div class="io-bar">
   <button class="iobtn" id="exportBtn" style="border-color:rgba(0,229,255,.3);color:rgba(0,229,255,.8)">▼ EXPORT</button>
@@ -400,11 +397,12 @@ audioEl.addEventListener('play',()=>{
 // ── LocalStorage ───────────────────────────────
 const LS_PREFS='ac_prefs3';
 function savePrefs(){
-  try{ localStorage.setItem(LS_PREFS,JSON.stringify({skipSec,playbackRate})); }catch(e){}
+  try{ localStorage.setItem(LS_PREFS,JSON.stringify({skipSec,playbackRate,spdPresets:SPD_PRESETS})); }catch(e){}
 }
 function loadPrefs(){
   try{
     const p=JSON.parse(localStorage.getItem(LS_PREFS)||'{}');
+    if(p.spdPresets?.length===6){ p.spdPresets.forEach((s,i)=>SPD_PRESETS[i]=s); }
     if(p.skipSec>0){ skipSec=p.skipSec; document.getElementById('skipSec').value=skipSec; updateSkipLabels(); }
     if(p.playbackRate>0) playbackRate=p.playbackRate;
   }catch(e){}
@@ -473,7 +471,7 @@ async function load(file){
 // ── Realtime silence detection ────────────────────────────────
 let waCtx=null, waAnalyser=null, waSrc=null, waReady=false;
 let waBuf=null;
-let silThr=0.02, silMinSec=1.0, silAutoMark=true;
+let silThr=0.010, silMinSec=1.0, silAutoMark=true;
 let rtInSil=false, rtSilStart=0;
 // Timestamped ring buffer: each entry = {rms, t}
 const RT_MAX=600;  // max entries stored
@@ -506,7 +504,7 @@ function rtLoop(){
   if(rtBuf.length>RT_MAX) rtBuf.shift();
 
   if(rms<silThr){
-    if(!rtInSil){ rtInSil=true; rtSilStart=t; }
+    if(!rtInSil){ rtInSil=true; rtSilStart=Math.max(0,t-(waAnalyser.fftSize/waCtx.sampleRate)); }
     document.getElementById('silCurDur').textContent=(t-rtSilStart).toFixed(1)+'s';
     document.getElementById('silStatus').textContent='無音中…';
   } else {
@@ -607,7 +605,8 @@ function drawLiveWave(){
   c.strokeStyle=colorAc; c.lineWidth=2;
   c.beginPath(); c.moveTo(lineX,0); c.lineTo(lineX,H); c.stroke();
   c.fillStyle=colorAc;
-  c.beginPath(); c.moveTo(lineX-4,0); c.lineTo(lineX+4,0); c.lineTo(lineX,6); c.fill();
+  // Triangle drawn fully inside canvas (apex at y=7 not y=0)
+  c.beginPath(); c.moveTo(lineX-5,1); c.lineTo(lineX+5,1); c.lineTo(lineX,8); c.fill();
 
   // ── Markers ──
   for(const m of markers){
@@ -747,7 +746,7 @@ function drawSeek(ct){
   const spr=duration/ROWS;
   for(let row=0;row<ROWS;row++){
     const rs=row*spr, re=(row+1)*spr, ry=row*RH, ly=ry+Math.floor(RH*.72);
-    c.fillStyle='#44445a'; c.font="9px 'Space Mono',monospace"; c.textAlign='right'; c.fillText(fmtShort(rs),LP-2,ly+3); c.textAlign='left';
+    c.fillStyle='#7a7a99'; c.font="9px 'Space Mono',monospace"; c.textAlign='right'; c.fillText(fmtShort(rs),LP-2,ly+3); c.textAlign='left';
     const pf=ct<=rs?0:ct>=re?1:(ct-rs)/spr;
     if(pf>0){const[ap,bp2,cp]=(colorAc.match(/[0-9a-f]{2}/gi)||['00','e5','ff']).map(x=>parseInt(x,16));c.fillStyle=`rgba(${ap},${bp2},${cp},0.5)`;c.fillRect(LP,ly-1,TW*pf,2);}
     c.fillStyle='#1a2e3a'; c.fillRect(LP+TW*pf,ly-1,TW*(1-pf),2);
@@ -982,7 +981,7 @@ document.getElementById('markerList').addEventListener('click',e=>{
 
 document.getElementById('btnMark').addEventListener('click',addMk);
 // Marker list collapse
-let mkListOpen=false;
+let mkListOpen=true;
 function toggleMkList(){
   mkListOpen=!mkListOpen;
   document.getElementById('markerList').classList.toggle('collapsed',!mkListOpen);
@@ -1173,13 +1172,23 @@ function drawBtn(id){
     cols.forEach((col,i)=>{ c.fillStyle=col; c.beginPath(); c.arc(pos[i][0],pos[i][1],3.5,0,Math.PI*2); c.fill(); });
   } else if(id==='btnHelp'){
     roundRect(c,0,0,W,H,6,'#0d1f2a','rgba(0,229,255,.3)');
-    // keyboard icon
     c.strokeStyle='rgba(0,229,255,.8)'; c.lineWidth=1.5;
     roundRect(c,cx-9,cy-5,18,10,2,null,'rgba(0,229,255,.8)');
-    // key dots
     c.fillStyle='rgba(0,229,255,.8)';
     [cx-6,cx-2,cx+2,cx+6].forEach(x=>{ c.fillRect(x-1,cy-3,2,2); });
     c.fillRect(cx-4,cy+1,8,2);
+  } else if(id==='btnCtrl'){
+    roundRect(c,0,0,W,H,6,'#0d1f2a','rgba(0,229,255,.3)');
+    // gear icon
+    c.fillStyle='rgba(0,229,255,.8)';
+    c.beginPath(); c.arc(cx,cy,4,0,Math.PI*2); c.fill();
+    c.fillStyle='#0d1f2a';
+    c.beginPath(); c.arc(cx,cy,2,0,Math.PI*2); c.fill();
+    c.fillStyle='rgba(0,229,255,.8)';
+    for(let a=0;a<8;a++){
+      const ang=a*Math.PI/4, x2=cx+Math.cos(ang)*6, y2=cy+Math.sin(ang)*6;
+      c.fillRect(x2-1,y2-1,2,2);
+    }
   } else if(id==='btnUndo'){
     roundRect(c,0,0,W,H,8,C.bg,C.bd);
     // curved arrow counter-clockwise
@@ -1245,7 +1254,7 @@ function drawBtn(id){
 }
 
 function drawAllBtns(){
-  ['folderBtn','fileBtn','btnColor','btnHelp',
+  ['folderBtn','fileBtn','btnColor','btnHelp','btnCtrl',
    'btnPrevMk','btnUndo','btnMark','btnRedo','btnNextMk',
    'btnHeadTail0','btnBack01','btnBackN','btnPlay','btnFwdN','btnFwd01','btnHeadTail1'].forEach(drawBtn);
 }
@@ -1254,6 +1263,7 @@ function drawAllBtns(){
 document.getElementById('folderBtn').addEventListener('click',()=>document.getElementById('folderInput').click());
 document.getElementById('fileBtn').addEventListener('click',()=>document.getElementById('fileInput').click());
 document.getElementById('btnColor').addEventListener('click',()=>openColorModal());
+document.getElementById('btnCtrl').addEventListener('click',()=>openCtrlModal());
 document.getElementById('btnHelp').addEventListener('click',()=>{document.getElementById('helpModal').style.display='flex';});
 
 // ── PWA Icon ──────────────────────────────────
@@ -1378,8 +1388,86 @@ function resetColors(){
   drawAllBtns(); showToast('リセット');
 }
 
+// ── Ctrl modal (playback settings) ────────────
+const SPD_PRESETS=[0.25,0.5,0.75,1.25,1.5,2.0]; // the 6 non-1.0 speeds
+
+function openCtrlModal(){
+  const modal=document.getElementById('ctrlModal');
+  modal.style.display='flex';
+  renderSpdPresets();
+  document.getElementById('skipSecM').value=skipSec;
+}
+function closeCtrlModal(){
+  document.getElementById('ctrlModal').style.display='none';
+  setTimeout(()=>grabFocus({}),100);
+}
+function renderSpdPresets(){
+  const cont=document.getElementById('spdPresets');
+  if(!cont) return;
+  cont.innerHTML=SPD_PRESETS.map((s,i)=>{
+    const btn=document.querySelector(`.spb[data-speed="${s}"]`);
+    const cur=btn?btn.textContent.trim():`×${s}`;
+    return `<div style="display:flex;flex-direction:column;gap:3px;align-items:center">
+      <span style="font-family:'Space Mono',monospace;font-size:8px;color:#6b6b88">${i+1}番</span>
+      <input type="number" value="${s}" min="0.1" max="4.0" step="0.05" data-preset="${i}"
+        style="width:100%;background:#1c1c28;border:1px solid #2a2a3d;border-radius:5px;
+        color:#e8e8f0;font-family:'Space Mono',monospace;font-size:12px;padding:4px;text-align:center"
+        onchange="updatePreset(${i},this.value)">
+    </div>`;
+  }).join('');
+}
+function updatePreset(idx,val){
+  const s=parseFloat(val);
+  if(isNaN(s)||s<=0||s>4) return;
+  SPD_PRESETS[idx]=s;
+  // Update the corresponding speed button
+  const btn=document.querySelectorAll('.spb:not([data-speed="1.0"])')[idx];
+  if(btn){ btn.dataset.speed=String(s); btn.textContent='×'+s; }
+  savePrefs();
+}
+function adjSkip(d){
+  const v=Math.max(1,Math.min(60,skipSec+d));
+  setSk(v);
+  document.getElementById('skipSecM').value=v;
+}
+document.getElementById('skipSecM')?.addEventListener('change',function(){
+  const v=parseInt(this.value); if(!isNaN(v)&&v>=1&&v<=60) setSk(v);
+});
+// ── Sil panel +/- buttons ──────────────────────
+function adjSilThr(d){
+  const el=document.getElementById('silThr');
+  const step=parseFloat(el.step)||0.002;
+  silThr=Math.max(parseFloat(el.min),Math.min(parseFloat(el.max),
+    Math.round((silThr+d*step)*1000)/1000));
+  el.value=silThr;
+  document.getElementById('silThrV').textContent=silThr.toFixed(3);
+  saveSilPrefs();
+}
+function adjSilMin(d){
+  const el=document.getElementById('silMin');
+  const step=parseFloat(el.step)||0.1;
+  silMinSec=Math.max(parseFloat(el.min),Math.min(parseFloat(el.max),
+    Math.round((silMinSec+d*step)*10)/10));
+  el.value=silMinSec;
+  document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒';
+  saveSilPrefs();
+}
+function saveSilPrefs(){
+  try{ localStorage.setItem('ac_silprefs',JSON.stringify({silThr,silMinSec})); }catch(e){}
+}
+function loadSilPrefs(){
+  try{
+    const d=JSON.parse(localStorage.getItem('ac_silprefs')||'{}');
+    if(d.silThr>0){ silThr=d.silThr; document.getElementById('silThr').value=silThr;
+      document.getElementById('silThrV').textContent=silThr.toFixed(3); }
+    if(d.silMinSec>0){ silMinSec=d.silMinSec; document.getElementById('silMin').value=silMinSec;
+      document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒'; }
+  }catch(e){}
+}
+
 // ── Init ──────────────────────────────────────
 loadPrefs();
+loadSilPrefs();
 // apply loaded speed silently
 audioEl.playbackRate=playbackRate; setPitch(audioEl);
 document.querySelectorAll('.spb').forEach(b=>b.classList.toggle('on',parseFloat(b.dataset.speed)===playbackRate));
