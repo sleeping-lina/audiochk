@@ -335,6 +335,26 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   </div>
 </div>
 
+<!-- Playback settings modal -->
+<div id="ctrlModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;align-items:flex-start;justify-content:center;overflow-y:auto;-webkit-overflow-scrolling:touch">
+  <div style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;margin:24px 16px;max-width:400px;width:calc(100%-32px);padding:16px">
+    <div style="display:flex;align-items:center;margin-bottom:14px">
+      <span style="font-family:'Space Mono',monospace;font-size:11px;color:#00e5ff;letter-spacing:1px">PLAYBACK SETTINGS</span>
+      <button onclick="closeCtrlModal()" style="margin-left:auto;background:transparent;border:none;color:#6b6b88;font-size:20px;cursor:pointer;padding:0 4px">×</button>
+    </div>
+    <div style="font-family:'Space Mono',monospace;font-size:9px;color:#6b6b88;margin-bottom:8px;letter-spacing:1px">SPEED PRESETS (×1.0以外、1〜6キー対応)</div>
+    <div id="spdPresets" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px"></div>
+    <div style="font-family:'Space Mono',monospace;font-size:9px;color:#6b6b88;margin-bottom:8px;letter-spacing:1px">SKIP 秒数</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button onclick="adjSkip(-1)" style="width:36px;height:36px;background:#1c1c28;border:1px solid #2a2a3d;border-radius:6px;color:#e8e8f0;font-size:18px;cursor:pointer">−</button>
+      <input type="number" id="skipSecM" min="1" max="60" value="5"
+        style="flex:1;background:#1c1c28;border:1px solid #2a2a3d;border-radius:6px;color:#e8e8f0;font-family:'Space Mono',monospace;font-size:16px;padding:6px;text-align:center">
+      <button onclick="adjSkip(1)"  style="width:36px;height:36px;background:#1c1c28;border:1px solid #2a2a3d;border-radius:6px;color:#e8e8f0;font-size:18px;cursor:pointer">＋</button>
+      <span style="font-family:'Space Mono',monospace;font-size:10px;color:#6b6b88">秒</span>
+    </div>
+  </div>
+</div>
+
 <script>
 'use strict';
 // ── Audio ──────────────────────────────────────
@@ -534,7 +554,7 @@ function rtLoop(){
       document.getElementById('silStatus').textContent='音あり';
     }
   }
-  requestAnimationFrame(rtLoop);
+  setTimeout(rtLoop, 50); // ~20fps is enough for silence detection
 }
 
 // ── Live waveform ────────────────────────────────────────────
@@ -867,18 +887,21 @@ function seekTo(t){
   if(!isPlaying){ if(waReady) drawLiveWave(); else drawWave(cl); updateTime(cl); drawSeek(cl); }
   hlMk(cl);
 }
+let lastSeekSec=-1;
 function loop(){
   if(!isPlaying)return;
   const t=curT();
-  // Track playhead — update zoomCtr so pausing shows correct position
   if(duration>0){
     const f=t/duration, hs=1/(2*zoomLv);
-    // Scroll when playhead is near edge of visible window
     if(f<zoomCtr-hs*.5||f>zoomCtr+hs*.5)
       zoomCtr=Math.max(hs,Math.min(1-hs,f));
   }
   if(waReady) drawLiveWave(); else drawWave(t);
-  updateTime(t); drawSeek(t); chkSil(t); hlMk(t);
+  updateTime(t);
+  // Redraw seek only once per second (expensive canvas op)
+  const sec=Math.floor(t);
+  if(sec!==lastSeekSec){ drawSeek(t); lastSeekSec=sec; }
+  chkSil(t); hlMk(t);
   raf=requestAnimationFrame(loop);
 }
 function redrawPlayBtn(){ drawBtn('btnPlay'); }
