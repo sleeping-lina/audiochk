@@ -363,7 +363,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;padding:20px;min-width:280px">
     <div style="font-family:'Space Mono',monospace;font-size:10px;color:#6b6b88;letter-spacing:1px;margin-bottom:14px;text-align:center">タイムジャンプ</div>
     <div style="display:flex;align-items:center;justify-content:center;gap:4px;margin-bottom:16px">
-      <input id="ti_h"  type="text" inputmode="numeric" maxlength="2" placeholder="00"
+      <input id="ti_h"  type="text" inputmode="numeric" maxlength="2" placeholder="00" autocomplete="off" autocorrect="off"
         style="width:52px;height:52px;background:#0d0d16;border:1px solid rgba(0,229,255,.4);border-radius:8px;
         color:#00e5ff;font-family:'Space Mono',monospace;font-size:26px;text-align:center;outline:none">
       <span style="color:#2a2a3d;font-size:24px;font-weight:300">:</span>
@@ -640,8 +640,8 @@ function drawLiveWave(){
   c.beginPath(); c.moveTo(0,mid-thrH); c.lineTo(W,mid-thrH);
   c.moveTo(0,mid+thrH); c.lineTo(W,mid+thrH); c.stroke();
 
-  // ── Waveform bars (only when playing) ──
-  if(isPlaying){
+  // ── Waveform bars ──
+  {
     const pxPerSample=(1/60)/secPerPx;
     const bw=Math.max(1,pxPerSample);
     for(let i=0;i<rtBuf.length;i++){
@@ -739,9 +739,9 @@ function drawWave(ct){
   c.fillStyle='#0d0d16'; c.fillRect(0,0,W,H);
   if(!duration){ c.fillStyle='#1e3a4a'; c.fillRect(0,H/2-1,W,2); return; }
 
-  // Fixed view: always show full file (zoom removed)
-  const sf=0, ef=1;
-  const startT=0, span=duration, mid=H/2;
+  // Use zoom window (same as live wave) so paused = playing position
+  const{sf,ef}=getZoomWin();
+  const startT=sf*duration, span=(ef-sf)*duration, mid=H/2;
   const BLOCK=0.1, bVis=span/BLOCK, bPx=W/bVis;
   const firstB=Math.floor(startT/BLOCK), lastB=Math.ceil((startT+span)/BLOCK);
   const gap=bPx>4?1:0;
@@ -884,8 +884,7 @@ function stop(){
     const f=curT()/duration, hs=1/(2*zoomLv);
     zoomCtr=Math.max(hs,Math.min(1-hs,f));
   }
-  // Draw static wave when paused (full file view with silence marks)
-  drawWave(curT()); drawSeek(curT()); updateTime(curT());
+  drawLiveWave(); drawSeek(curT()); updateTime(curT());
 }
 function seekTo(t){
   if(!objURL)return;
@@ -899,7 +898,7 @@ function seekTo(t){
     const f=cl/duration, hs=1/(2*zoomLv);
     zoomCtr=Math.max(hs,Math.min(1-hs,f));
   }
-  if(!isPlaying){ drawWave(cl); updateTime(cl); drawSeek(cl); }
+  if(!isPlaying){ drawLiveWave(); updateTime(cl); drawSeek(cl); }
   hlMk(cl);
 }
 let lastSeekSec=-1;
@@ -911,7 +910,7 @@ function loop(){
     if(f<zoomCtr-hs*.5||f>zoomCtr+hs*.5)
       zoomCtr=Math.max(hs,Math.min(1-hs,f));
   }
-  if(waReady) drawLiveWave(); else drawWave(t);
+  drawLiveWave(); // always use live view (no full-file drawWave)
   updateTime(t);
   // Redraw seek only once per second (expensive canvas op)
   const sec=Math.floor(t);
@@ -1323,11 +1322,14 @@ function openTimeInput(){
   document.getElementById('ti_h').value=p2(h);
   document.getElementById('ti_m').value=p2(m);
   document.getElementById('ti_s').value=p2(s);
-  // Focus first segment and select all
-  setTimeout(()=>{
-    const h=document.getElementById('ti_h');
-    h.focus(); h.select();
-  },80);
+  // iOS: focus must happen in same event tick as user gesture,
+  // but modal display needs a frame first
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
+      const inp=document.getElementById('ti_h');
+      inp.focus(); inp.select();
+    });
+  });
 }
 function closeTimeModal(){
   document.getElementById('timeModal').style.display='none';
