@@ -543,6 +543,7 @@ function ensureWAGraph(){
 function resetRTSilence(){ rtInSil=false; rtBuf=[]; }
 
 let rtTimerId=null;
+let stopTime=0; // timestamp of last stop() call
 function rtLoop(){
   rtTimerId=null;
   if(!isPlaying||!waReady) return;
@@ -853,8 +854,8 @@ function doZoom(scale,cr){
 // ── Playback ──────────────────────────────────
 function curT(){return audioEl.currentTime||0;}
 function play(){
-  if(!objURL)return;
-  if(isPlaying) stop(); // prevent double-play
+  if(!objURL||isPlaying)return;
+  if(Date.now()-stopTime<200)return; // debounce: ignore rapid play after stop
   ensureWAGraph();
   if(waCtx&&waCtx.state==='suspended') waCtx.resume();
   // Set rate before AND after play() — iOS sometimes resets it on play()
@@ -872,7 +873,7 @@ function play(){
   }
 }
 function stop(){
-  audioEl.pause(); isPlaying=false; redrawPlayBtn();
+  audioEl.pause(); isPlaying=false; stopTime=Date.now(); redrawPlayBtn();
   cancelAnimationFrame(raf); raf=null;
   if(rtTimerId){ clearTimeout(rtTimerId); rtTimerId=null; }
   resetRTSilence();
@@ -883,7 +884,8 @@ function stop(){
     const f=curT()/duration, hs=1/(2*zoomLv);
     zoomCtr=Math.max(hs,Math.min(1-hs,f));
   }
-  if(waReady) drawLiveWave(); else drawWave(curT()); drawSeek(curT()); updateTime(curT());
+  // Draw static wave when paused (full file view with silence marks)
+  drawWave(curT()); drawSeek(curT()); updateTime(curT());
 }
 function seekTo(t){
   if(!objURL)return;
@@ -897,7 +899,7 @@ function seekTo(t){
     const f=cl/duration, hs=1/(2*zoomLv);
     zoomCtr=Math.max(hs,Math.min(1-hs,f));
   }
-  if(!isPlaying){ if(waReady) drawLiveWave(); else drawWave(cl); updateTime(cl); drawSeek(cl); }
+  if(!isPlaying){ drawWave(cl); updateTime(cl); drawSeek(cl); }
   hlMk(cl);
 }
 let lastSeekSec=-1;
