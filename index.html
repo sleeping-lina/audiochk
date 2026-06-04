@@ -534,8 +534,8 @@ function ensureWAGraph(){
   waCtx=new(window.AudioContext||window.webkitAudioContext)();
   waSrc=waCtx.createMediaElementSource(audioEl);
   waAnalyser=waCtx.createAnalyser();
-  waAnalyser.fftSize=1024;
-  waBuf=new Float32Array(waAnalyser.fftSize);
+  waAnalyser.fftSize=4096; // larger = better RMS averaging for silence detection
+  waBuf=new Float32Array(waAnalyser.fftSize); // matches new fftSize
   waSrc.connect(waAnalyser);
   waAnalyser.connect(waCtx.destination);
   waReady=true;
@@ -765,18 +765,9 @@ function drawWave(ct){
     }
   }
 
-  // Flat bars: played=cyan, unplayed=dark
-  const barW=Math.max(2, W/((duration/0.1)));
-  const firstB=Math.floor(startT/0.1), lastB=Math.ceil((ct+visibleSec*0.2)/0.1);
-  for(let bi=firstB;bi<=lastB;bi++){
-    const bs=bi*0.1, be=bs+0.1;
-    const bx=toPx(bs);
-    if(bx+barW<0||bx>W) continue;
-    const played=be<=ct;
-    const h=mid*0.4;
-    c.fillStyle=played?'rgba(0,184,212,.7)':'rgba(30,58,74,.8)';
-    c.fillRect(bx,mid-h,barW-1,h*2);
-  }
+  // Timeline: thin played/unplayed line (not bars — those are in live wave)
+  c.fillStyle='rgba(0,184,212,.4)'; c.fillRect(0,mid-1,toPx(ct),2);
+  c.fillStyle='rgba(30,58,74,.8)';  c.fillRect(toPx(ct),mid-1,W-toPx(ct),2);
 
   // Center line
   c.fillStyle='#2a2a3d'; c.fillRect(0,mid-.5,W,1);
@@ -809,51 +800,6 @@ function drawWave(ct){
     }
   }
 
-  const BLOCK=0.1, bVis=span/BLOCK, bPx=W/bVis;
-  const firstBx=Math.floor(startT/BLOCK), lastBx=Math.ceil((startT+span)/BLOCK);
-  const gap=bPx>4?1:0;
-
-  for(let bi=firstB;bi<=lastB;bi++){
-    const bs=bi*BLOCK, be=bs+BLOCK;
-    const bx=((bs-startT)/span)*W, bw=Math.max(1,bPx-gap);
-    if(bx+bw<0||bx>W) continue;
-    let inSil=false;
-    for(const sr of silReg){ if(bs<sr.end&&be>sr.start){inSil=true;break;} }
-    const played=be<=ct, isCur=(ct>=bs&&ct<be);
-    if(inSil){
-      const sc=colorSilBar.match(/\d+/g)||[255,140,80];c.fillStyle=played?`rgba(${sc[0]},${sc[1]},${sc[2]},.45)`:`rgba(${sc[0]},${sc[1]},${sc[2]},.15)`;
-      c.fillRect(bx,2,bw,H-4);
-    } else if(waveData){
-      const wi=Math.min(WSAMP-1,Math.floor((bs/duration)*WSAMP));
-      const amp=Math.max(2,waveData[wi]*mid*.9);
-      c.fillStyle=played?'#00b8d4':'#1e3a4a';
-      c.fillRect(bx,mid-amp,bw,amp*2);
-    } else {
-      c.fillStyle=played?'#005f7a':'#162433';
-      c.fillRect(bx,mid-H*.15,bw,H*.3);
-    }
-    if(isCur){ c.fillStyle='rgba(0,229,255,.15)'; c.fillRect(bx,0,bw,H); }
-  }
-  c.fillStyle='#2a2a3d'; c.fillRect(0,mid-.5,W,1);
-  // silence labels when zoomed
-  if(bPx>30){
-    for(const sr of silReg){
-      if(sr.end<startT||sr.start>startT+span) continue;
-      const sx=Math.max(0,((sr.start-startT)/span)*W), ex=Math.min(W,((sr.end-startT)/span)*W);
-      if(ex-sx>20){ c.fillStyle='rgba(255,64,129,.85)'; c.font="8px 'Space Mono',monospace";
-        c.fillText(sr.dur.toFixed(1)+'s',Math.max(2,Math.min(W-28,(sx+ex)/2-8)),H-3); }
-    }
-  }
-  // markers
-  for(const m of markers){
-    if(m.time<startT||m.time>startT+span) continue;
-    const mx=((m.time-startT)/span)*W;
-    c.strokeStyle='#ff4081'; c.lineWidth=1.5; c.beginPath(); c.moveTo(mx,0); c.lineTo(mx,H); c.stroke();
-    c.fillStyle='#ff4081'; c.beginPath(); c.moveTo(mx-3,0); c.lineTo(mx+3,0); c.lineTo(mx,6); c.fill();
-  }
-  // playhead
-  const ppx=((ct-startT)/span)*W;
-  if(ppx>=0&&ppx<=W){ c.strokeStyle='#00e5ff'; c.lineWidth=2; c.beginPath(); c.moveTo(ppx,0); c.lineTo(ppx,H); c.stroke(); }
 }
 
 // ── Draw seek ────────────────────────────────
@@ -1383,17 +1329,17 @@ document.getElementById('btnHelp').addEventListener('click',()=>{document.getEle
 // ── Time input modal (segmented HH:MM:SS) ─────
 function openTimeInput(){
   if(!objURL) return;
-  document.getElementById('timeModal').style.display='flex';
+  // Pre-fill values
   const ct=curT();
-  const h=Math.floor(ct/3600),m=Math.floor((ct%3600)/60),s=Math.floor(ct%60);
-  document.getElementById('ti_h').value=p2(h);
-  document.getElementById('ti_m').value=p2(m);
-  document.getElementById('ti_s').value=p2(s);
-  // iOS: need tiny delay after display change, but must stay in user-gesture context
-  setTimeout(()=>{
-    const inp=document.getElementById('ti_h');
-    inp.focus(); inp.select();
-  }, 0);
+  const hv=Math.floor(ct/3600),mv=Math.floor((ct%3600)/60),sv=Math.floor(ct%60);
+  document.getElementById('ti_h').value=p2(hv);
+  document.getElementById('ti_m').value=p2(mv);
+  document.getElementById('ti_s').value=p2(sv);
+  // Focus BEFORE showing modal — keeps iOS keyboard trigger in user-gesture chain
+  const inp=document.getElementById('ti_h');
+  inp.focus(); inp.select();
+  // Show modal after focus (keeps keyboard up)
+  document.getElementById('timeModal').style.display='flex';
 }
 function closeTimeModal(){
   document.getElementById('timeModal').style.display='none';
