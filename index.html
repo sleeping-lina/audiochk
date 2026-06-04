@@ -512,7 +512,7 @@ async function load(file){
   });
   if(duration>0) document.getElementById('timeTotal').textContent='/ '+fmtMs(duration);
 
-  if(silReg.length>0){ drawWave(0); drawSeek(0); }
+  drawWave(0); drawSeek(0);
   showLd(false); showToast(file.name); renderPL();
 
   // decode waveform in background
@@ -739,11 +739,78 @@ function drawWave(ct){
   c.fillStyle='#0d0d16'; c.fillRect(0,0,W,H);
   if(!duration){ c.fillStyle='#1e3a4a'; c.fillRect(0,H/2-1,W,2); return; }
 
-  // Use zoom window (same as live wave) so paused = playing position
-  const{sf,ef}=getZoomWin();
-  const startT=sf*duration, span=(ef-sf)*duration, mid=H/2;
+  // Always show a fixed window around current time (same width = RT_SEC*2 seconds)
+  // lineX = 85% from left = playhead position
+  const lineX=Math.floor(W*0.85);
+  const visibleSec=RT_SEC; // same as live wave
+  const secPerPx=visibleSec/(lineX); // left side
+  const startT=Math.max(0,ct-visibleSec);
+  const span=visibleSec; // only left side matters
+  const mid=H/2;
+  // helper
+  const toPx=t=>lineX+(t-ct)/secPerPx;
+
+  // Silence regions
+  const[scR2,scG2,scB2]=(colorSilBar.match(/\d+/g)||['255','140','80']).slice(0,3).map(Number);
+  for(const silItem of silReg){
+    const sx=toPx(silItem.start), ex=toPx(silItem.end);
+    if(ex<0||sx>W) continue;
+    const rx=Math.max(0,sx), rw=Math.min(W,ex)-rx;
+    c.fillStyle=`rgba(${scR2},${scG2},${scB2},0.15)`;
+    c.fillRect(rx,0,rw,H);
+    if(rw>18){
+      c.fillStyle=`rgba(${scR2},${scG2},${scB2},.9)`;
+      c.font="bold 11px 'Space Mono',monospace";
+      const lx2=rx+rw/2; if(lx2>4&&lx2<lineX-4) c.fillText(silItem.dur.toFixed(1)+'s',lx2-12,H-3);
+    }
+  }
+
+  // Flat bars: played=cyan, unplayed=dark
+  const barW=Math.max(2, W/((duration/0.1)));
+  const firstB=Math.floor(startT/0.1), lastB=Math.ceil((ct+visibleSec*0.2)/0.1);
+  for(let bi=firstB;bi<=lastB;bi++){
+    const bs=bi*0.1, be=bs+0.1;
+    const bx=toPx(bs);
+    if(bx+barW<0||bx>W) continue;
+    const played=be<=ct;
+    const h=mid*0.4;
+    c.fillStyle=played?'rgba(0,184,212,.7)':'rgba(30,58,74,.8)';
+    c.fillRect(bx,mid-h,barW-1,h*2);
+  }
+
+  // Center line
+  c.fillStyle='#2a2a3d'; c.fillRect(0,mid-.5,W,1);
+
+  // Playhead line
+  c.strokeStyle=colorAc; c.lineWidth=2;
+  c.beginPath(); c.moveTo(lineX,0); c.lineTo(lineX,H); c.stroke();
+
+  // Markers
+  for(const m of markers){
+    const mx=toPx(m.time);
+    if(mx<0||mx>W) continue;
+    c.strokeStyle=colorMarkLine; c.lineWidth=1.5;
+    c.beginPath(); c.moveTo(mx,0); c.lineTo(mx,H); c.stroke();
+    c.fillStyle=colorMarkLine;
+    c.beginPath(); c.moveTo(mx-3,0); c.lineTo(mx+3,0); c.lineTo(mx,6); c.fill();
+  }
+
+  // Right panel: last silence
+  const rightW=W-lineX-4;
+  if(rightW>16){
+    c.fillStyle='#0d0d16'; c.fillRect(lineX+2,0,rightW,H);
+    let lastSil=null;
+    for(const sr of silReg){ if(sr.end<=ct+0.1) lastSil=sr; }
+    if(lastSil){
+      const fs=Math.min(H*0.55,rightW*0.45);
+      c.font=`bold ${Math.floor(fs)}px 'Space Mono',monospace`;
+      c.fillStyle=`rgba(${scR2},${scG2},${scB2},.65)`;
+      c.textAlign='center'; c.fillText(lastSil.dur.toFixed(1)+'s',lineX+2+rightW/2,mid+fs*0.35); c.textAlign='left';
+    }
+  }
+
   const BLOCK=0.1, bVis=span/BLOCK, bPx=W/bVis;
-  const firstB=Math.floor(startT/BLOCK), lastB=Math.ceil((startT+span)/BLOCK);
+  const firstBx=Math.floor(startT/BLOCK), lastBx=Math.ceil((startT+span)/BLOCK);
   const gap=bPx>4?1:0;
 
   for(let bi=firstB;bi<=lastB;bi++){
@@ -884,7 +951,7 @@ function stop(){
     const f=curT()/duration, hs=1/(2*zoomLv);
     zoomCtr=Math.max(hs,Math.min(1-hs,f));
   }
-  drawLiveWave(); drawSeek(curT()); updateTime(curT());
+  drawWave(curT()); drawSeek(curT()); updateTime(curT());
 }
 function seekTo(t){
   if(!objURL)return;
@@ -898,7 +965,7 @@ function seekTo(t){
     const f=cl/duration, hs=1/(2*zoomLv);
     zoomCtr=Math.max(hs,Math.min(1-hs,f));
   }
-  if(!isPlaying){ drawLiveWave(); updateTime(cl); drawSeek(cl); }
+  if(!isPlaying){ drawWave(cl); updateTime(cl); drawSeek(cl); }
   hlMk(cl);
 }
 let lastSeekSec=-1;
@@ -1322,14 +1389,11 @@ function openTimeInput(){
   document.getElementById('ti_h').value=p2(h);
   document.getElementById('ti_m').value=p2(m);
   document.getElementById('ti_s').value=p2(s);
-  // iOS: focus must happen in same event tick as user gesture,
-  // but modal display needs a frame first
-  requestAnimationFrame(()=>{
-    requestAnimationFrame(()=>{
-      const inp=document.getElementById('ti_h');
-      inp.focus(); inp.select();
-    });
-  });
+  // iOS: need tiny delay after display change, but must stay in user-gesture context
+  setTimeout(()=>{
+    const inp=document.getElementById('ti_h');
+    inp.focus(); inp.select();
+  }, 0);
 }
 function closeTimeModal(){
   document.getElementById('timeModal').style.display='none';
