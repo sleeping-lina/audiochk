@@ -362,19 +362,35 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="timeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:center;justify-content:center" onclick="closeTimeModal()">
   <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;padding:20px;min-width:280px">
     <div style="font-family:'Space Mono',monospace;font-size:10px;color:#6b6b88;letter-spacing:1px;margin-bottom:14px;text-align:center">タイムジャンプ</div>
-    <div style="display:flex;align-items:center;justify-content:center;gap:4px;margin-bottom:16px">
-      <input id="ti_h"  type="text" inputmode="numeric" maxlength="2" placeholder="00" autocomplete="off" autocorrect="off"
-        style="width:52px;height:52px;background:#0d0d16;border:1px solid rgba(0,229,255,.4);border-radius:8px;
-        color:#00e5ff;font-family:'Space Mono',monospace;font-size:26px;text-align:center;outline:none">
-      <span style="color:#2a2a3d;font-size:24px;font-weight:300">:</span>
-      <input id="ti_m"  type="text" inputmode="numeric" maxlength="2" placeholder="00"
-        style="width:52px;height:52px;background:#0d0d16;border:1px solid rgba(0,229,255,.4);border-radius:8px;
-        color:#00e5ff;font-family:'Space Mono',monospace;font-size:26px;text-align:center;outline:none">
-      <span style="color:#2a2a3d;font-size:24px;font-weight:300">:</span>
-      <input id="ti_s"  type="text" inputmode="numeric" maxlength="2" placeholder="00"
-        style="width:52px;height:52px;background:#0d0d16;border:1px solid rgba(0,229,255,.4);border-radius:8px;
-        color:#00e5ff;font-family:'Space Mono',monospace;font-size:26px;text-align:center;outline:none">
+    <div style="display:flex;align-items:center;justify-content:center;gap:4px;margin-bottom:8px">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+        <span style="font-family:'Space Mono',monospace;font-size:9px;color:#6b6b88">時</span>
+        <input id="ti_h" type="text" inputmode="numeric" maxlength="2" placeholder="00"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+          onfocus="this.select()" ontouchstart="this.select()"
+          style="width:64px;height:64px;background:#0d0d16;border:1px solid rgba(0,229,255,.4);border-radius:8px;
+          color:#00e5ff;font-family:'Space Mono',monospace;font-size:28px;text-align:center;outline:none;-webkit-appearance:none">
+      </div>
+      <span style="color:#3a3a5a;font-size:28px;margin-top:14px">:</span>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+        <span style="font-family:'Space Mono',monospace;font-size:9px;color:#6b6b88">分</span>
+        <input id="ti_m" type="text" inputmode="numeric" maxlength="2" placeholder="00"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+          onfocus="this.select()" ontouchstart="this.select()"
+          style="width:64px;height:64px;background:#0d0d16;border:1px solid rgba(0,229,255,.4);border-radius:8px;
+          color:#00e5ff;font-family:'Space Mono',monospace;font-size:28px;text-align:center;outline:none;-webkit-appearance:none">
+      </div>
+      <span style="color:#3a3a5a;font-size:28px;margin-top:14px">:</span>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+        <span style="font-family:'Space Mono',monospace;font-size:9px;color:#6b6b88">秒</span>
+        <input id="ti_s" type="text" inputmode="numeric" maxlength="2" placeholder="00"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+          onfocus="this.select()" ontouchstart="this.select()"
+          style="width:64px;height:64px;background:#0d0d16;border:1px solid rgba(0,229,255,.4);border-radius:8px;
+          color:#00e5ff;font-family:'Space Mono',monospace;font-size:28px;text-align:center;outline:none;-webkit-appearance:none">
+      </div>
     </div>
+    <div style="font-family:'Space Mono',monospace;font-size:9px;color:#6b6b88;text-align:center;margin-bottom:12px">タップで全選択・即入力</div>
     <div style="display:flex;gap:8px">
       <button onclick="closeTimeModal()" style="flex:1;padding:10px;background:#1c1c28;border:1px solid #2a2a3d;border-radius:8px;color:#6b6b88;font-family:'Space Mono',monospace;font-size:12px;cursor:pointer">キャンセル</button>
       <button onclick="commitTimeInput()" style="flex:1;padding:10px;background:rgba(0,229,255,.15);border:1px solid #00e5ff;border-radius:8px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:12px;cursor:pointer">ジャンプ</button>
@@ -1329,17 +1345,13 @@ document.getElementById('btnHelp').addEventListener('click',()=>{document.getEle
 // ── Time input modal (segmented HH:MM:SS) ─────
 function openTimeInput(){
   if(!objURL) return;
-  // Pre-fill values
   const ct=curT();
   const hv=Math.floor(ct/3600),mv=Math.floor((ct%3600)/60),sv=Math.floor(ct%60);
   document.getElementById('ti_h').value=p2(hv);
   document.getElementById('ti_m').value=p2(mv);
   document.getElementById('ti_s').value=p2(sv);
-  // Focus BEFORE showing modal — keeps iOS keyboard trigger in user-gesture chain
-  const inp=document.getElementById('ti_h');
-  inp.focus(); inp.select();
-  // Show modal after focus (keeps keyboard up)
   document.getElementById('timeModal').style.display='flex';
+  // No auto-focus — user taps each field to activate keyboard + auto-select
 }
 function closeTimeModal(){
   document.getElementById('timeModal').style.display='none';
@@ -1359,8 +1371,13 @@ function wireTimeInputs(){
   const ids=['ti_h','ti_m','ti_s'];
   ids.forEach((id,i)=>{
     const el=document.getElementById(id);
+    // Track whether this tap started on already-selected text
+    el.addEventListener('touchstart',()=>{
+      // select all on next touchend if not already empty
+      el._touched=true;
+    },{passive:true});
     el.addEventListener('input',()=>{
-      // strip non-digits
+      el._touched=false;
       el.value=el.value.replace(/[^0-9]/g,'').slice(0,2);
       if(el.value.length===2 && i<ids.length-1){
         const next=document.getElementById(ids[i+1]);
