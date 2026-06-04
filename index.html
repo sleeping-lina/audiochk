@@ -65,7 +65,7 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
 
 .spcust{display:flex;align-items:center;gap:2px;flex-shrink:0;margin-left:3px}
 .spcust label{font-size:9px;color:var(--dm)}
-.sil-arrow{font-size:9px;color:var(--dm);margin-left:auto}
+/* sil-arrow replaced by tog-btn */
 .sil-body{max-height:0;overflow:hidden;transition:max-height .25s}
 .sil-body.open{max-height:160px}
 .sil-adj{background:var(--s2);border:1px solid var(--bd);border-radius:4px;color:var(--tx);
@@ -116,6 +116,13 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 #toast{position:fixed;bottom:48px;left:50%;transform:translateX(-50%) translateY(10px);
   background:var(--s2);border:1px solid var(--ac);color:var(--ac);font-family:'Space Mono',monospace;
   font-size:10px;padding:4px 12px;border-radius:20px;opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap;z-index:200}
+/* toggle button style */
+.tog-btn{display:inline-flex;align-items:center;justify-content:center;
+  width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ac);
+  color:var(--ac);font-size:11px;font-family:sans-serif;cursor:pointer;
+  flex-shrink:0;line-height:1;user-select:none;-webkit-user-select:none;
+  margin-left:4px;background:transparent;padding:0}
+.tog-btn:active{background:rgba(0,229,255,.15)}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 #lbar{position:fixed;top:0;left:0;height:2px;background:var(--ac);width:0%;transition:width .3s;z-index:300}
 </style>
@@ -125,7 +132,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <header>
   <span class="logo">AUDIOCHK</span>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
-  <span id="plToggleBtn" onclick="togglePlaylist()" style="display:none;font-family:'Space Mono',monospace;font-size:11px;color:var(--ac);cursor:pointer;flex-shrink:0;padding:2px 6px;white-space:nowrap">▼</span>
+  <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
   <div style="display:flex;gap:3px;flex-shrink:0">
     <canvas class="cbtn" id="folderBtn" width="32" height="28" data-w="32" data-h="28"></canvas>
     <canvas class="cbtn" id="fileBtn" width="32" height="28" data-w="32" data-h="28"></canvas>
@@ -157,7 +164,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   <div class="sil-header" id="silHeader">
     <span class="sil-lbl">SILENCE DETECT</span>
     <span class="sil-status" id="silStatus">停止中</span>
-    <span class="sil-arrow" id="silArrow" style="color:var(--ac)">▼</span>
+    <button class="tog-btn" id="silArrow" style="margin-left:auto">∨</button>
   </div>
   <div class="sil-body" id="silBody">
     <div class="spd-inner">
@@ -225,7 +232,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   <div class="mk-hdr" id="mkHdr" onclick="toggleMkList()" style="cursor:pointer">
     MARKERS
     <span id="mkCount" style="color:var(--dm);margin-left:4px"></span>
-    <span id="mkArrow" style="font-size:11px;color:var(--ac);margin-left:4px">▲</span>
+    <button class="tog-btn" id="mkArrow">∧</button>
     <div class="mk-acts" onclick="event.stopPropagation()">
       <button class="smbtn" id="prevMrkBtn">◀ prev</button>
       <button class="smbtn" id="nextMrkBtn">next ▶</button>
@@ -462,12 +469,20 @@ audioEl.addEventListener('play',()=>{
 // ── LocalStorage ───────────────────────────────
 const LS_PREFS='ac_prefs3';
 function savePrefs(){
-  try{ localStorage.setItem(LS_PREFS,JSON.stringify({skipSec,playbackRate,spdPresets:SPD_PRESETS})); }catch(e){}
+  try{ localStorage.setItem(LS_PREFS,JSON.stringify({skipSec,playbackRate,spdPresets:SPD_PRESETS,colors:{colorAc,colorA2,colorSilBar,colorSilFill,colorMarkLine}})); }catch(e){}
 }
 function loadPrefs(){
   try{
     const p=JSON.parse(localStorage.getItem(LS_PREFS)||'{}');
     if(p.spdPresets?.length===6){ p.spdPresets.forEach((s,i)=>SPD_PRESETS[i]=s); }
+    if(p.colors){
+      const cl=p.colors;
+      if(cl.colorAc){colorAc=cl.colorAc;C.ac=cl.colorAc;document.documentElement.style.setProperty('--ac',cl.colorAc);}
+      if(cl.colorA2){colorA2=cl.colorA2;C.a2=cl.colorA2;document.documentElement.style.setProperty('--a2',cl.colorA2);}
+      if(cl.colorSilBar) colorSilBar=cl.colorSilBar;
+      if(cl.colorSilFill) colorSilFill=cl.colorSilFill;
+      if(cl.colorMarkLine) colorMarkLine=cl.colorMarkLine;
+    }
     if(p.skipSec>0){ skipSec=p.skipSec; updateSkipLabels(); }
     if(p.playbackRate>0) playbackRate=p.playbackRate;
   }catch(e){}
@@ -724,11 +739,11 @@ function togglePlaylist(){
   const pl=document.getElementById('playlist');
   const btn=document.getElementById('plToggleBtn');
   const opening=pl.classList.toggle('open');
-  if(btn) btn.textContent=opening?'▲':'▼';
+  if(btn) btn.textContent=opening?'∧':'∨'; // ∨=closed(click to open), ∧=open(click to close)
 }
 function showPlToggle(show){
   const btn=document.getElementById('plToggleBtn');
-  if(btn) btn.style.display=show?'':'none';
+  if(btn) btn.style.display=show?'inline-flex':'none';
   if(!show) document.getElementById('playlist').classList.remove('open');
 }
 function prevFile(){
@@ -1059,7 +1074,7 @@ function toggleMkList(){
   mkListOpen=!mkListOpen;
   document.getElementById('markerList').classList.toggle('collapsed',!mkListOpen);
   // ▼ = list visible (open), ▲ = list hidden (closed)
-  document.getElementById('mkArrow').textContent=mkListOpen?'▲':'▼';
+  document.getElementById('mkArrow').textContent=mkListOpen?'∧':'∨';
 }
 document.getElementById('btnPrevMk').addEventListener('click',()=>document.getElementById('prevMrkBtn').click());
 document.getElementById('btnNextMk').addEventListener('click',()=>document.getElementById('nextMrkBtn').click());
@@ -1414,8 +1429,7 @@ window.addEventListener('resize',()=>{drawWave(curT());drawSeek(curT());drawAllB
 document.getElementById('silHeader').addEventListener('click',()=>{
   const b=document.getElementById('silBody'), a=document.getElementById('silArrow');
   const opening=b.classList.toggle('open');
-  // ▼ = closed (click to open), ▲ = open (click to close)
-  a.textContent=opening?'▲':'▼';
+  a.textContent=opening?'∧':'∨'; // ∨=closed(open), ∧=open(close)
 });
 document.getElementById('silThr').addEventListener('input',function(){
   silThr=parseFloat(this.value);
@@ -1481,8 +1495,15 @@ function applyColor(id,val){
   }
   drawAllBtns();
   if(!isPlaying) drawWave(audioEl.currentTime);
+  savePrefs(); // persist color changes
 }
 function buildColorPanel(){
+  // Sync inputs with current color vars
+  const hexFromColor=s=>{const m=s.match(/^#[0-9a-f]{6}$/i);return m?s:'#ff8c50';};
+  document.getElementById('cpAc').value=colorAc;
+  document.getElementById('cpA2').value=colorMarkLine||'#ffdd00';
+  document.getElementById('cpSil').value=hexFromColor(colorSilBar.replace(/rgba?\([^)]+\)/,'#ff8c50'));
+  document.getElementById('cpMk').value=colorA2;
   if(document.getElementById('cpAc')._wired) return;
   document.getElementById('cpAc')._wired=true;
   ['cpAc','cpA2','cpSil','cpMk'].forEach(id=>{
