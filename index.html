@@ -343,7 +343,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 
 <!-- Playback settings modal -->
 <div id="ctrlModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;align-items:flex-start;justify-content:center;overflow-y:auto;-webkit-overflow-scrolling:touch">
-  <div style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;margin:24px 16px;max-width:400px;width:calc(100%-32px);padding:16px">
+  <div style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;margin:24px 16px;max-width:400px;width:calc(100% - 32px);padding:16px">
     <div style="display:flex;align-items:center;margin-bottom:14px">
       <span style="font-family:'Space Mono',monospace;font-size:11px;color:#00e5ff;letter-spacing:1px">PLAYBACK SETTINGS</span>
       <button onclick="closeCtrlModal()" style="margin-left:auto;background:transparent;border:none;color:#6b6b88;font-size:20px;cursor:pointer;padding:0 4px">×</button>
@@ -502,7 +502,7 @@ document.getElementById('folderInput').addEventListener('change',function(){
   const files=Array.from(this.files).filter(f=>AEXTS.test(f.name)||f.type.startsWith('audio/')).sort((a,b)=>a.name.localeCompare(b.name,'ja'));
   if(!files.length){ showToast('音声ファイルなし'); return; }
   playlist=files.map(f=>({name:f.name,file:f})); plIdx=0;
-  renderPL(); showPlToggle(true); document.getElementById('plToggleBtn').textContent='▼';
+  renderPL(); showPlToggle(true); document.getElementById('plToggleBtn').textContent='∨';
   setSrc(files[0]); load(files[0]); this.value='';
 });
 function setSrc(file){
@@ -1562,6 +1562,11 @@ function updatePreset(idx,val){
   if(btn){ btn.dataset.speed=String(s); btn.textContent='×'+s; }
   savePrefs();
 }
+// Apply all stored presets to the speed buttons (used on init)
+function applyPresetsToButtons(){
+  const btns=document.querySelectorAll('.spb:not([data-speed="1.0"])');
+  SPD_PRESETS.forEach((s,i)=>{ const b=btns[i]; if(b){ b.dataset.speed=String(s); b.textContent='×'+s; } });
+}
 function adjSkip(d){
   const v=Math.max(1,Math.min(60,skipSec+d));
   setSk(v);
@@ -1614,6 +1619,7 @@ function loadSilPrefs(){
 loadPrefs();
 loadSilPrefs();
 // apply loaded speed silently
+applyPresetsToButtons();
 audioEl.playbackRate=playbackRate; setPitch(audioEl);
 document.querySelectorAll('.spb').forEach(b=>b.classList.toggle('on',parseFloat(b.dataset.speed)===playbackRate));
 drawAllBtns();
