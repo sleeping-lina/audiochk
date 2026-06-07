@@ -18,6 +18,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Noto Sans JP',sans-serif;
 header{display:flex;align-items:center;gap:5px;padding:5px 8px;
   border-bottom:1px solid var(--bd);background:var(--sf);flex-shrink:0}
 .logo{font-family:'Space Mono',monospace;font-size:11px;color:var(--ac);letter-spacing:2px;white-space:nowrap}
+.ver{font-family:'Space Mono',monospace;font-size:9px;color:var(--dm);white-space:nowrap;flex-shrink:0}
 .fname{flex:1;font-size:10px;color:var(--dm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 #fileInput,#folderInput,#importData{display:none}
 /* playlist */
@@ -130,7 +131,9 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <body tabindex="0">
 <div id="lbar"></div>
 <header>
-  <span class="logo">AUDIOCHK</span>
+  <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v53</span>
+  </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -1017,11 +1020,13 @@ document.querySelectorAll('.spb').forEach(b=>{
 
 // Shortcut keys 1-6 mapped to the 6 speed buttons in order
 const SPD_BUTTONS=()=>Array.from(document.querySelectorAll('.spb[data-speed]'));
+// Speed label: integers always show ".0" (×1.0, ×2.0); others as-is (×0.25, ×1.5)
+function fmtSpd(s){ return '×'+(Number.isInteger(s)?s.toFixed(1):String(s)); }
 function setSpd(s){
   playbackRate=s;
   audioEl.playbackRate=s; setPitch(audioEl);
   document.querySelectorAll('.spb').forEach(b=>b.classList.toggle('on',parseFloat(b.dataset.speed)===s));
-  showToast('×'+(Number.isInteger(s)?s.toFixed(1):s));
+  showToast(fmtSpd(s));
   savePrefs();
 }
 
@@ -1559,13 +1564,13 @@ function updatePreset(idx,val){
   SPD_PRESETS[idx]=s;
   // Update the corresponding speed button
   const btn=document.querySelectorAll('.spb:not([data-speed="1.0"])')[idx];
-  if(btn){ btn.dataset.speed=String(s); btn.textContent='×'+s; }
+  if(btn){ btn.dataset.speed=String(s); btn.textContent=fmtSpd(s); }
   savePrefs();
 }
 // Apply all stored presets to the speed buttons (used on init)
 function applyPresetsToButtons(){
   const btns=document.querySelectorAll('.spb:not([data-speed="1.0"])');
-  SPD_PRESETS.forEach((s,i)=>{ const b=btns[i]; if(b){ b.dataset.speed=String(s); b.textContent='×'+s; } });
+  SPD_PRESETS.forEach((s,i)=>{ const b=btns[i]; if(b){ b.dataset.speed=String(s); b.textContent=fmtSpd(s); } });
 }
 function adjSkip(d){
   const v=Math.max(1,Math.min(60,skipSec+d));
