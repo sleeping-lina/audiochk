@@ -18,7 +18,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Noto Sans JP',sans-serif;
 header{display:flex;align-items:center;gap:5px;padding:5px 8px;
   border-bottom:1px solid var(--bd);background:var(--sf);flex-shrink:0}
 .logo{font-family:'Space Mono',monospace;font-size:11px;color:var(--ac);letter-spacing:2px;white-space:nowrap}
-.ver{font-family:'Space Mono',monospace;font-size:10px;color:#ff4d4d;font-weight:700;white-space:nowrap;flex-shrink:0}
+.ver{font-family:'Space Mono',monospace;font-size:10px;color:#ff4d4d;white-space:nowrap;flex-shrink:0}
 .fname{flex:1;font-size:10px;color:var(--dm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 #fileInput,#folderInput,#importData{display:none}
 /* playlist */
@@ -132,7 +132,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v54</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v55</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -171,6 +171,18 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   </div>
   <div class="sil-body" id="silBody">
     <div class="spd-inner">
+      <div class="sil-row" style="justify-content:space-between;align-items:center">
+        <span class="sil-ctl-lbl" style="white-space:nowrap">検出モード</span>
+        <div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleDetect()" id="detectToggle">
+          <div id="detectTrack" style="width:36px;height:20px;border-radius:10px;background:rgba(0,229,255,.3);border:1px solid #00e5ff;position:relative;transition:background .2s">
+            <div id="detectThumb" style="width:16px;height:16px;border-radius:50%;background:#00e5ff;position:absolute;top:1px;left:17px;transition:left .2s,background .2s"></div>
+          </div>
+          <span id="detectLbl" style="font-size:9px;color:#00e5ff;font-family:'Space Mono',monospace">ON</span>
+        </div>
+      </div>
+      <div class="sil-row" style="margin-top:-4px;margin-bottom:2px">
+        <span style="font-size:8.5px;color:var(--dm);font-family:'Space Mono',monospace;line-height:1.4">OFF＝聞くモード（倍速なめらか優先・波形/無音検出オフ）。切替後はリロードで確実に反映。</span>
+      </div>
       <div class="sil-row">
         <span class="sil-ctl-lbl">感度（閾値）</span>
         <button class="sil-adj" onclick="adjSilThr(-1)">−</button><input type="range" id="silThr" min="0.004" max="0.08" step="0.002" value="0.010"><button class="sil-adj" onclick="adjSilThr(1)">＋</button>
@@ -472,19 +484,27 @@ audioEl.addEventListener('play',()=>{
 // ── LocalStorage ───────────────────────────────
 const LS_PREFS='ac_prefs3';
 function savePrefs(){
-  try{ localStorage.setItem(LS_PREFS,JSON.stringify({skipSec,playbackRate,spdPresets:SPD_PRESETS,colors:{colorAc,colorA2,colorSilBar,colorSilFill,colorMarkLine}})); }catch(e){}
+  try{ localStorage.setItem(LS_PREFS,JSON.stringify({scheme:'yakou',skipSec,playbackRate,spdPresets:SPD_PRESETS,colors:{colorAc,colorA2,colorSilBar,colorSilFill,colorMarkLine,colorSilText}})); }catch(e){}
 }
 function loadPrefs(){
   try{
     const p=JSON.parse(localStorage.getItem(LS_PREFS)||'{}');
     if(p.spdPresets?.length===6){ p.spdPresets.forEach((s,i)=>SPD_PRESETS[i]=s); }
-    if(p.colors){
+    if(p.scheme==='yakou' && p.colors){
+      // restore user-adjusted 夜光 colors
       const cl=p.colors;
       if(cl.colorAc){colorAc=cl.colorAc;C.ac=cl.colorAc;document.documentElement.style.setProperty('--ac',cl.colorAc);}
       if(cl.colorA2){colorA2=cl.colorA2;C.a2=cl.colorA2;document.documentElement.style.setProperty('--a2',cl.colorA2);}
       if(cl.colorSilBar) colorSilBar=cl.colorSilBar;
       if(cl.colorSilFill) colorSilFill=cl.colorSilFill;
       if(cl.colorMarkLine) colorMarkLine=cl.colorMarkLine;
+      if(cl.colorSilText) colorSilText=cl.colorSilText;
+    } else {
+      // legacy/empty prefs → adopt 夜光 defaults (ignore old colors), apply CSS vars & persist once
+      document.documentElement.style.setProperty('--ac',colorAc);
+      document.documentElement.style.setProperty('--a2',colorA2);
+      C.ac=colorAc; C.a2=colorA2;
+      savePrefs();
     }
     if(p.skipSec>0){ skipSec=p.skipSec; updateSkipLabels(); }
     if(p.playbackRate>0) playbackRate=p.playbackRate;
@@ -557,6 +577,7 @@ async function load(file){
 let waCtx=null, waAnalyser=null, waSrc=null, waReady=false;
 let waBuf=null;
 let silThr=0.010, silMinSec=1.0, silAutoMark=true;
+let detectOn=true; // 検出モード: true=WebAudio経路ON(波形/無音検出) / false=聞くモード(経路バイパス・倍速なめらか優先)
 let rtInSil=false, rtSilStart=0;
 // Timestamped ring buffer: each entry = {rms, t}
 const RT_MAX=600;  // max entries stored
@@ -653,7 +674,7 @@ function drawLiveWave(){
     c.fillStyle=colorSilFill;
     c.fillRect(rx,0,rw,H);
     if(rw>18){
-      c.fillStyle=`rgba(${scR},${scG},${scB},.9)`;
+      c.fillStyle=colorSilText;
       c.font="bold 12px 'Space Mono',monospace";
       const lx2=rx+rw/2; if(lx2>4&&lx2<lineX-4){ c.fillText(silItem.dur.toFixed(1)+'s', lx2-12, H-3); }
     }
@@ -689,7 +710,7 @@ function drawLiveWave(){
   }
 
   // ── Center line ──
-  c.fillStyle='#2a2a3d'; c.fillRect(0,mid-.5,W,1);
+  c.fillStyle=colorCenter; c.fillRect(0,mid-.5,W,1);
 
   // ── Detection line (center, fixed) ──
   c.strokeStyle=colorAc; c.lineWidth=2;
@@ -719,7 +740,7 @@ function drawLiveWave(){
       const durStr=lastSil.dur.toFixed(1)+'s';
       let fs=Math.min(H*0.55, rightW*0.45);
       c.font=`bold ${Math.floor(fs)}px 'Space Mono',monospace`;
-      c.fillStyle=`rgba(${scR},${scG},${scB},.65)`;
+      c.fillStyle=colorSilText;
       c.textAlign='center';
       c.fillText(durStr, lineX+2+rightW/2, mid+fs*0.35);
       c.textAlign='left';
@@ -793,7 +814,7 @@ function drawWave(ct){
     c.fillStyle=`rgba(${scR2},${scG2},${scB2},0.15)`;
     c.fillRect(rx,0,rw,H);
     if(rw>18){
-      c.fillStyle=`rgba(${scR2},${scG2},${scB2},.9)`;
+      c.fillStyle=colorSilText;
       c.font="bold 11px 'Space Mono',monospace";
       const lx2=rx+rw/2; if(lx2>4&&lx2<lineX-4) c.fillText(silItem.dur.toFixed(1)+'s',lx2-12,H-3);
     }
@@ -804,7 +825,7 @@ function drawWave(ct){
   c.fillStyle='rgba(30,58,74,.8)';  c.fillRect(toPx(ct),mid-1,W-toPx(ct),2);
 
   // Center line
-  c.fillStyle='#2a2a3d'; c.fillRect(0,mid-.5,W,1);
+  c.fillStyle=colorCenter; c.fillRect(0,mid-.5,W,1);
 
   // Playhead line
   c.strokeStyle=colorAc; c.lineWidth=2;
@@ -829,7 +850,7 @@ function drawWave(ct){
     if(lastSil){
       const fs=Math.min(H*0.55,rightW*0.45);
       c.font=`bold ${Math.floor(fs)}px 'Space Mono',monospace`;
-      c.fillStyle=`rgba(${scR2},${scG2},${scB2},.65)`;
+      c.fillStyle=colorSilText;
       c.textAlign='center'; c.fillText(lastSil.dur.toFixed(1)+'s',lineX+2+rightW/2,mid+fs*0.35); c.textAlign='left';
     }
   }
@@ -903,7 +924,7 @@ function curT(){return audioEl.currentTime||0;}
 function play(){
   if(!objURL||isPlaying)return;
   if(Date.now()-stopTime<200)return; // debounce: ignore rapid play after stop
-  ensureWAGraph();
+  if(detectOn) ensureWAGraph();      // 聞くモード(OFF)ではグラフを作らず直接再生→倍速なめらか
   if(waCtx&&waCtx.state==='suspended') waCtx.resume();
   // Set rate before AND after play() — iOS sometimes resets it on play()
   audioEl.playbackRate=playbackRate; setPitch(audioEl);
@@ -912,11 +933,11 @@ function play(){
     p.then(()=>{
       // Re-apply rate after play() resolves (iOS resets it)
       audioEl.playbackRate=playbackRate; setPitch(audioEl);
-      isPlaying=true; redrawPlayBtn(); loop(); rtLoop();
+      isPlaying=true; redrawPlayBtn(); loop(); if(detectOn&&waReady) rtLoop();
     }).catch(e=>showToast('再生失敗:'+e.message));
   } else {
     audioEl.playbackRate=playbackRate; setPitch(audioEl);
-    isPlaying=true; redrawPlayBtn(); loop(); rtLoop();
+    isPlaying=true; redrawPlayBtn(); loop(); if(detectOn&&waReady) rtLoop();
   }
 }
 function stop(){
@@ -957,7 +978,7 @@ function loop(){
     if(f<zoomCtr-hs*.5||f>zoomCtr+hs*.5)
       zoomCtr=Math.max(hs,Math.min(1-hs,f));
   }
-  drawLiveWave(); // always use live view (no full-file drawWave)
+  if(waReady) drawLiveWave(); else drawWave(t); // 聞くモードはアナライザ無し→静的波形+再生ライン
   updateTime(t);
   // Redraw seek only once per second (expensive canvas op)
   const sec=Math.floor(t);
@@ -1468,6 +1489,23 @@ function toggleAutoMark(){
 // init state = OFF
 silAutoMark=false;
 
+// ── 検出モード（WebAudio経路 ON/OFF）診断用 ──
+function setDetectUI(){
+  const track=document.getElementById('detectTrack'),thumb=document.getElementById('detectThumb'),lbl=document.getElementById('detectLbl');
+  if(!track) return;
+  if(detectOn){ track.style.background='rgba(0,229,255,.3)'; track.style.border='1px solid #00e5ff'; thumb.style.left='17px'; thumb.style.background='#00e5ff'; lbl.textContent='ON'; lbl.style.color='#00e5ff'; }
+  else { track.style.background='#2a2a3d'; track.style.border='1px solid #2a2a3d'; thumb.style.left='1px'; thumb.style.background='#6b6b88'; lbl.textContent='OFF'; lbl.style.color='#6b6b88'; }
+}
+function toggleDetect(){
+  detectOn=!detectOn;
+  try{ localStorage.setItem('ac_detect', detectOn?'1':'0'); }catch(e){}
+  setDetectUI();
+  document.getElementById('silStatus').textContent = detectOn ? (isPlaying?'検出中':'停止中') : '検出OFF（聞く）';
+  if(!detectOn && waReady) showToast('聞くモードへ。完全バイパスはリロード後');
+  else if(!detectOn) showToast('聞くモード（倍速なめらか優先）');
+  else showToast('検出モード ON');
+}
+
 // ── Color system ──────────────────────────────
 // Editable CSS variables mapped to user-friendly labels
 const COLOR_DEFS=[
@@ -1478,8 +1516,11 @@ const COLOR_DEFS=[
   {key:'markline',label:'マーク線色',           def:'#ffdd00'},
 ];
 // Overridable draw colors
-let colorAc='#00e5ff', colorA2='#ff4081', colorSilBar='rgba(255,140,80,1)';
-let colorSilFill='rgba(255,140,80,0.15)', colorMarkLine='#ffdd00';
+// ── 夜光 (yakou) scheme defaults ──
+let colorAc='#00e5ff', colorA2='#ff4081', colorSilBar='rgba(82,214,252,1)';
+let colorSilFill='rgba(82,214,252,0.15)', colorMarkLine='#ff4081';
+let colorSilText='#ffffff';                 // 無音の秒数テキスト・直近無音表示（独立・高視認）
+let colorCenter='rgba(255,64,129,0.35)';    // センターライン（控えめなピンク）
 
 function hexToRgb(h){return[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];}
 function openColorModal(){
@@ -1505,10 +1546,10 @@ function applyColor(id,val){
 }
 function buildColorPanel(){
   // Sync inputs with current color vars
-  const hexFromColor=s=>{const m=s.match(/^#[0-9a-f]{6}$/i);return m?s:'#ff8c50';};
+  const silToHex=()=>{const m=(colorSilBar.match(/\d+/g)||[82,214,252]).slice(0,3).map(Number);const h=n=>n.toString(16).padStart(2,'0');return '#'+h(m[0])+h(m[1])+h(m[2]);};
   document.getElementById('cpAc').value=colorAc;
-  document.getElementById('cpA2').value=colorMarkLine||'#ffdd00';
-  document.getElementById('cpSil').value=hexFromColor(colorSilBar.replace(/rgba?\([^)]+\)/,'#ff8c50'));
+  document.getElementById('cpA2').value=colorMarkLine||'#ff4081';
+  document.getElementById('cpSil').value=silToHex();
   document.getElementById('cpMk').value=colorA2;
   if(document.getElementById('cpAc')._wired) return;
   document.getElementById('cpAc')._wired=true;
@@ -1520,16 +1561,16 @@ function buildColorPanel(){
 }
 function resetColors(){
   colorAc='#00e5ff'; colorA2='#ff4081';
-  colorSilBar='rgba(255,140,80,1)'; colorSilFill='rgba(255,140,80,0.15)';
-  colorMarkLine='#ffdd00';
+  colorSilBar='rgba(82,214,252,1)'; colorSilFill='rgba(82,214,252,0.15)';
+  colorMarkLine='#ff4081'; colorSilText='#ffffff';
   C.ac=colorAc; C.a2=colorA2;
   document.documentElement.style.setProperty('--ac','#00e5ff');
   document.documentElement.style.setProperty('--a2','#ff4081');
   document.getElementById('cpAc').value='#00e5ff';
-  document.getElementById('cpA2').value='#ffdd00';
-  document.getElementById('cpSil').value='#ff8c50';
+  document.getElementById('cpA2').value='#ff4081';
+  document.getElementById('cpSil').value='#52d6fc';
   document.getElementById('cpMk').value='#ff4081';
-  drawAllBtns(); showToast('リセット');
+  drawAllBtns(); if(!isPlaying) drawWave(audioEl.currentTime); savePrefs(); showToast('夜光カラーに戻しました');
 }
 
 // ── Ctrl modal (playback settings) ────────────
@@ -1626,6 +1667,10 @@ function loadSilPrefs(){
 // ── Init ──────────────────────────────────────
 loadPrefs();
 loadSilPrefs();
+// restore 検出モード (default ON)
+try{ detectOn = localStorage.getItem('ac_detect')!=='0'; }catch(e){}
+setDetectUI();
+if(!detectOn) document.getElementById('silStatus').textContent='検出OFF（聞く）';
 // apply loaded speed silently
 applyPresetsToButtons();
 audioEl.playbackRate=playbackRate; setPitch(audioEl);
