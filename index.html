@@ -19,7 +19,7 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
   border-bottom:1px solid var(--bd);background:var(--sf);flex-shrink:0}
 .logo{font-family:'Space Mono',monospace;font-size:11px;color:var(--ac);letter-spacing:2px;white-space:nowrap}
 .ver{font-family:'Space Mono',monospace;font-size:10px;color:#ff4d4d;white-space:nowrap;flex-shrink:0}
-.fname{flex:1;font-size:10px;color:var(--dm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.fname{flex:1;font-size:10px;color:#dfe2f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 #fileInput,#folderInput,#importData{display:none}
 /* playlist */
 #playlist{background:var(--s2);border-bottom:1px solid var(--bd);max-height:0;overflow:hidden;transition:max-height .2s;flex-shrink:0}
@@ -36,7 +36,7 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
 .info{display:flex;align-items:center;gap:4px;padding:2px 8px;background:var(--s2);
   border-bottom:1px solid var(--bd);font-family:'Space Mono',monospace;font-size:10px;flex-shrink:0}
 #timeDisp{color:var(--ac);font-size:11px}
-#timeTotal{color:var(--dm)}
+#timeTotal{color:#dfe2f0}
 #silInfo{color:var(--a3);font-size:10px}
 /* seek */
 .seek-wrap{flex-shrink:0;background:var(--sf);border-bottom:1px solid var(--bd);
@@ -132,7 +132,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v56</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v57</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -871,7 +871,7 @@ function drawSeek(ct){
   const spr=duration/ROWS;
   for(let row=0;row<ROWS;row++){
     const rs=row*spr, re=(row+1)*spr, ry=row*RH, ly=ry+Math.floor(RH*.72);
-    c.fillStyle='#7a7a99'; c.font="9px 'Space Mono',monospace"; c.textAlign='right'; c.fillText(fmtShort(rs),LP-2,ly+3); c.textAlign='left';
+    c.fillStyle='#9a9db8'; c.font="9px 'Space Mono',monospace"; c.textAlign='right'; c.fillText(fmtShort(rs),LP-2,ly+3); c.textAlign='left';
     const pf=ct<=rs?0:ct>=re?1:(ct-rs)/spr;
     if(pf>0){const[ap,bp2,cp]=(colorAc.match(/[0-9a-f]{2}/gi)||['00','e5','ff']).map(x=>parseInt(x,16));c.fillStyle=`rgba(${ap},${bp2},${cp},0.5)`;c.fillRect(LP,ly-1,TW*pf,2);}
     c.fillStyle='#1a2e3a'; c.fillRect(LP+TW*pf,ly-1,TW*(1-pf),2);
@@ -1118,8 +1118,9 @@ document.getElementById('exportBtn').addEventListener('click',()=>{
   exportCurrent();
 });
 function mkExportObj(fname,mkrs,silR,dur){ return{file:fname,duration:dur,markers:mkrs,silences:silR.map(s=>({start:+s.start.toFixed(3),end:+s.end.toFixed(3),dur:+s.dur.toFixed(3)}))}; }
-function exportCurrent(){ dlJSON(mkExportObj(curFileName,markers,silReg,duration),(curFileName||'audio').replace(/\.[^.]+$/,'')+'_markers.json'); showToast('エクスポート完了'); }
-function exportAll(){ dlJSON(playlist.map(item=>{const d=loadMk(item.name);return mkExportObj(item.name,d?.markers||[],d?.silReg||[],d?.duration||0);}),'audiochk_all.json'); showToast('全エクスポート完了'); }
+function todayStr(){ const d=new Date(); return ''+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); }
+function exportCurrent(){ dlJSON(mkExportObj(curFileName,markers,silReg,duration),(curFileName||'audio').replace(/\.[^.]+$/,'')+'_markers_'+todayStr()+'.json'); showToast('エクスポート完了'); }
+function exportAll(){ dlJSON(playlist.map(item=>{const d=loadMk(item.name);return mkExportObj(item.name,d?.markers||[],d?.silReg||[],d?.duration||0);}),'audiochk_all_'+todayStr()+'.json'); showToast('全エクスポート完了'); }
 function dlJSON(obj,fname){ const b=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=fname;a.click();URL.revokeObjectURL(u); }
 document.getElementById('importData').addEventListener('change',function(){
   const file=this.files[0];if(!file)return;
@@ -1137,6 +1138,7 @@ document.getElementById('importData').addEventListener('change',function(){
 //   1-6 → speed   0 → speed reset
 
 function onKey(e){
+  if(e._acHandled) return; e._acHandled=true; // 同一keydownが document/window/focusTrap の3経路で届く重複を1回に集約
   const tag=e.target.tagName;
   if((tag==='INPUT'&&e.target.id!=='focusTrap')||tag==='TEXTAREA'||tag==='SELECT') return;
 
