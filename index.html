@@ -19,7 +19,7 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
   border-bottom:1px solid var(--bd);background:var(--sf);flex-shrink:0}
 .logo{font-family:'Space Mono',monospace;font-size:11px;color:var(--ac);letter-spacing:2px;white-space:nowrap}
 .ver{font-family:'Space Mono',monospace;font-size:10px;color:#ff4d4d;white-space:nowrap;flex-shrink:0}
-.fname{flex:1;font-size:10px;color:#dfe2f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.fname{flex:1;font-size:10px;color:var(--dm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 #fileInput,#folderInput,#importData{display:none}
 /* playlist */
 #playlist{background:var(--s2);border-bottom:1px solid var(--bd);max-height:0;overflow:hidden;transition:max-height .2s;flex-shrink:0}
@@ -132,7 +132,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v58</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v59</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -170,7 +170,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
     <span class="sil-status" id="silStatus" style="margin-left:8px">停止中</span>
     <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
       <div style="display:flex;align-items:center;gap:4px;cursor:pointer" onclick="event.stopPropagation();toggleDetect()" id="detectToggle">
-        <span style="font-size:8px;color:var(--dm);font-family:'Space Mono',monospace">検出</span>
+        <span style="font-size:8px;color:var(--dm);font-family:'Space Mono',monospace">無音検出</span>
         <div id="detectTrack" style="width:32px;height:18px;border-radius:9px;background:rgba(0,229,255,.3);border:1px solid #00e5ff;position:relative;transition:background .2s">
           <div id="detectThumb" style="width:14px;height:14px;border-radius:50%;background:#00e5ff;position:absolute;top:1px;left:15px;transition:left .2s,background .2s"></div>
         </div>
@@ -205,7 +205,8 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
       <div class="sil-row" style="justify-content:center;gap:10px">
         <span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--dm)">現在の無音：</span>
         <span style="font-family:'Space Mono',monospace;font-size:14px;color:var(--a2);font-weight:700" id="silCurDur">0.0s</span>
-        <button onclick="resetSilPrefs()" style="background:#1c1c28;border:1px solid #2a2a3d;border-radius:5px;color:#6b6b88;font-family:'Space Mono',monospace;font-size:9px;padding:3px 7px;cursor:pointer">リセット</button>
+        <button onclick="resetSilPrefs()" style="background:#1c1c28;border:1px solid #2a2a3d;border-radius:5px;color:#6b6b88;font-family:'Space Mono',monospace;font-size:9px;padding:3px 7px;cursor:pointer">設定リセット</button>
+        <button onclick="clearSilData()" style="background:#1c1c28;border:1px solid rgba(255,140,80,.4);border-radius:5px;color:rgba(255,160,110,.9);font-family:'Space Mono',monospace;font-size:9px;padding:3px 7px;cursor:pointer">無音クリア</button>
       </div>
     </div>
   </div>
@@ -581,7 +582,7 @@ async function load(file){
   resetRTSilence();
   document.getElementById('silStatus').textContent='停止中';
   document.getElementById('silCurDur').textContent='0.0s';
-  document.getElementById('fileName').textContent=file.name;
+  const fnEl=document.getElementById('fileName'); fnEl.textContent=file.name; fnEl.style.color='#dfe2f0';
   document.getElementById('timeTotal').textContent='/ --:--:--';
   drawWave(0); drawSeek(0);
 
@@ -657,14 +658,17 @@ function rtLoop(){
       document.getElementById('silCurDur').textContent=dur.toFixed(1)+'s';
       document.getElementById('silStatus').textContent='音あり';
       if(dur>=silMinSec){
-        silReg.push({start:rtSilStart,end:t,dur});
-        silReg.sort((a,b)=>a.start-b.start);
-        if(silAutoMark){
-          saveH();
-          markers.push({time:rtSilStart,note:'無音 '+dur.toFixed(1)+'s'});
-          markers.sort((a,b)=>a.time-b.time);
-          renderMarkers(); saveMk();
-          showToast('🔖 無音 '+dur.toFixed(1)+'s @ '+fmtMs(rtSilStart));
+        const dup=silReg.some(s=>Math.abs(s.start-rtSilStart)<0.3 && Math.abs(s.end-t)<0.5);
+        if(!dup){
+          silReg.push({start:rtSilStart,end:t,dur});
+          silReg.sort((a,b)=>a.start-b.start);
+          if(silAutoMark){
+            saveH();
+            markers.push({time:rtSilStart,note:'無音 '+dur.toFixed(1)+'s'});
+            markers.sort((a,b)=>a.time-b.time);
+            renderMarkers(); saveMk();
+            showToast('🔖 無音 '+dur.toFixed(1)+'s @ '+fmtMs(rtSilStart));
+          }
         }
       }
     } else {
@@ -1193,15 +1197,38 @@ function doExport(which){
 }
 function mkExportObj(fname,mkrs,silR,dur){ return{file:fname,duration:dur,markers:mkrs,silences:silR.map(s=>({start:+s.start.toFixed(3),end:+s.end.toFixed(3),dur:+s.dur.toFixed(3)}))}; }
 function todayStr(){ const d=new Date(); return ''+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); }
-function exportCurrent(){ dlJSON(mkExportObj(curFileName,markers,silReg,duration),(curFileName||'audio').replace(/\.[^.]+$/,'')+'_markers_'+todayStr()+'.json'); showToast('エクスポート完了'); }
-function exportAll(){ dlJSON(playlist.map(item=>{const d=loadMk(item.name);return mkExportObj(item.name,d?.markers||[],d?.silReg||[],d?.duration||0);}),'audiochk_all_'+todayStr()+'.json'); showToast('全エクスポート完了'); }
+function exportCurrent(){ dlJSON(mkExportObj(curFileName,markers,silReg,duration),(curFileName||'audio').replace(/\.[^.]+$/,'')+'_markers_'+todayStr()+'.json'); showToast('エクスポートを開始'); }
+function exportAll(){ dlJSON(playlist.map(item=>{const d=loadMk(item.name);return mkExportObj(item.name,d?.markers||[],d?.silReg||[],d?.duration||0);}),'audiochk_'+todayStr()+'.json'); showToast('エクスポートを開始'); }
 function dlJSON(obj,fname){ const b=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=fname;a.click();URL.revokeObjectURL(u); }
 document.getElementById('importData').addEventListener('change',function(){
   const file=this.files[0];if(!file)return;
   const r=new FileReader();
-  r.onload=ev=>{try{const d=JSON.parse(ev.target.result);const e=Array.isArray(d)?d.find(x=>x.file===curFileName)||d[0]:d;if(!Array.isArray(e.markers))throw 0;
-    saveH();markers=e.markers;if(Array.isArray(e.silences))silReg=e.silences.map(s=>({start:s.start,end:s.end,dur:s.dur}));
-    renderMarkers();drawWave(curT());drawSeek(curT());saveMk();showToast('インポート'+markers.length+'件');}catch{showToast('失敗');}};
+  r.onload=ev=>{try{
+    const d=JSON.parse(ev.target.result);
+    if(Array.isArray(d)){
+      // 全ファイル形式：各エントリを自分のキーに復元
+      let n=0;
+      d.forEach(e=>{
+        if(!e||!e.file||!Array.isArray(e.markers))return;
+        const sil=(Array.isArray(e.silences)?e.silences:[]).map(s=>({start:s.start,end:s.end,dur:s.dur}));
+        try{ localStorage.setItem(lsKey(e.file),JSON.stringify({markers:e.markers,silReg:sil,duration:e.duration||0,ts:Date.now()})); n++; }catch(err){}
+        if(e.file===curFileName){ saveH(); markers=e.markers; silReg=sil; }
+      });
+      renderMarkers();
+      if(detectOn&&!isPlaying) drawWave(curT());
+      drawSeek(curT());
+      showToast(n+'ファイル分を復元');
+    } else {
+      // 単一ファイル形式：現在のファイルへ
+      if(!Array.isArray(d.markers))throw 0;
+      saveH(); markers=d.markers;
+      silReg=Array.isArray(d.silences)?d.silences.map(s=>({start:s.start,end:s.end,dur:s.dur})):[];
+      renderMarkers();
+      if(detectOn&&!isPlaying) drawWave(curT());
+      drawSeek(curT()); saveMk();
+      showToast('インポート '+markers.length+'件');
+    }
+  }catch(err){showToast('インポート失敗');}};
   r.readAsText(file);this.value='';
 });
 
@@ -1789,7 +1816,15 @@ function resetSilPrefs(){
   document.getElementById('silMin').value=silMinSec;
   document.getElementById('silThrV').textContent=silThr.toFixed(3);
   document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒';
-  saveSilPrefs(); showToast('リセット完了');
+  saveSilPrefs(); showToast('設定をリセット');
+}
+function clearSilData(){
+  // 現在のファイルの検出済み無音をクリア（マークは消さない）
+  if(!silReg.length){ showToast('無音データなし'); return; }
+  silReg=[]; rtInSil=false;
+  document.getElementById('silCurDur').textContent='0.0s';
+  if(detectOn&&!isPlaying) drawWave(curT());
+  drawSeek(curT()); saveMk(); showToast('無音データをクリア');
 }
 function saveSilPrefs(){
   try{ localStorage.setItem('ac_silprefs',JSON.stringify({silThr,silMinSec})); }catch(e){}
