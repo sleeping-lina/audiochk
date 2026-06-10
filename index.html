@@ -132,7 +132,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v65</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v66</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -193,14 +193,10 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
         <button class="sil-adj" onclick="adjSilMin(-1)">−</button><input type="range" id="silMin" min="0.1" max="5" step="0.1" value="1.0"><button class="sil-adj" onclick="adjSilMin(1)">＋</button>
         <span class="sil-val" id="silMinV">1.0秒</span>
       </div>
-      <div class="sil-row" style="justify-content:space-between;align-items:center">
-        <span class="sil-ctl-lbl" style="white-space:nowrap">自動マーク</span>
-        <div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleAutoMark()" id="autoMarkToggle">
-          <div id="autoMarkTrack" style="width:36px;height:20px;border-radius:10px;background:#2a2a3d;border:1px solid #2a2a3d;position:relative;transition:background .2s">
-            <div id="autoMarkThumb" style="width:16px;height:16px;border-radius:50%;background:#6b6b88;position:absolute;top:1px;left:1px;transition:left .2s,background .2s"></div>
-          </div>
-          <span id="autoMarkLbl" style="font-size:9px;color:var(--dm);font-family:'Space Mono',monospace">OFF</span>
-        </div>
+      <div class="sil-row">
+        <span class="sil-ctl-lbl" style="white-space:nowrap">切替補正(ms)</span>
+        <button class="sil-adj" onclick="adjSeekComp(-1)">−</button><input type="range" id="silComp" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjSeekComp(1)">＋</button>
+        <span class="sil-val" id="silCompV">0ms</span>
       </div>
       <div class="sil-row" style="justify-content:center;gap:10px">
         <span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--dm)">現在の無音：</span>
@@ -350,8 +346,12 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid #00e5ff;border-radius:12px;margin:16px;max-width:420px;width:calc(100% - 32px);padding:16px">
     <div id="captureLabel" style="font-family:'Space Mono',monospace;font-size:12px;color:#00e5ff;text-align:center;margin-bottom:6px">キーを押してください</div>
     <div style="font-size:9px;color:#6b6b88;font-family:'Space Mono',monospace;text-align:center;margin-bottom:12px">コントローラー/キーボードのキーを押す、または下から選択</div>
-    <div id="keyGrid" style="display:flex;flex-wrap:wrap;gap:5px;justify-content:center;max-height:46vh;overflow-y:auto"></div>
-    <button onclick="endCapture()" style="margin-top:12px;width:100%;background:#1c1c28;border:1px solid #2a2a3d;border-radius:8px;color:#9a9ab0;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">キャンセル</button>
+    <div id="keyGrid" style="display:flex;flex-wrap:wrap;gap:5px;justify-content:center;max-height:42vh;overflow-y:auto"></div>
+    <div id="captureDbg" style="margin-top:10px;font-family:'Space Mono',monospace;font-size:9px;color:#6b6b88;text-align:center;line-height:1.4;min-height:14px"></div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button onclick="endCapture()" style="flex:1;background:#1c1c28;border:1px solid #2a2a3d;border-radius:8px;color:#9a9ab0;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">キャンセル</button>
+      <button id="captureConfirm" onclick="confirmCapture()" style="display:none;flex:1;background:rgba(0,229,255,.15);border:1px solid #00e5ff;border-radius:8px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">このキーを登録</button>
+    </div>
   </div>
 </div>
 
@@ -606,7 +606,8 @@ async function load(file){
 // ── Realtime silence detection ────────────────────────────────
 let waCtx=null, waAnalyser=null, waSrc=null, waReady=false;
 let waBuf=null;
-let silThr=0.010, silMinSec=1.0, silAutoMark=true;
+let silThr=0.010, silMinSec=1.0, silAutoMark=false;
+let seekComp=0; // モード切替の先読み補正(ms)
 let rtInSil=false, rtSilStart=0;
 // Timestamped ring buffer: each entry = {rms, t}
 const RT_MAX=600;  // max entries stored
@@ -1322,7 +1323,7 @@ function tokenLabel(t){
   if(t.length===1)return t.toUpperCase();
   return t;
 }
-let captureFn=null;
+let captureFn=null, pendingCapTok=null;
 function anyModalOpen(){
   return ['colorModal','helpModal','ctrlModal','timeModal','exportModal','clearModal','keymapModal']
     .some(id=>{const el=document.getElementById(id);return el&&el.style.display!=='none';});
@@ -1366,13 +1367,20 @@ function buildKeyGrid(){
   });
 }
 function startCapture(fn){
-  captureFn=fn;
+  captureFn=fn; pendingCapTok=null;
   document.getElementById('captureLabel').textContent='「'+FN_LABELS[fn]+'」に割り当て';
+  document.getElementById('captureDbg').textContent='';
+  document.getElementById('captureConfirm').style.display='none';
   buildKeyGrid();
   document.getElementById('captureOverlay').style.display='flex';
   const ft=document.getElementById('focusTrap'); if(ft) ft.focus({preventScroll:true});
 }
-function endCapture(){ captureFn=null; const ov=document.getElementById('captureOverlay'); if(ov) ov.style.display='none'; }
+function endCapture(){
+  captureFn=null; pendingCapTok=null;
+  const ov=document.getElementById('captureOverlay'); if(ov) ov.style.display='none';
+  const cf=document.getElementById('captureConfirm'); if(cf) cf.style.display='none';
+}
+function confirmCapture(){ if(captureFn&&pendingCapTok!==null){ assignKey(captureFn,pendingCapTok); } endCapture(); }
 function assignKey(fn,tok){
   for(const k in keymap){ keymap[k]=keymap[k].filter(x=>x!==tok); } // 重複防止：他機能から外す
   if(!keymap[fn]) keymap[fn]=[];
@@ -1387,8 +1395,16 @@ function onKey(e){
   const tag=e.target.tagName;
   if((tag==='INPUT'&&e.target.id!=='focusTrap')||tag==='TEXTAREA'||tag==='SELECT') return;
 
-  // キー登録中：押されたキーを取り込み（通常動作はさせない）
-  if(captureFn){ e.preventDefault(); e.stopPropagation(); assignKey(captureFn, keyToken(e)); endCapture(); return; }
+  // キー登録中：押されたキーを表示（key/code）。通常動作はさせず、確認ボタンで登録。
+  if(captureFn){
+    e.preventDefault(); e.stopPropagation();
+    pendingCapTok=keyToken(e);
+    const kd=JSON.stringify(e.key), cd=e.code||'-';
+    document.getElementById('captureLabel').textContent='登録キー: '+tokenLabel(pendingCapTok);
+    document.getElementById('captureDbg').textContent='key='+kd+'  code='+cd;
+    const cf=document.getElementById('captureConfirm'); cf.style.display=''; 
+    return;
+  }
   // モーダル表示中はショートカットを発火させない
   if(anyModalOpen()) return;
 
@@ -1669,28 +1685,21 @@ document.getElementById('silMin').addEventListener('input',function(){
   silMinSec=parseFloat(this.value);
   document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒';
 });
-// Custom toggle for silAutoMark (default OFF)
-function toggleAutoMark(){
-  silAutoMark=!silAutoMark;
-  const track=document.getElementById('autoMarkTrack');
-  const thumb=document.getElementById('autoMarkThumb');
-  const lbl=document.getElementById('autoMarkLbl');
-  if(silAutoMark){
-    track.style.background='rgba(0,229,255,.3)';
-    track.style.border='1px solid #00e5ff';
-    thumb.style.left='17px';
-    thumb.style.background='#00e5ff';
-    lbl.textContent='ON'; lbl.style.color='#00e5ff';
-  } else {
-    track.style.background='#2a2a3d';
-    track.style.border='1px solid #2a2a3d';
-    thumb.style.left='1px';
-    thumb.style.background='#6b6b88';
-    lbl.textContent='OFF'; lbl.style.color='#6b6b88';
-  }
-}
-// init state = OFF
+document.getElementById('silComp')?.addEventListener('input',function(){
+  seekComp=parseInt(this.value)||0;
+  document.getElementById('silCompV').textContent=seekComp+'ms';
+  saveSilPrefs();
+});
+// 自動マーク機能は廃止（v66）。silAutoMark は常に false。
 silAutoMark=false;
+
+// 切替の先読み補正（ms）：検出⇔聞くモード切替時の位置引き継ぎを seekComp 分だけ先へ。巻き戻り感の軽減用。
+function adjSeekComp(d){
+  seekComp=Math.max(0,Math.min(500, seekComp + d*10));
+  const el=document.getElementById('silComp'); if(el) el.value=seekComp;
+  document.getElementById('silCompV').textContent=seekComp+'ms';
+  saveSilPrefs();
+}
 
 // ── 検出モード（WebAudio経路 ON/OFF）診断用 ──
 function setDetectUI(){
@@ -1717,7 +1726,7 @@ function toggleDetect(){
   detectOn=!detectOn;
   try{ localStorage.setItem('ac_detect', detectOn?'1':'0'); }catch(e){}
   audioEl = detectOn ? audioDet : audioPlay; // swap active element
-  try{ audioEl.currentTime=t; }catch(e){}    // carry position across
+  try{ audioEl.currentTime=Math.max(0,Math.min(duration||t, t + seekComp/1000)); }catch(e){} // 位置引き継ぎ＋先読み補正
   audioEl.playbackRate=activeRate(); setPitch(audioEl);
   setDetectUI(); applyDetectLayout();
   // redraw
@@ -1926,7 +1935,7 @@ function clearSilData(){
   drawSeek(curT()); saveMk(); showToast('無音データをクリア');
 }
 function saveSilPrefs(){
-  try{ localStorage.setItem('ac_silprefs',JSON.stringify({silThr,silMinSec})); }catch(e){}
+  try{ localStorage.setItem('ac_silprefs',JSON.stringify({silThr,silMinSec,seekComp})); }catch(e){}
 }
 function loadSilPrefs(){
   try{
@@ -1935,6 +1944,8 @@ function loadSilPrefs(){
       document.getElementById('silThrV').textContent=silThr.toFixed(3); }
     if(d.silMinSec>0){ silMinSec=d.silMinSec; document.getElementById('silMin').value=silMinSec;
       document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒'; }
+    if(d.seekComp>=0){ seekComp=d.seekComp; const c=document.getElementById('silComp');
+      if(c) c.value=seekComp; const cv=document.getElementById('silCompV'); if(cv) cv.textContent=seekComp+'ms'; }
   }catch(e){}
 }
 
