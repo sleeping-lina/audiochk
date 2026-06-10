@@ -132,7 +132,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v59</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v60</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -658,17 +658,19 @@ function rtLoop(){
       document.getElementById('silCurDur').textContent=dur.toFixed(1)+'s';
       document.getElementById('silStatus').textContent='音あり';
       if(dur>=silMinSec){
-        const dup=silReg.some(s=>Math.abs(s.start-rtSilStart)<0.3 && Math.abs(s.end-t)<0.5);
-        if(!dup){
+        // 重なり判定：既存区間と重なる場合は再追加しない（保存済み/再生済みの重複ハイライト防止）
+        const overlap=silReg.some(s=> rtSilStart < s.end+0.3 && t > s.start-0.3);
+        if(!overlap){
           silReg.push({start:rtSilStart,end:t,dur});
           silReg.sort((a,b)=>a.start-b.start);
           if(silAutoMark){
             saveH();
             markers.push({time:rtSilStart,note:'無音 '+dur.toFixed(1)+'s'});
             markers.sort((a,b)=>a.time-b.time);
-            renderMarkers(); saveMk();
+            renderMarkers();
             showToast('🔖 無音 '+dur.toFixed(1)+'s @ '+fmtMs(rtSilStart));
           }
+          saveMk(); // 自動マークOFFでも無音データを永続化（移動/再起動で消えないように）
         }
       }
     } else {
@@ -995,8 +997,7 @@ function seekTo(t){
   const cl=Math.max(0,Math.min(duration||0,t));
   audioEl.currentTime=cl;
   resetRTSilence();
-  // Remove silence regions that start at or after seek point (will be re-detected)
-  silReg=silReg.filter(sr=>sr.end<cl-0.1);
+  // (旧: シーク地点以降のsilRegを削除 → 頭出しで全消失していたため廃止。重複はrtLoopの重なり判定で防止)
   // Sync zoomCtr
   if(duration>0){
     const f=cl/duration, hs=1/(2*zoomLv);
