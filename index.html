@@ -132,7 +132,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v62</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v63</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -324,8 +324,35 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
       <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">0</td><td style="padding:5px 4px;color:#e8e8f0">速度リセット (×1.0)</td></tr>
       <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">1 〜 6</td><td style="padding:5px 4px;color:#e8e8f0">倍速切替 ×0.25〜×2.0</td></tr>
       <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">Z / Y</td><td style="padding:5px 4px;color:#e8e8f0">取り消し / やり直し</td></tr>
-      <tr style="background:rgba(0,229,255,.05)"><td colspan="2" style="padding:6px 4px;color:#6b6b88;font-size:9px;line-height:1.5">8BitDo micro は本体設定で各ボタンに上記キーを割り当ててください。<br>※キー割り当てのカスタマイズ機能は今後追加予定。</td></tr>
+      <tr style="background:rgba(0,229,255,.05)"><td colspan="2" style="padding:6px 4px;color:#6b6b88;font-size:9px;line-height:1.5">8BitDo micro は本体設定で各ボタンに上記キーを割り当ててください。</td></tr>
     </table>
+    <button onclick="openKeymapModal()" style="margin-top:12px;width:100%;background:rgba(0,229,255,.12);border:1px solid #00e5ff;border-radius:8px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:11px;padding:10px;cursor:pointer">⌨ キー割り当てを変更</button>
+  </div>
+</div>
+
+<!-- Keymap (shortcut) editor modal -->
+<div id="keymapModal" onclick="closeKeymapModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:520;align-items:flex-start;justify-content:center;overflow-y:auto;-webkit-overflow-scrolling:touch">
+  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;margin:20px 12px;max-width:400px;width:calc(100% - 24px);padding:16px">
+    <div style="display:flex;align-items:center;margin-bottom:6px">
+      <span style="font-family:'Space Mono',monospace;font-size:11px;color:#00e5ff;letter-spacing:1px">ショートカット設定</span>
+      <button onclick="closeKeymapModal()" style="margin-left:auto;background:transparent;border:none;color:#6b6b88;font-size:18px;cursor:pointer">×</button>
+    </div>
+    <div style="font-size:9px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:10px">各機能の「＋」を押し、登録したいキー（コントローラー/キーボード）を押すか一覧から選びます。チップの×で削除。</div>
+    <div id="keymapList"></div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button onclick="resetKeymap()" style="flex:1;background:#1c1c28;border:1px solid #2a2a3d;border-radius:7px;color:#6b6b88;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">既定に戻す</button>
+      <button onclick="closeKeymapModal()" style="flex:1;background:rgba(0,229,255,.15);border:1px solid #00e5ff;border-radius:7px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- Key capture overlay -->
+<div id="captureOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:560;align-items:center;justify-content:center">
+  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid #00e5ff;border-radius:12px;margin:16px;max-width:420px;width:calc(100% - 32px);padding:16px">
+    <div id="captureLabel" style="font-family:'Space Mono',monospace;font-size:12px;color:#00e5ff;text-align:center;margin-bottom:6px">キーを押してください</div>
+    <div style="font-size:9px;color:#6b6b88;font-family:'Space Mono',monospace;text-align:center;margin-bottom:12px">コントローラー/キーボードのキーを押す、または下から選択</div>
+    <div id="keyGrid" style="display:flex;flex-wrap:wrap;gap:5px;justify-content:center;max-height:46vh;overflow-y:auto"></div>
+    <button onclick="endCapture()" style="margin-top:12px;width:100%;background:#1c1c28;border:1px solid #2a2a3d;border-radius:8px;color:#9a9ab0;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">キャンセル</button>
   </div>
 </div>
 
@@ -1283,10 +1310,86 @@ function doAction(fn){
     case 'detect': toggleDetect(); break;
   }
 }
+// ── Keymap editor (stage B) ──
+const FN_ORDER=['playpause','markadd','markdel','skipback','skipfwd','fineback','finefwd','prevmark','nextmark','prevfile','nextfile','head','tail','speedreset','speed1','speed2','speed3','speed4','speed5','speed6','undo','redo','detect'];
+const FN_LABELS={playpause:'再生/停止',markadd:'マーク追加',markdel:'マーク削除',skipback:'−N秒スキップ',skipfwd:'+N秒スキップ',fineback:'−0.1秒',finefwd:'+0.1秒',prevmark:'前のマーク',nextmark:'次のマーク',prevfile:'前のファイル',nextfile:'次のファイル',head:'先頭へ',tail:'末尾へ',speedreset:'速度 ×1.0',speed1:'速度 ×0.25',speed2:'速度 ×0.5',speed3:'速度 ×0.75',speed4:'速度 ×1.25',speed5:'速度 ×1.5',speed6:'速度 ×2.0',undo:'取り消し',redo:'やり直し',detect:'無音検出 ON/OFF'};
+function tokenLabel(t){
+  if(t===' ')return'Space';
+  const m={ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',Backspace:'BS',Delete:'Del',Enter:'Enter',Escape:'Esc',Tab:'Tab',Home:'Home',End:'End'};
+  if(m[t])return m[t];
+  if(t.indexOf('Numpad')===0)return'Num'+t.slice(6);
+  if(t.length===1)return t.toUpperCase();
+  return t;
+}
+let captureFn=null;
+function anyModalOpen(){
+  return ['colorModal','helpModal','ctrlModal','timeModal','exportModal','clearModal','keymapModal']
+    .some(id=>{const el=document.getElementById(id);return el&&el.style.display!=='none';});
+}
+function openKeymapModal(){ document.getElementById('helpModal').style.display='none'; renderKeymap(); document.getElementById('keymapModal').style.display='flex'; }
+function closeKeymapModal(){ endCapture(); document.getElementById('keymapModal').style.display='none'; setTimeout(()=>grabFocus({}),100); }
+function renderKeymap(){
+  const wrap=document.getElementById('keymapList'); if(!wrap)return;
+  wrap.innerHTML='';
+  FN_ORDER.forEach(fn=>{
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid #1c1c28;flex-wrap:wrap';
+    const lbl=document.createElement('span');
+    lbl.style.cssText="flex:1;min-width:90px;font-family:'Space Mono',monospace;font-size:11px;color:#e8e8f0";
+    lbl.textContent=FN_LABELS[fn];
+    row.appendChild(lbl);
+    (keymap[fn]||[]).forEach(tok=>{
+      const chip=document.createElement('span');
+      chip.style.cssText="display:inline-flex;align-items:center;gap:3px;background:#1c1c28;border:1px solid #2a2a3d;border-radius:5px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:10px;padding:2px 5px";
+      const tx=document.createElement('span'); tx.textContent=tokenLabel(tok); chip.appendChild(tx);
+      const x=document.createElement('span'); x.textContent='×'; x.style.cssText='color:#ff6b6b;cursor:pointer;font-size:11px;padding:0 1px';
+      x.onclick=(ev)=>{ ev.stopPropagation(); removeKey(fn,tok); };
+      chip.appendChild(x); row.appendChild(chip);
+    });
+    const add=document.createElement('button');
+    add.textContent='＋'; add.style.cssText="background:rgba(0,229,255,.12);border:1px solid #00e5ff;border-radius:5px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:13px;width:28px;height:26px;cursor:pointer;flex-shrink:0";
+    add.onclick=()=>startCapture(fn);
+    row.appendChild(add);
+    wrap.appendChild(row);
+  });
+}
+const GRID_KEYS=['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','0','1','2','3','4','5','6','7','8','9',',','.','[',']',';',"'",'/','\\','-','=','ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' ','Enter','Backspace'];
+function buildKeyGrid(){
+  const g=document.getElementById('keyGrid'); g.innerHTML='';
+  GRID_KEYS.forEach(tok=>{
+    const b=document.createElement('button');
+    b.textContent=tokenLabel(tok);
+    b.style.cssText="background:#1c1c28;border:1px solid #2a2a3d;border-radius:5px;color:#e8e8f0;font-family:'Space Mono',monospace;font-size:11px;min-width:30px;padding:7px 6px;cursor:pointer";
+    b.onclick=()=>{ if(captureFn){ assignKey(captureFn,tok); endCapture(); } };
+    g.appendChild(b);
+  });
+}
+function startCapture(fn){
+  captureFn=fn;
+  document.getElementById('captureLabel').textContent='「'+FN_LABELS[fn]+'」に割り当て';
+  buildKeyGrid();
+  document.getElementById('captureOverlay').style.display='flex';
+  const ft=document.getElementById('focusTrap'); if(ft) ft.focus({preventScroll:true});
+}
+function endCapture(){ captureFn=null; const ov=document.getElementById('captureOverlay'); if(ov) ov.style.display='none'; }
+function assignKey(fn,tok){
+  for(const k in keymap){ keymap[k]=keymap[k].filter(x=>x!==tok); } // 重複防止：他機能から外す
+  if(!keymap[fn]) keymap[fn]=[];
+  if(!keymap[fn].includes(tok)) keymap[fn].push(tok);
+  saveKeymap(); renderKeymap();
+}
+function removeKey(fn,tok){ keymap[fn]=(keymap[fn]||[]).filter(x=>x!==tok); saveKeymap(); renderKeymap(); }
+function resetKeymap(){ keymap=defKeymapCopy(); saveKeymap(); renderKeymap(); showToast('既定キーに戻しました'); }
+
 function onKey(e){
   if(e._acHandled) return; e._acHandled=true; // 同一keydownが document/window/focusTrap の3経路で届く重複を1回に集約
   const tag=e.target.tagName;
   if((tag==='INPUT'&&e.target.id!=='focusTrap')||tag==='TEXTAREA'||tag==='SELECT') return;
+
+  // キー登録中：押されたキーを取り込み（通常動作はさせない）
+  if(captureFn){ e.preventDefault(); e.stopPropagation(); assignKey(captureFn, keyToken(e)); endCapture(); return; }
+  // モーダル表示中はショートカットを発火させない
+  if(anyModalOpen()) return;
 
   if([' ','ArrowLeft','ArrowRight','ArrowUp','ArrowDown',
       'PageUp','PageDown','[',']','Backspace'].includes(e.key))
@@ -1862,12 +1965,16 @@ function grabFocus(e){
   const tm=document.getElementById('timeModal');
   const em=document.getElementById('exportModal');
   const xm=document.getElementById('clearModal');
+  const km=document.getElementById('keymapModal');
+  const co=document.getElementById('captureOverlay');
   const modalOpen = document.getElementById('colorModal').style.display!=='none' ||
                     document.getElementById('helpModal').style.display!=='none' ||
                     (cm&&cm.style.display!=='none') ||
                     (tm&&tm.style.display!=='none') ||
                     (em&&em.style.display!=='none') ||
-                    (xm&&xm.style.display!=='none');
+                    (xm&&xm.style.display!=='none') ||
+                    (km&&km.style.display!=='none') ||
+                    (co&&co.style.display!=='none');
   if(modalOpen) return;
   const tag = e && e.target && e.target.tagName;
   if(tag==='INPUT'||tag==='BUTTON'||tag==='SELECT'||tag==='TEXTAREA') return;
