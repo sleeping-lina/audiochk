@@ -132,7 +132,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v64</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v65</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -500,10 +500,12 @@ function onEnded(){
 [audioPlay,audioDet].forEach(el=>{
   el.addEventListener('ended',onEnded);
   el.addEventListener('error',()=>{ if(el===audioEl) showToast('エラー code='+(el.error?el.error.code:'?')); });
-  // iOS can silently reset playbackRate on play — re-apply after start
-  el.addEventListener('play',()=>{
-    setTimeout(()=>{ if(el===audioEl&&Math.abs(el.playbackRate-activeRate())>0.01){ el.playbackRate=activeRate(); setPitch(el); } },100);
-    setTimeout(()=>{ if(el===audioEl&&Math.abs(el.playbackRate-activeRate())>0.01){ el.playbackRate=activeRate(); setPitch(el); } },500);
+  // iOSが稀にplaybackRateを勝手に戻す場合の保険：戻された時だけ即補正。
+  // （旧: play後100/500msのタイマー再適用＝切替もたつきの主因。廃止）
+  el.addEventListener('ratechange',()=>{
+    if(el===audioEl && Math.abs(el.playbackRate-activeRate())>0.01){
+      el.playbackRate=activeRate(); setPitch(el);
+    }
   });
 });
 
