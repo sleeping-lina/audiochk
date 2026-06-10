@@ -132,7 +132,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v61</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v62</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -312,19 +312,18 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
     </div>
     <table style="width:100%;border-collapse:collapse;font-family:'Space Mono',monospace;font-size:11px">
       <tr style="background:rgba(0,229,255,.05)"><td colspan="2" style="padding:4px;color:#6b6b88;font-size:9px">── キーボード / 8BitDo ─────────────────</td></tr>
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">P / Space</td><td style="padding:5px 4px;color:#e8e8f0">再生 / 一時停止</td></tr>
+      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">Space</td><td style="padding:5px 4px;color:#e8e8f0">再生 / 一時停止</td></tr>
       <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">M</td><td style="padding:5px 4px;color:#e8e8f0">マーク追加</td></tr>
       <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">Backspace</td><td style="padding:5px 4px;color:#e8e8f0">現在位置のマーク削除</td></tr>
       <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">← / →</td><td style="padding:5px 4px;color:#e8e8f0">−N秒 / +N秒</td></tr>
       <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">, / .</td><td style="padding:5px 4px;color:#e8e8f0">−0.1秒 / +0.1秒</td></tr>
       <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">[ / ]</td><td style="padding:5px 4px;color:#e8e8f0">前 / 次のマークへ</td></tr>
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">&lt; / &gt;</td><td style="padding:5px 4px;color:#e8e8f0">前 / 次のファイルへ</td></tr>
+      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">P / N</td><td style="padding:5px 4px;color:#e8e8f0">前 / 次のファイルへ</td></tr>
       <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">H / E</td><td style="padding:5px 4px;color:#e8e8f0">先頭 / 末尾へ</td></tr>
       <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">D</td><td style="padding:5px 4px;color:#e8e8f0">無音検出 ON / OFF</td></tr>
       <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">0</td><td style="padding:5px 4px;color:#e8e8f0">速度リセット (×1.0)</td></tr>
       <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">1 〜 6</td><td style="padding:5px 4px;color:#e8e8f0">倍速切替 ×0.25〜×2.0</td></tr>
       <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">Z / Y</td><td style="padding:5px 4px;color:#e8e8f0">取り消し / やり直し</td></tr>
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">⌘/Ctrl+Z / Y</td><td style="padding:5px 4px;color:#e8e8f0">取り消し / やり直し</td></tr>
       <tr style="background:rgba(0,229,255,.05)"><td colspan="2" style="padding:6px 4px;color:#6b6b88;font-size:9px;line-height:1.5">8BitDo micro は本体設定で各ボタンに上記キーを割り当ててください。<br>※キー割り当てのカスタマイズ機能は今後追加予定。</td></tr>
     </table>
   </div>
@@ -1210,7 +1209,7 @@ document.getElementById('importData').addEventListener('change',function(){
 
 // ── Keymap (data-driven; remap UI added in stage B) ──
 const DEFAULT_KEYMAP={
-  playpause:['p',' '],   // P と Space（両対応）
+  playpause:[' '],       // Space（Pは前ファイルへ）
   markadd:['m'],
   markdel:['Backspace','Delete'],
   skipback:['ArrowLeft'],
@@ -1219,8 +1218,8 @@ const DEFAULT_KEYMAP={
   finefwd:['.'],
   prevmark:['['],
   nextmark:[']'],
-  prevfile:['<'],
-  nextfile:['>'],
+  prevfile:['p'],
+  nextfile:['n'],
   head:['h'],
   tail:['e'],
   speedreset:['0','Numpad0'],
@@ -1293,12 +1292,8 @@ function onKey(e){
       'PageUp','PageDown','[',']','Backspace'].includes(e.key))
     e.preventDefault();
 
-  // Ctrl/Cmd+Z / +Y も undo/redo（デスクトップ用）
-  if(e.ctrlKey||e.metaKey){
-    if(e.key==='z'||e.key==='Z'){undo(); return;}
-    if(e.key==='y'||e.key==='Y'){redo(); return;}
-    return;
-  }
+  // 修飾キー(Ctrl/Cmd)付きは無視（このアプリ/8BitDoでは修飾が化けるため単独キーのみ運用）
+  if(e.ctrlKey||e.metaKey) return;
 
   const fn=lookupFn(keyToken(e));
   if(fn) doAction(fn);
