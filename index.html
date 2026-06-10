@@ -132,7 +132,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v60</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v61</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -311,52 +311,21 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
       <button onclick="closeHelpModal()" style="margin-left:auto;background:transparent;border:none;color:#6b6b88;font-size:18px;cursor:pointer">×</button>
     </div>
     <table style="width:100%;border-collapse:collapse;font-family:'Space Mono',monospace;font-size:11px">
-      <tr style="background:rgba(0,229,255,.05)"><td colspan="2" style="padding:4px;color:#6b6b88;font-size:9px">── キーボード ─────────────────</td></tr>
-
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">H / A / Enter</td><td style="padding:5px 4px;color:#e8e8f0">再生 / 一時停止</td></tr>
-
+      <tr style="background:rgba(0,229,255,.05)"><td colspan="2" style="padding:4px;color:#6b6b88;font-size:9px">── キーボード / 8BitDo ─────────────────</td></tr>
+      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">P / Space</td><td style="padding:5px 4px;color:#e8e8f0">再生 / 一時停止</td></tr>
       <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">M</td><td style="padding:5px 4px;color:#e8e8f0">マーク追加</td></tr>
-
       <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">Backspace</td><td style="padding:5px 4px;color:#e8e8f0">現在位置のマーク削除</td></tr>
-
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">← →</td><td style="padding:5px 4px;color:#e8e8f0">−N秒 / +N秒</td></tr>
-
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">B / C</td><td style="padding:5px 4px;color:#e8e8f0">−0.1秒 / +0.1秒</td></tr>
-
+      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">← / →</td><td style="padding:5px 4px;color:#e8e8f0">−N秒 / +N秒</td></tr>
+      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">, / .</td><td style="padding:5px 4px;color:#e8e8f0">−0.1秒 / +0.1秒</td></tr>
       <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">[ / ]</td><td style="padding:5px 4px;color:#e8e8f0">前 / 次のマークへ</td></tr>
-
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">P / N</td><td style="padding:5px 4px;color:#e8e8f0">前 / 次のファイルへ</td></tr>
-
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">Y / 0</td><td style="padding:5px 4px;color:#e8e8f0">速度リセット (×1.0)</td></tr>
-
+      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">&lt; / &gt;</td><td style="padding:5px 4px;color:#e8e8f0">前 / 次のファイルへ</td></tr>
+      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">H / E</td><td style="padding:5px 4px;color:#e8e8f0">先頭 / 末尾へ</td></tr>
+      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">D</td><td style="padding:5px 4px;color:#e8e8f0">無音検出 ON / OFF</td></tr>
+      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">0</td><td style="padding:5px 4px;color:#e8e8f0">速度リセット (×1.0)</td></tr>
       <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">1 〜 6</td><td style="padding:5px 4px;color:#e8e8f0">倍速切替 ×0.25〜×2.0</td></tr>
-
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">⌘+Z / Y</td><td style="padding:5px 4px;color:#e8e8f0">取り消し / やり直し</td></tr>
-
-      <tr style="background:rgba(0,229,255,.05)"><td colspan="2" style="padding:4px;color:#6b6b88;font-size:9px">── 8BitDo micro 設定 ─────────────────</td></tr>
-
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">A / B ボタン → A</td><td style="padding:5px 4px;color:#e8e8f0">再生 / 一時停止</td></tr>
-
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">X ボタン → M</td><td style="padding:5px 4px;color:#e8e8f0">マーク追加</td></tr>
-
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">Y ボタン → 0</td><td style="padding:5px 4px;color:#e8e8f0">速度リセット</td></tr>
-
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">L / R ボタン → [ / ]</td><td style="padding:5px 4px;color:#e8e8f0">前 / 次のマークへ</td></tr>
-
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">L2 → P</td><td style="padding:5px 4px;color:#e8e8f0">前のファイルへ</td></tr>
-
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">R2 → V / N</td><td style="padding:5px 4px;color:#e8e8f0">次のファイルへ</td></tr>
-
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">− / + → B / C</td><td style="padding:5px 4px;color:#e8e8f0">−0.1秒 / +0.1秒</td></tr>
-
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">← / → → Shift+← / →</td><td style="padding:5px 4px;color:#e8e8f0">−N秒 / +N秒</td></tr>
-
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">↑ → 5</td><td style="padding:5px 4px;color:#e8e8f0">×1.5倍速</td></tr>
-
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">↓ → 1</td><td style="padding:5px 4px;color:#e8e8f0">×0.25倍速</td></tr>
-
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">★ → H（保留）</td><td style="padding:5px 4px;color:#e8e8f0">再生 / 一時停止</td></tr>
-
+      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">Z / Y</td><td style="padding:5px 4px;color:#e8e8f0">取り消し / やり直し</td></tr>
+      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">⌘/Ctrl+Z / Y</td><td style="padding:5px 4px;color:#e8e8f0">取り消し / やり直し</td></tr>
+      <tr style="background:rgba(0,229,255,.05)"><td colspan="2" style="padding:6px 4px;color:#6b6b88;font-size:9px;line-height:1.5">8BitDo micro は本体設定で各ボタンに上記キーを割り当ててください。<br>※キー割り当てのカスタマイズ機能は今後追加予定。</td></tr>
     </table>
   </div>
 </div>
@@ -1198,8 +1167,8 @@ function doExport(which){
 }
 function mkExportObj(fname,mkrs,silR,dur){ return{file:fname,duration:dur,markers:mkrs,silences:silR.map(s=>({start:+s.start.toFixed(3),end:+s.end.toFixed(3),dur:+s.dur.toFixed(3)}))}; }
 function todayStr(){ const d=new Date(); return ''+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); }
-function exportCurrent(){ dlJSON(mkExportObj(curFileName,markers,silReg,duration),(curFileName||'audio').replace(/\.[^.]+$/,'')+'_markers_'+todayStr()+'.json'); showToast('エクスポートを開始'); }
-function exportAll(){ dlJSON(playlist.map(item=>{const d=loadMk(item.name);return mkExportObj(item.name,d?.markers||[],d?.silReg||[],d?.duration||0);}),'audiochk_'+todayStr()+'.json'); showToast('エクスポートを開始'); }
+function exportCurrent(){ dlJSON(mkExportObj(curFileName,markers,silReg,duration),(curFileName||'audio').replace(/\.[^.]+$/,'')+'_markers_'+todayStr()+'.json'); }
+function exportAll(){ dlJSON(playlist.map(item=>{const d=loadMk(item.name);return mkExportObj(item.name,d?.markers||[],d?.silReg||[],d?.duration||0);}),'audiochk_'+todayStr()+'.json'); }
 function dlJSON(obj,fname){ const b=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=fname;a.click();URL.revokeObjectURL(u); }
 document.getElementById('importData').addEventListener('change',function(){
   const file=this.files[0];if(!file)return;
@@ -1239,70 +1208,100 @@ document.getElementById('importData').addEventListener('change',function(){
 //   L1/[ → prev mark   R1/] → next mark   ←→ → seek   L2/PageUp → prev file   R2/PageDown → next file
 //   1-6 → speed   0 → speed reset
 
+// ── Keymap (data-driven; remap UI added in stage B) ──
+const DEFAULT_KEYMAP={
+  playpause:['p',' '],   // P と Space（両対応）
+  markadd:['m'],
+  markdel:['Backspace','Delete'],
+  skipback:['ArrowLeft'],
+  skipfwd:['ArrowRight'],
+  fineback:[','],
+  finefwd:['.'],
+  prevmark:['['],
+  nextmark:[']'],
+  prevfile:['<'],
+  nextfile:['>'],
+  head:['h'],
+  tail:['e'],
+  speedreset:['0','Numpad0'],
+  speed1:['1','Numpad1'],
+  speed2:['2','Numpad2'],
+  speed3:['3','Numpad3'],
+  speed4:['4','Numpad4'],
+  speed5:['5','Numpad5'],
+  speed6:['6','Numpad6'],
+  undo:['z'],
+  redo:['y'],
+  detect:['d']
+};
+function defKeymapCopy(){ const m={}; for(const k in DEFAULT_KEYMAP) m[k]=DEFAULT_KEYMAP[k].slice(); return m; }
+function loadKeymap(){
+  try{ const o=JSON.parse(localStorage.getItem('ac_keymap')||'null');
+    if(o&&typeof o==='object'){ const m=defKeymapCopy(); for(const k in m){ if(Array.isArray(o[k])) m[k]=o[k].slice(); } return m; }
+  }catch(e){}
+  return defKeymapCopy();
+}
+function saveKeymap(){ try{ localStorage.setItem('ac_keymap',JSON.stringify(keymap)); }catch(e){} }
+let keymap=loadKeymap();
+// canonical token: letters/symbols lowercased; Numpad via code; space=' '
+function keyToken(e){
+  if(e.code&&e.code.indexOf('Numpad')===0) return e.code;
+  const k=e.key;
+  if(k===' ') return ' ';
+  if(k&&k.length===1) return k.toLowerCase();
+  return k;
+}
+function lookupFn(tok){ for(const fn in keymap){ if(keymap[fn].includes(tok)) return fn; } return null; }
+function delNearestMk(){
+  const t=curT(); let best=-1,bestD=0.5;
+  markers.forEach((mk,i)=>{const d=Math.abs(mk.time-t);if(d<bestD){bestD=d;best=i;}});
+  if(best>=0) delMk(best);
+}
+function doAction(fn){
+  switch(fn){
+    case 'playpause': isPlaying?stop():play(); break;
+    case 'markadd': addMk(); break;
+    case 'markdel': delNearestMk(); break;
+    case 'skipback': seekTo(curT()-skipSec); break;
+    case 'skipfwd': seekTo(curT()+skipSec); break;
+    case 'fineback': seekTo(curT()-0.1); break;
+    case 'finefwd': seekTo(curT()+0.1); break;
+    case 'prevmark': document.getElementById('prevMrkBtn').click(); break;
+    case 'nextmark': document.getElementById('nextMrkBtn').click(); break;
+    case 'prevfile': prevFile(); break;
+    case 'nextfile': nextFile(); break;
+    case 'head': seekTo(0); break;
+    case 'tail': seekTo(duration); break;
+    case 'speedreset': setSpd(1.0); break;
+    case 'speed1': setSpd(0.25); break;
+    case 'speed2': setSpd(0.5); break;
+    case 'speed3': setSpd(0.75); break;
+    case 'speed4': setSpd(1.25); break;
+    case 'speed5': setSpd(1.5); break;
+    case 'speed6': setSpd(2.0); break;
+    case 'undo': undo(); break;
+    case 'redo': redo(); break;
+    case 'detect': toggleDetect(); break;
+  }
+}
 function onKey(e){
   if(e._acHandled) return; e._acHandled=true; // 同一keydownが document/window/focusTrap の3経路で届く重複を1回に集約
   const tag=e.target.tagName;
   if((tag==='INPUT'&&e.target.id!=='focusTrap')||tag==='TEXTAREA'||tag==='SELECT') return;
 
-  const key=e.key, code=e.code, shift=e.shiftKey, mod=e.ctrlKey||e.metaKey;
-
   if([' ','ArrowLeft','ArrowRight','ArrowUp','ArrowDown',
-      'PageUp','PageDown','[',']','Backspace'].includes(key))
+      'PageUp','PageDown','[',']','Backspace'].includes(e.key))
     e.preventDefault();
 
-  // Ctrl/Cmd combos
-  if(mod){
-    if(key==='z'||key==='Z'){undo(); return;}
-    if(key==='y'||key==='Y'){redo(); return;}
+  // Ctrl/Cmd+Z / +Y も undo/redo（デスクトップ用）
+  if(e.ctrlKey||e.metaKey){
+    if(e.key==='z'||e.key==='Z'){undo(); return;}
+    if(e.key==='y'||e.key==='Y'){redo(); return;}
     return;
   }
 
-  // ── Confirmed working keys (from iOS keytest) ──────────────────
-
-  // Play/pause: A key (8BitDo A/B button), H key (★ button reserved)
-  if(key==='a'||key==='A'||key==='h'||key==='H')
-    {isPlaying?stop():play();}
-
-  // Mark add: M key (8BitDo X button)
-  else if(key==='m'||key==='M')
-    {addMk();}
-
-  // Mark delete: Backspace (8BitDo dedicated if assigned)
-  else if(key==='Backspace'||key==='Delete'){
-    const t=curT(); let best=-1,bestD=0.5;
-    markers.forEach((mk,i)=>{const d=Math.abs(mk.time-t);if(d<bestD){bestD=d;best=i;}});
-    if(best>=0) delMk(best);
-  }
-
-  // Seek: Shift+← → (8BitDo ←/→ sends Shift+Arrow) = −N/+N sec
-  //       B key (8BitDo − button) = −0.1s
-  //       C key (8BitDo + button) = +0.1s
-  else if(key==='ArrowLeft')  {shift?seekTo(curT()-skipSec):seekTo(curT()-skipSec);}
-  else if(key==='ArrowRight') {shift?seekTo(curT()+skipSec):seekTo(curT()+skipSec);}
-  else if(key==='b'||key==='B') {seekTo(curT()-.1);}
-  else if(key==='c'||key==='C') {seekTo(curT()+.1);}
-
-  // Marker nav: [ ] (8BitDo L/R buttons)
-  else if(key==='['||code==='BracketLeft')  {document.getElementById('prevMrkBtn').click();}
-  else if(key===']'||code==='BracketRight') {document.getElementById('nextMrkBtn').click();}
-
-  // File nav: P (8BitDo L2), N/V (8BitDo R2)
-  else if(key==='p'||key==='P') {prevFile();}
-  else if(key==='n'||key==='N'||key==='v'||key==='V') {nextFile();}
-
-  // Speed: Y=0 reset (8BitDo Y button)
-  else if(key==='y'||key==='Y') {setSpd(1.0);}
-
-  // Speed 0 key = reset
-  else if(key==='0'||code==='Numpad0') {setSpd(1.0);}
-
-  // Speed 1-6 digits and numpad (8BitDo ↑=5, ↓=1, etc.)
-  else if((key>='1'&&key<='6')||
-          (code>='Numpad1'&&code<='Numpad6')){
-    const d=code.startsWith('Numpad')?code.replace('Numpad',''):key;
-    const map={'1':0.25,'2':0.5,'3':0.75,'4':1.25,'5':1.5,'6':2.0};
-    if(map[d]) setSpd(map[d]);
-  }
+  const fn=lookupFn(keyToken(e));
+  if(fn) doAction(fn);
 }
 // Listen on both document and window
 document.addEventListener('keydown', onKey, true);  // capture phase
