@@ -132,7 +132,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v70</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v71</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -1182,8 +1182,8 @@ function renderSilList(){
       <span class="m-time sil-jump" data-jump="${s.start}">${fmtMs(s.start)}</span>
       <span style="color:var(--dm);font-size:10px">▸</span>
       <span class="m-time sil-jump" data-jump="${s.end}">${fmtMs(s.end)}</span>
-      <span class="m-label" style="color:var(--dm);text-align:right">${s.dur.toFixed(1)}s</span>
-      <span class="m-del" data-start="${s.start}" data-end="${s.end}">×</span>
+      <span style="color:var(--a3);font-family:'Space Mono',monospace;font-size:10px;margin-left:6px">${s.dur.toFixed(2)}s</span>
+      <span class="m-del" style="margin-left:auto" data-start="${s.start}" data-end="${s.end}">×</span>
     </div>`).join('');
   curSilIdx=-1; hlSil(curT());
 }
@@ -1193,6 +1193,7 @@ function hlSil(t){
   let idx=-1; for(let i=0;i<arr.length;i++){ if(t>=arr[i].start-0.05 && t<=arr[i].end+0.05){ idx=i; break; } }
   if(idx===curSilIdx) return; curSilIdx=idx;
   document.querySelectorAll('#silListBox .sil-item').forEach((el,i)=>el.classList.toggle('cur',i===idx));
+  if(idx>=0){const el=document.getElementById('si'+idx);if(el)el.scrollIntoView({block:'nearest',behavior:'smooth'});}
 }
 function delSilReg(start,end){
   const i=silReg.findIndex(s=>Math.abs(s.start-start)<1e-6 && Math.abs(s.end-end)<1e-6);
@@ -2163,7 +2164,10 @@ function grabFocus(e){
                     (cpm&&cpm.style.display!=='none');
   if(modalOpen) return;
   const tag = e && e.target && e.target.tagName;
-  if(tag==='INPUT'||tag==='BUTTON'||tag==='SELECT'||tag==='TEXTAREA') return;
+  const ty  = e && e.target && e.target.type;
+  // 本物のテキスト入力中のみフォーカスを奪わない（テキスト入力はモーダル内のみ＝上の modalOpen でほぼ網羅）。
+  // ボタンやレンジスライダーのタップ後は focusTrap に戻す（戻さないと8BitDo等のキーが効かなくなる）。
+  if(tag==='TEXTAREA' || (tag==='INPUT' && ty!=='range' && e.target.id!=='focusTrap')) return;
   setTimeout(()=>{ focusTrap.focus({preventScroll:true}); }, 50);
 }
 
