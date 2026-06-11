@@ -132,7 +132,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v67</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v68</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -194,9 +194,24 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
         <span class="sil-val" id="silMinV">1.0秒</span>
       </div>
       <div class="sil-row">
-        <span class="sil-ctl-lbl" style="white-space:nowrap">切替補正(ms)</span>
-        <button class="sil-adj" onclick="adjSeekComp(-1)">−</button><input type="range" id="silComp" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjSeekComp(1)">＋</button>
-        <span class="sil-val" id="silCompV">0ms</span>
+        <span class="sil-ctl-lbl" style="white-space:nowrap">検出→聞く(ms)</span>
+        <button class="sil-adj" onclick="adjComp('D2L',-1)">−</button><input type="range" id="compD2L" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjComp('D2L',1)">＋</button>
+        <span class="sil-val" id="compD2LV">0ms</span>
+      </div>
+      <div class="sil-row">
+        <span class="sil-ctl-lbl" style="white-space:nowrap">聞く→検出(ms)</span>
+        <button class="sil-adj" onclick="adjComp('L2D',-1)">−</button><input type="range" id="compL2D" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjComp('L2D',1)">＋</button>
+        <span class="sil-val" id="compL2DV">0ms</span>
+      </div>
+      <div class="sil-row">
+        <span class="sil-ctl-lbl" style="white-space:nowrap">先頭補正(ms)</span>
+        <button class="sil-adj" onclick="adjComp('head',-1)">−</button><input type="range" id="headComp" min="0" max="1000" step="10" value="0"><button class="sil-adj" onclick="adjComp('head',1)">＋</button>
+        <span class="sil-val" id="headCompV">0ms</span>
+      </div>
+      <div class="sil-row">
+        <span class="sil-ctl-lbl" style="white-space:nowrap">速度補正(ms)<span style="color:var(--dm);font-size:8px">実験</span></span>
+        <button class="sil-adj" onclick="adjComp('spd',-1)">−</button><input type="range" id="spdComp" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjComp('spd',1)">＋</button>
+        <span class="sil-val" id="spdCompV">0ms</span>
       </div>
       <div class="sil-row" style="justify-content:center;gap:10px">
         <span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--dm)">現在の無音：</span>
@@ -253,6 +268,17 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   </div>
   <div id="markerList"></div>
 </div>
+<div class="mk-sec">
+  <div class="mk-hdr" id="silListHdr" onclick="toggleSilList()" style="cursor:pointer">
+    SILENCE
+    <span id="silListCount" style="color:var(--dm);margin-left:4px"></span>
+    <button class="tog-btn" id="silListArrow">∧</button>
+    <div class="mk-acts" onclick="event.stopPropagation()">
+      <button class="smbtn danger" onclick="clearSilData()">クリア</button>
+    </div>
+  </div>
+  <div id="silListBox"></div>
+</div>
 <div class="io-bar">
   <button class="iobtn" id="exportBtn" style="border-color:rgba(0,229,255,.3);color:rgba(0,229,255,.8)">▼ EXPORT</button>
   <button class="iobtn" onclick="document.getElementById('importData').click()" style="border-color:rgba(0,229,255,.3);color:rgba(0,229,255,.8)">▲ IMPORT</button>
@@ -301,15 +327,15 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 
 <!-- Shortcut help modal -->
 <div id="helpModal" onclick="closeHelpModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;overflow-y:auto">
-  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;margin:20px auto;max-width:360px;padding:16px">
-    <div style="display:flex;align-items:center;margin-bottom:12px">
+  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;margin:20px auto;max-width:360px;padding:16px;max-height:calc(100vh - 40px);display:flex;flex-direction:column;overflow:hidden">
+    <div style="display:flex;align-items:center;margin-bottom:12px;flex-shrink:0">
       <span style="font-family:'Space Mono',monospace;font-size:11px;color:#00e5ff;letter-spacing:1px">SHORTCUTS</span>
       <button onclick="closeHelpModal()" style="margin-left:auto;background:transparent;border:none;color:#6b6b88;font-size:18px;cursor:pointer">×</button>
     </div>
-    <div style="font-family:'Space Mono',monospace;font-size:9px;color:#6b6b88;letter-spacing:1px;margin-bottom:6px">キーボード / コントローラー</div>
-    <div id="helpList" style="font-family:'Space Mono',monospace"></div>
-    <div style="font-size:9px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.5;margin-top:8px">速度プリセットの倍率は「再生設定」で変更できます。</div>
-    <button onclick="openKeymapModal()" style="margin-top:12px;width:100%;background:rgba(0,229,255,.12);border:1px solid #00e5ff;border-radius:8px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:11px;padding:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"><span style="font-size:18px;line-height:1">⌨️</span><span>キー割り当てを変更</span></button>
+    <div style="font-family:'Space Mono',monospace;font-size:9px;color:#6b6b88;letter-spacing:1px;margin-bottom:6px;flex-shrink:0">キーボード / コントローラー</div>
+    <div id="helpList" style="font-family:'Space Mono',monospace;overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0"></div>
+    <div style="font-size:9px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.5;margin-top:8px;flex-shrink:0">速度プリセットの倍率は「再生設定」で変更できます。</div>
+    <button onclick="openKeymapModal()" style="margin-top:12px;width:100%;background:rgba(0,229,255,.12);border:1px solid #00e5ff;border-radius:8px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:11px;padding:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;flex-shrink:0"><span style="font-size:18px;line-height:1">⌨️</span><span>キー割り当てを変更</span></button>
   </div>
 </div>
 
@@ -478,6 +504,7 @@ function onEnded(){
         renderMarkers(); saveMk();
       }
       document.getElementById('silCurDur').textContent=dur.toFixed(2)+'s';
+      renderSilList();
     }
     rtInSil=false;
   }
@@ -574,7 +601,7 @@ async function load(file){
   const cached=loadMk(file.name);
   if(cached){ markers=cached.markers||[]; silReg=cached.silReg||[]; duration=cached.duration||0; }
   else markers=[];
-  renderMarkers();
+  renderMarkers(); renderSilList();
 
   await new Promise(res=>{
     const done=()=>{ if(isFinite(audioEl.duration)&&audioEl.duration>0) duration=audioEl.duration; res(); };
@@ -596,7 +623,7 @@ async function load(file){
 let waCtx=null, waAnalyser=null, waSrc=null, waReady=false;
 let waBuf=null;
 let silThr=0.010, silMinSec=1.0, silAutoMark=false;
-let seekComp=0; // モード切替の先読み補正(ms)
+let compD2L=0, compL2D=0, headComp=0, spdComp=0; // 検出→聞く / 聞く→検出 / 先頭補正 / 速度補正(実験) (ms)
 let rtInSil=false, rtSilStart=0;
 // Timestamped ring buffer: each entry = {rms, t}
 const RT_MAX=600;  // max entries stored
@@ -633,8 +660,8 @@ function rtLoop(){
 
   if(rms<silThr){
     if(!rtInSil){ rtInSil=true;
-      // For head silence: if within first 0.3s, start from 0
-      rtSilStart=t<0.3?0:Math.max(0,t-(waAnalyser.fftSize/waCtx.sampleRate)); }
+      // For head silence: if within first (0.3s + headComp) start from 0
+      rtSilStart=t<(0.3+headComp/1000)?0:Math.max(0,t-(waAnalyser.fftSize/waCtx.sampleRate)); }
     document.getElementById('silCurDur').textContent=(t-rtSilStart).toFixed(1)+'s';
     document.getElementById('silStatus').textContent='無音中…';
   } else {
@@ -657,6 +684,7 @@ function rtLoop(){
             showToast('🔖 無音 '+dur.toFixed(1)+'s @ '+fmtMs(rtSilStart));
           }
           saveMk(); // 自動マークOFFでも無音データを永続化（移動/再起動で消えないように）
+          renderSilList();
         }
       }
     } else {
@@ -1069,7 +1097,11 @@ function fmtNum(s){ return Number.isInteger(s)?s.toFixed(1):String(s); }
 function fmtSpd(s){ return '×'+fmtNum(s); }
 function setSpd(s){
   playbackRate=s;
-  if(!detectOn){ audioEl.playbackRate=s; setPitch(audioEl); } // 検出モードは1.0固定（切替時に適用）
+  if(!detectOn){
+    audioEl.playbackRate=s; setPitch(audioEl); // 検出モードは1.0固定（切替時に適用）
+    // 速度補正(実験)：聞くモードで再生中、速度変更時にわずかに先送り（原理的に効きにくい）
+    if(spdComp>0 && isPlaying){ try{ audioEl.currentTime=Math.min(duration||audioEl.currentTime, audioEl.currentTime + spdComp/1000); }catch(e){} }
+  }
   document.querySelectorAll('.spb').forEach(b=>b.classList.toggle('on',parseFloat(b.dataset.speed)===s));
   showToast(fmtSpd(s));
   savePrefs();
@@ -1088,7 +1120,7 @@ function redo(){if(!redoSt.length)return;hist.push(JSON.parse(JSON.stringify(mar
 function hlMk(t){
   let idx=-1; for(let i=markers.length-1;i>=0;i--){if(markers[i].time<=t+0.05){idx=i;break;}}
   if(idx===curMkIdx)return; curMkIdx=idx;
-  document.querySelectorAll('.mk-item').forEach((el,i)=>el.classList.toggle('cur',i===idx));
+  document.querySelectorAll('#markerList .mk-item').forEach((el,i)=>el.classList.toggle('cur',i===idx));
   if(idx>=0){const el=document.getElementById('mi'+idx);if(el)el.scrollIntoView({block:'nearest',behavior:'smooth'});}
 }
 function renderMarkers(){
@@ -1116,6 +1148,41 @@ document.getElementById('markerList').addEventListener('click',e=>{
   if(e.target.classList.contains('m-note')) return;
   const item=e.target.closest('.mk-item');
   if(item) seekTo(parseFloat(item.dataset.time));
+});
+
+// ── 無音区間一覧 ──
+let silListOpen=true;
+function toggleSilList(){
+  silListOpen=!silListOpen;
+  document.getElementById('silListBox').classList.toggle('collapsed',!silListOpen);
+  document.getElementById('silListArrow').textContent=silListOpen?'∧':'∨';
+}
+function renderSilList(){
+  const box=document.getElementById('silListBox'); if(!box) return;
+  const cnt=document.getElementById('silListCount');
+  const arr=silReg.map(s=>({start:s.start,end:s.end,dur:(s.dur!=null?s.dur:s.end-s.start)})).sort((a,b)=>a.start-b.start);
+  if(cnt) cnt.textContent=arr.length?'('+arr.length+')':'';
+  if(!arr.length){ box.innerHTML='<div class="mk-empty">無音区間なし<br><span style="font-size:9px;opacity:.5">検出モードで再生すると追加</span></div>'; return; }
+  box.innerHTML=arr.map(s=>`
+    <div class="mk-item" data-start="${s.start}" data-end="${s.end}">
+      <span class="m-time">${fmtMs(s.start)} – ${fmtMs(s.end)}</span>
+      <span class="m-label" style="color:var(--dm)">${s.dur.toFixed(1)}s</span>
+      <span class="m-del" data-start="${s.start}" data-end="${s.end}">×</span>
+    </div>`).join('');
+}
+function delSilReg(start,end){
+  const i=silReg.findIndex(s=>Math.abs(s.start-start)<1e-6 && Math.abs(s.end-end)<1e-6);
+  if(i<0) return;
+  silReg.splice(i,1);
+  renderSilList();
+  if(detectOn&&!isPlaying) drawWave(curT());
+  drawSeek(curT()); saveMk();
+}
+document.getElementById('silListBox').addEventListener('click',e=>{
+  const del=e.target.closest('.m-del');
+  if(del){ e.stopPropagation(); delSilReg(parseFloat(del.dataset.start),parseFloat(del.dataset.end)); return; }
+  const item=e.target.closest('.mk-item');
+  if(item) seekTo(parseFloat(item.dataset.start));
 });
 
 document.getElementById('btnMark').addEventListener('click',addMk);
@@ -1211,7 +1278,7 @@ document.getElementById('importData').addEventListener('change',function(){
       if(!Array.isArray(d.markers))throw 0;
       saveH(); markers=d.markers;
       silReg=Array.isArray(d.silences)?d.silences.map(s=>({start:s.start,end:s.end,dur:s.dur})):[];
-      renderMarkers();
+      renderMarkers(); renderSilList();
       if(detectOn&&!isPlaying) drawWave(curT());
       drawSeek(curT()); saveMk();
       showToast('インポート '+markers.length+'件');
@@ -1702,19 +1769,23 @@ document.getElementById('silMin').addEventListener('input',function(){
   silMinSec=parseFloat(this.value);
   document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒';
 });
-document.getElementById('silComp')?.addEventListener('input',function(){
-  seekComp=parseInt(this.value)||0;
-  document.getElementById('silCompV').textContent=seekComp+'ms';
-  saveSilPrefs();
+// 4つの補正スライダー（ドラッグ）
+[['compD2L',v=>compD2L=v],['compL2D',v=>compL2D=v],['headComp',v=>headComp=v],['spdComp',v=>spdComp=v]].forEach(([id,set])=>{
+  const el=document.getElementById(id);
+  if(el) el.addEventListener('input',function(){ set(parseInt(this.value)||0); document.getElementById(id+'V').textContent=(parseInt(this.value)||0)+'ms'; saveSilPrefs(); });
 });
 // 自動マーク機能は廃止（v66）。silAutoMark は常に false。
 silAutoMark=false;
 
-// 切替の先読み補正（ms）：検出⇔聞くモード切替時の位置引き継ぎを seekComp 分だけ先へ。巻き戻り感の軽減用。
-function adjSeekComp(d){
-  seekComp=Math.max(0,Math.min(500, seekComp + d*10));
-  const el=document.getElementById('silComp'); if(el) el.value=seekComp;
-  document.getElementById('silCompV').textContent=seekComp+'ms';
+// 補正スライダー（±ボタン）。kind: 'D2L'(検出→聞く) / 'L2D'(聞く→検出) / 'head'(先頭) / 'spd'(速度実験)
+function adjComp(kind,d){
+  const map={D2L:['compD2L',500],L2D:['compL2D',500],head:['headComp',1000],spd:['spdComp',500]};
+  const [id,mx]=map[kind];
+  let v=({D2L:compD2L,L2D:compL2D,head:headComp,spd:spdComp})[kind];
+  v=Math.max(0,Math.min(mx, v + d*10));
+  if(kind==='D2L')compD2L=v; else if(kind==='L2D')compL2D=v; else if(kind==='head')headComp=v; else spdComp=v;
+  const el=document.getElementById(id); if(el) el.value=v;
+  document.getElementById(id+'V').textContent=v+'ms';
   saveSilPrefs();
 }
 
@@ -1743,7 +1814,9 @@ function toggleDetect(){
   detectOn=!detectOn;
   try{ localStorage.setItem('ac_detect', detectOn?'1':'0'); }catch(e){}
   audioEl = detectOn ? audioDet : audioPlay; // swap active element
-  try{ audioEl.currentTime=Math.max(0,Math.min(duration||t, t + seekComp/1000)); }catch(e){} // 位置引き継ぎ＋先読み補正
+  // 方向別補正：検出→聞く=compD2L / 聞く→検出=compL2D
+  const comp = detectOn ? compL2D : compD2L;
+  try{ audioEl.currentTime=Math.max(0,Math.min(duration||t, t + comp/1000)); }catch(e){} // 位置引き継ぎ＋先読み補正
   audioEl.playbackRate=activeRate(); setPitch(audioEl);
   setDetectUI(); applyDetectLayout();
   // redraw
@@ -1948,12 +2021,14 @@ function clearSilData(){
   if(!silReg.length){ showToast('無音データなし'); return; }
   silReg=[]; rtInSil=false;
   document.getElementById('silCurDur').textContent='0.0s';
+  renderSilList();
   if(detectOn&&!isPlaying) drawWave(curT());
   drawSeek(curT()); saveMk(); showToast('無音データをクリア');
 }
 function saveSilPrefs(){
-  try{ localStorage.setItem('ac_silprefs',JSON.stringify({silThr,silMinSec,seekComp})); }catch(e){}
+  try{ localStorage.setItem('ac_silprefs',JSON.stringify({silThr,silMinSec,compD2L,compL2D,headComp,spdComp})); }catch(e){}
 }
+function setCompUI(id,val){ const el=document.getElementById(id); if(el) el.value=val; const v=document.getElementById(id+'V'); if(v) v.textContent=val+'ms'; }
 function loadSilPrefs(){
   try{
     const d=JSON.parse(localStorage.getItem('ac_silprefs')||'{}');
@@ -1961,8 +2036,12 @@ function loadSilPrefs(){
       document.getElementById('silThrV').textContent=silThr.toFixed(3); }
     if(d.silMinSec>0){ silMinSec=d.silMinSec; document.getElementById('silMin').value=silMinSec;
       document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒'; }
-    if(d.seekComp>=0){ seekComp=d.seekComp; const c=document.getElementById('silComp');
-      if(c) c.value=seekComp; const cv=document.getElementById('silCompV'); if(cv) cv.textContent=seekComp+'ms'; }
+    // 旧 seekComp（単一）は 検出→聞く 補正へ移行
+    if(d.compD2L>=0) compD2L=d.compD2L; else if(d.seekComp>=0) compD2L=d.seekComp;
+    if(d.compL2D>=0) compL2D=d.compL2D;
+    if(d.headComp>=0) headComp=d.headComp;
+    if(d.spdComp>=0) spdComp=d.spdComp;
+    setCompUI('compD2L',compD2L); setCompUI('compL2D',compL2D); setCompUI('headComp',headComp); setCompUI('spdComp',spdComp);
   }catch(e){}
 }
 
@@ -1981,7 +2060,7 @@ document.querySelectorAll('.spb').forEach(b=>b.classList.toggle('on',parseFloat(
 drawAllBtns();
 buildColorPanel();
 wireTimeInputs();
-drawWave(0); drawSeek(0); renderMarkers();
+drawWave(0); drawSeek(0); renderMarkers(); renderSilList();
 // ── Focus trap for hardware keyboard (8BitDo etc.) ──────────
 // iOS Safari only fires keydown when an element has focus.
 // We use a hidden readonly input (inputmode=none = no virtual keyboard)
