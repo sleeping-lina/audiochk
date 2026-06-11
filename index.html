@@ -90,11 +90,8 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   color:var(--tx);font-family:'Space Mono',monospace;font-size:10px;padding:2px;text-align:center}
 /* markers */
 .mk-sec{flex:1;display:flex;flex-direction:column;background:var(--bg);min-height:0}
-#markerList{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1}
-#markerList.collapsed{display:none}
-.sil-sec{display:flex;flex-direction:column;background:var(--bg);flex:0 0 auto;border-top:1px solid var(--bd)}
-#silListBox{overflow-y:auto;-webkit-overflow-scrolling:touch;max-height:26vh}
-#silListBox.collapsed{display:none}
+#markerList,#silListBox{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1}
+#markerList.collapsed,#silListBox.collapsed{display:none}
 .mk-hdr{display:flex;align-items:center;padding:4px 8px;font-family:'Space Mono',monospace;
   font-size:9px;color:var(--dm);letter-spacing:1px;border-bottom:1px solid var(--bd);
   position:sticky;top:0;background:var(--bg);z-index:10}
@@ -135,7 +132,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v69</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v70</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -239,7 +236,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   </div>
 </div>
 
-<div class="mk-sec">
+<div class="mk-sec" id="mkSec">
   <div class="mk-hdr" id="mkHdr" onclick="toggleMkList()" style="cursor:pointer">
     MARKERS
     <span id="mkCount" style="color:var(--dm);margin-left:4px"></span>
@@ -252,13 +249,15 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   </div>
   <div id="markerList"></div>
 </div>
-<div class="sil-sec">
+<div class="mk-sec" id="silSec" style="display:none">
   <div class="mk-hdr" id="silListHdr" onclick="toggleSilList()" style="cursor:pointer">
     SILENCE
     <span id="silListCount" style="color:var(--dm);margin-left:4px"></span>
     <button class="tog-btn" id="silListArrow">∧</button>
     <div class="mk-acts" onclick="event.stopPropagation()">
-      <button class="smbtn danger" onclick="openSilClearModal()">クリア</button>
+      <button class="smbtn" id="prevSilBtn">◀ prev</button>
+      <button class="smbtn" id="nextSilBtn">next ▶</button>
+      <button class="smbtn danger" onclick="openSilClearModal()">全削除</button>
     </div>
   </div>
   <div id="silListBox"></div>
@@ -1076,6 +1075,11 @@ document.getElementById('btnHeadTail1').addEventListener('click',()=>{
 });
 document.getElementById('prevMrkBtn').addEventListener('click',()=>{const t=curT(),p=[...markers].filter(m=>m.time<t-.15).pop();if(p)seekTo(p.time);else showToast('前のマークなし');});
 document.getElementById('nextMrkBtn').addEventListener('click',()=>{const t=curT(),n=markers.find(m=>m.time>t+.1);if(n)seekTo(n.time);else showToast('次のマークなし');});
+function silStarts(){ return silReg.map(s=>s.start).sort((a,b)=>a-b); }
+function gotoPrevSil(){ const t=curT(),arr=silStarts().filter(x=>x<t-.15); if(arr.length)seekTo(arr[arr.length-1]); else showToast('前の無音なし'); }
+function gotoNextSil(){ const t=curT(),n=silStarts().find(x=>x>t+.1); if(n!=null)seekTo(n); else showToast('次の無音なし'); }
+document.getElementById('prevSilBtn').addEventListener('click',gotoPrevSil);
+document.getElementById('nextSilBtn').addEventListener('click',gotoNextSil);
 
 document.getElementById('skipSec')?.addEventListener('change',function(){
   const v=parseInt(this.value); if(!isNaN(v)&&v>=1&&v<=60) setSk(v);
@@ -1326,6 +1330,8 @@ const DEFAULT_KEYMAP={
   finefwd:['.'],
   prevmark:['['],
   nextmark:[']'],
+  prevsil:[';'],
+  nextsil:["'"],
   prevfile:['p'],
   nextfile:['n'],
   head:['h'],
@@ -1386,6 +1392,8 @@ function doAction(fn){
     case 'finefwd': seekTo(curT()+0.1); break;
     case 'prevmark': document.getElementById('prevMrkBtn').click(); break;
     case 'nextmark': document.getElementById('nextMrkBtn').click(); break;
+    case 'prevsil': gotoPrevSil(); break;
+    case 'nextsil': gotoNextSil(); break;
     case 'prevfile': prevFile(); break;
     case 'nextfile': nextFile(); break;
     case 'head': seekTo(0); break;
@@ -1403,8 +1411,8 @@ function doAction(fn){
   }
 }
 // ── Keymap editor (stage B) ──
-const FN_ORDER=['playpause','markadd','markdel','skipback','skipfwd','fineback','finefwd','prevmark','nextmark','prevfile','nextfile','head','tail','speedreset','speed1','speed2','speed3','speed4','speed5','speed6','undo','redo','detect'];
-const FN_LABELS={playpause:'再生/停止',markadd:'マーク追加',markdel:'マーク削除',skipback:'−N秒スキップ',skipfwd:'+N秒スキップ',fineback:'−0.1秒',finefwd:'+0.1秒',prevmark:'前のマーク',nextmark:'次のマーク',prevfile:'前のファイル',nextfile:'次のファイル',head:'先頭へ',tail:'末尾へ',speedreset:'速度リセット(×1.0)',speed1:'速度プリセット1',speed2:'速度プリセット2',speed3:'速度プリセット3',speed4:'速度プリセット4',speed5:'速度プリセット5',speed6:'速度プリセット6',undo:'取り消し',redo:'やり直し',detect:'無音検出 ON/OFF'};
+const FN_ORDER=['playpause','markadd','markdel','skipback','skipfwd','fineback','finefwd','prevmark','nextmark','prevsil','nextsil','prevfile','nextfile','head','tail','speedreset','speed1','speed2','speed3','speed4','speed5','speed6','undo','redo','detect'];
+const FN_LABELS={playpause:'再生/停止',markadd:'マーク追加',markdel:'マーク削除',skipback:'−N秒スキップ',skipfwd:'+N秒スキップ',fineback:'−0.1秒',finefwd:'+0.1秒',prevmark:'前のマーク',nextmark:'次のマーク',prevsil:'前の無音',nextsil:'次の無音',prevfile:'前のファイル',nextfile:'次のファイル',head:'先頭へ',tail:'末尾へ',speedreset:'速度リセット(×1.0)',speed1:'速度プリセット1',speed2:'速度プリセット2',speed3:'速度プリセット3',speed4:'速度プリセット4',speed5:'速度プリセット5',speed6:'速度プリセット6',undo:'取り消し',redo:'やり直し',detect:'無音検出 ON/OFF'};
 function tokenLabel(t){
   if(t===' ')return'Space';
   const m={ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',Backspace:'BS',Delete:'Del',Enter:'Enter',Escape:'Esc',Tab:'Tab',Home:'Home',End:'End'};
@@ -1826,6 +1834,12 @@ function applyDetectLayout(){
   const st=document.getElementById('silStatus');
   if(st) st.textContent = detectOn ? (isPlaying?'検出中':'停止中') : '聞くモード';
 }
+// 一覧表示をモード連動に：聞く=MARKERS / 検出=SILENCE
+function updateListMode(){
+  const mk=document.getElementById('mkSec'), sl=document.getElementById('silSec');
+  if(mk) mk.style.display = detectOn ? 'none' : '';
+  if(sl) sl.style.display = detectOn ? '' : 'none';
+}
 function toggleDetect(){
   const wasPlaying=isPlaying;
   const t=curT();
@@ -1842,7 +1856,7 @@ function toggleDetect(){
   const comp = detectOn ? compL2D : compD2L;
   try{ audioEl.currentTime=Math.max(0,Math.min(duration||t, t + comp/1000)); }catch(e){} // 位置引き継ぎ＋先読み補正
   audioEl.playbackRate=activeRate(); setPitch(audioEl);
-  setDetectUI(); applyDetectLayout();
+  setDetectUI(); applyDetectLayout(); updateListMode();
   // redraw
   if(detectOn){ drawWave(t); } // static until play rebuilds live bars
   drawSeek(t); updateTime(t);
@@ -2120,7 +2134,7 @@ document.querySelectorAll('.spb').forEach(b=>b.classList.toggle('on',parseFloat(
 drawAllBtns();
 buildColorPanel();
 wireTimeInputs();
-drawWave(0); drawSeek(0); renderMarkers(); renderSilList();
+drawWave(0); drawSeek(0); renderMarkers(); renderSilList(); updateListMode();
 // ── Focus trap for hardware keyboard (8BitDo etc.) ──────────
 // iOS Safari only fires keydown when an element has focus.
 // We use a hidden readonly input (inputmode=none = no virtual keyboard)
