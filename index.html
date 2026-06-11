@@ -132,7 +132,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v66</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v67</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -306,21 +306,9 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
       <span style="font-family:'Space Mono',monospace;font-size:11px;color:#00e5ff;letter-spacing:1px">SHORTCUTS</span>
       <button onclick="closeHelpModal()" style="margin-left:auto;background:transparent;border:none;color:#6b6b88;font-size:18px;cursor:pointer">×</button>
     </div>
-    <table style="width:100%;border-collapse:collapse;font-family:'Space Mono',monospace;font-size:11px">
-      <tr style="background:rgba(0,229,255,.05)"><td colspan="2" style="padding:4px;color:#6b6b88;font-size:9px">── キーボード ─────────────────</td></tr>
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">Space</td><td style="padding:5px 4px;color:#e8e8f0">再生 / 一時停止</td></tr>
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">M</td><td style="padding:5px 4px;color:#e8e8f0">マーク追加</td></tr>
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">Backspace</td><td style="padding:5px 4px;color:#e8e8f0">現在位置のマーク削除</td></tr>
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">← / →</td><td style="padding:5px 4px;color:#e8e8f0">−N秒 / +N秒</td></tr>
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">, / .</td><td style="padding:5px 4px;color:#e8e8f0">−0.1秒 / +0.1秒</td></tr>
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">[ / ]</td><td style="padding:5px 4px;color:#e8e8f0">前 / 次のマークへ</td></tr>
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">P / N</td><td style="padding:5px 4px;color:#e8e8f0">前 / 次のファイルへ</td></tr>
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">H / E</td><td style="padding:5px 4px;color:#e8e8f0">先頭 / 末尾へ</td></tr>
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">D</td><td style="padding:5px 4px;color:#e8e8f0">無音検出 ON / OFF</td></tr>
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">0</td><td style="padding:5px 4px;color:#e8e8f0">速度リセット (×1.0)</td></tr>
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">1 〜 6</td><td style="padding:5px 4px;color:#e8e8f0">倍速切替 ×0.25〜×2.0</td></tr>
-      <tr style="border-bottom:1px solid #2a2a3d"><td style="padding:5px 4px;color:#00e5ff">Z / Y</td><td style="padding:5px 4px;color:#e8e8f0">取り消し / やり直し</td></tr>
-    </table>
+    <div style="font-family:'Space Mono',monospace;font-size:9px;color:#6b6b88;letter-spacing:1px;margin-bottom:6px">キーボード / コントローラー</div>
+    <div id="helpList" style="font-family:'Space Mono',monospace"></div>
+    <div style="font-size:9px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.5;margin-top:8px">速度プリセットの倍率は「再生設定」で変更できます。</div>
     <button onclick="openKeymapModal()" style="margin-top:12px;width:100%;background:rgba(0,229,255,.12);border:1px solid #00e5ff;border-radius:8px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:11px;padding:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"><span style="font-size:18px;line-height:1">⌨️</span><span>キー割り当てを変更</span></button>
   </div>
 </div>
@@ -335,6 +323,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
     <div style="font-size:9px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:10px">各機能の「＋」を押し、登録したいキー（コントローラー/キーボード）を押すか一覧から選びます。チップの×で削除。</div>
     <div id="keymapList"></div>
     <div style="display:flex;gap:8px;margin-top:12px">
+      <button onclick="backToHelp()" style="flex:1;background:#1c1c28;border:1px solid #2a2a3d;border-radius:7px;color:#9a9ab0;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">戻る</button>
       <button onclick="resetKeymap()" style="flex:1;background:#1c1c28;border:1px solid #2a2a3d;border-radius:7px;color:#6b6b88;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">既定に戻す</button>
       <button onclick="closeKeymapModal()" style="flex:1;background:rgba(0,229,255,.15);border:1px solid #00e5ff;border-radius:7px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">閉じる</button>
     </div>
@@ -363,7 +352,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
       <button onclick="closeCtrlModal(false)" style="margin-left:auto;background:transparent;border:none;color:#6b6b88;font-size:20px;cursor:pointer;padding:0 4px">×</button>
     </div>
     <div style="background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:8px;padding:10px;margin-bottom:12px">
-      <div style="font-family:'Space Mono',monospace;font-size:9px;color:rgba(0,229,255,.7);margin-bottom:10px;letter-spacing:1px">SPEED PRESETS  <span style="color:#6b6b88;font-size:8px">1〜6キー対応</span></div>
+      <div style="font-family:'Space Mono',monospace;font-size:9px;color:rgba(0,229,255,.7);margin-bottom:10px;letter-spacing:1px">SPEED PRESETS</div>
       <div id="spdPresets" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"></div>
     </div>
     <div style="background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:8px;padding:10px">
@@ -1117,6 +1106,7 @@ function renderMarkers(){
       <span class="m-label">${esc(m.note||'')}</span>
       <span class="m-del" data-idx="${i}">×</span>
     </div>`).join('');
+  if(typeof drawBtn==='function'){ drawBtn('btnUndo'); drawBtn('btnRedo'); }
 }
 // Event delegation — no inline handlers (fixes iOS crash)
 document.getElementById('markerList').addEventListener('click',e=>{
@@ -1265,15 +1255,26 @@ const DEFAULT_KEYMAP={
 function defKeymapCopy(){ const m={}; for(const k in DEFAULT_KEYMAP) m[k]=DEFAULT_KEYMAP[k].slice(); return m; }
 function loadKeymap(){
   try{ const o=JSON.parse(localStorage.getItem('ac_keymap')||'null');
-    if(o&&typeof o==='object'){ const m=defKeymapCopy(); for(const k in m){ if(Array.isArray(o[k])) m[k]=o[k].slice(); } return m; }
+    if(o&&typeof o==='object'){ const m=defKeymapCopy(); for(const k in m){ if(Array.isArray(o[k])) m[k]=o[k].filter(t=>t!==''&&t!=null); } return m; }
   }catch(e){}
   return defKeymapCopy();
 }
 function saveKeymap(){ try{ localStorage.setItem('ac_keymap',JSON.stringify(keymap)); }catch(e){} }
 let keymap=loadKeymap();
 // canonical token: letters/symbols lowercased; Numpad via code; space=' '
+// 物理キーは code を優先（key=" "が空文字に化ける等を防ぐ。例: A=Space は code=Space で安定）
 function keyToken(e){
-  if(e.code&&e.code.indexOf('Numpad')===0) return e.code;
+  const c=e.code||'';
+  if(c.indexOf('Numpad')===0) return c;                 // Numpad0.. / NumpadEnter
+  if(c==='Space') return ' ';
+  if(c==='Enter') return 'Enter';
+  if(c==='Backspace') return 'Backspace';
+  if(c==='ArrowLeft'||c==='ArrowRight'||c==='ArrowUp'||c==='ArrowDown') return c;
+  if(c.indexOf('Key')===0 && c.length===4) return c.slice(3).toLowerCase();  // KeyA→a
+  if(c.indexOf('Digit')===0 && c.length===6) return c.slice(5);             // Digit0→0
+  const sym={Comma:',',Period:'.',Semicolon:';',Quote:"'",Slash:'/',Backslash:'\\',Minus:'-',Equal:'=',BracketLeft:'[',BracketRight:']'};
+  if(sym[c]!==undefined) return sym[c];
+  // fallback: key
   const k=e.key;
   if(k===' ') return ' ';
   if(k&&k.length===1) return k.toLowerCase();
@@ -1314,7 +1315,7 @@ function doAction(fn){
 }
 // ── Keymap editor (stage B) ──
 const FN_ORDER=['playpause','markadd','markdel','skipback','skipfwd','fineback','finefwd','prevmark','nextmark','prevfile','nextfile','head','tail','speedreset','speed1','speed2','speed3','speed4','speed5','speed6','undo','redo','detect'];
-const FN_LABELS={playpause:'再生/停止',markadd:'マーク追加',markdel:'マーク削除',skipback:'−N秒スキップ',skipfwd:'+N秒スキップ',fineback:'−0.1秒',finefwd:'+0.1秒',prevmark:'前のマーク',nextmark:'次のマーク',prevfile:'前のファイル',nextfile:'次のファイル',head:'先頭へ',tail:'末尾へ',speedreset:'速度 ×1.0',speed1:'速度 ×0.25',speed2:'速度 ×0.5',speed3:'速度 ×0.75',speed4:'速度 ×1.25',speed5:'速度 ×1.5',speed6:'速度 ×2.0',undo:'取り消し',redo:'やり直し',detect:'無音検出 ON/OFF'};
+const FN_LABELS={playpause:'再生/停止',markadd:'マーク追加',markdel:'マーク削除',skipback:'−N秒スキップ',skipfwd:'+N秒スキップ',fineback:'−0.1秒',finefwd:'+0.1秒',prevmark:'前のマーク',nextmark:'次のマーク',prevfile:'前のファイル',nextfile:'次のファイル',head:'先頭へ',tail:'末尾へ',speedreset:'速度リセット(×1.0)',speed1:'速度プリセット1',speed2:'速度プリセット2',speed3:'速度プリセット3',speed4:'速度プリセット4',speed5:'速度プリセット5',speed6:'速度プリセット6',undo:'取り消し',redo:'やり直し',detect:'無音検出 ON/OFF'};
 function tokenLabel(t){
   if(t===' ')return'Space';
   const m={ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',Backspace:'BS',Delete:'Del',Enter:'Enter',Escape:'Esc',Tab:'Tab',Home:'Home',End:'End'};
@@ -1330,6 +1331,7 @@ function anyModalOpen(){
 }
 function openKeymapModal(){ document.getElementById('helpModal').style.display='none'; renderKeymap(); document.getElementById('keymapModal').style.display='flex'; }
 function closeKeymapModal(){ endCapture(); document.getElementById('keymapModal').style.display='none'; setTimeout(()=>grabFocus({}),100); }
+function backToHelp(){ endCapture(); document.getElementById('keymapModal').style.display='none'; renderHelpList(); document.getElementById('helpModal').style.display='flex'; }
 function renderKeymap(){
   const wrap=document.getElementById('keymapList'); if(!wrap)return;
   wrap.innerHTML='';
@@ -1382,6 +1384,7 @@ function endCapture(){
 }
 function confirmCapture(){ if(captureFn&&pendingCapTok!==null){ assignKey(captureFn,pendingCapTok); } endCapture(); }
 function assignKey(fn,tok){
+  if(tok===''||tok==null) return; // 空トークンは登録しない
   for(const k in keymap){ keymap[k]=keymap[k].filter(x=>x!==tok); } // 重複防止：他機能から外す
   if(!keymap[fn]) keymap[fn]=[];
   if(!keymap[fn].includes(tok)) keymap[fn].push(tok);
@@ -1512,24 +1515,26 @@ function drawBtn(id){
     [cx-6,cx-2,cx+2,cx+6].forEach(x=>{ c.fillRect(x-1,cy-3,2,2); });
     c.fillRect(cx-4,cy+1,8,2);
   } else if(id==='btnUndo'){
+    const off=!hist.length; const col=off?C.bd:C.tx;
     roundRect(c,0,0,W,H,8,C.bg,C.bd);
     // curved arrow counter-clockwise
-    c.strokeStyle=C.tx; c.lineWidth=2; c.lineCap='round';
+    c.strokeStyle=col; c.lineWidth=2; c.lineCap='round';
     c.beginPath(); c.arc(cx+1,cy+2,7,Math.PI*.25,Math.PI*1.1); c.stroke();
     // arrowhead left
-    c.fillStyle=C.tx;
+    c.fillStyle=col;
     c.beginPath();c.moveTo(cx-6,cy-5);c.lineTo(cx-10,cy);c.lineTo(cx-3,cy+1);c.fill();
-    c.fillStyle=C.dm; c.font="7px 'Space Mono',monospace"; c.textAlign='center';
+    c.fillStyle=off?C.bd:C.dm; c.font="7px 'Space Mono',monospace"; c.textAlign='center';
     c.fillText('取り消し',cx,H-4); c.textAlign='left';
   } else if(id==='btnRedo'){
+    const off=!redoSt.length; const col=off?C.bd:C.tx;
     roundRect(c,0,0,W,H,8,C.bg,C.bd);
     // curved arrow clockwise (mirror of undo)
-    c.strokeStyle=C.tx; c.lineWidth=2; c.lineCap='round';
+    c.strokeStyle=col; c.lineWidth=2; c.lineCap='round';
     c.beginPath(); c.arc(cx-1,cy+2,7,Math.PI*1.9,Math.PI*.9,true); c.stroke();
     // arrowhead right
-    c.fillStyle=C.tx;
+    c.fillStyle=col;
     c.beginPath();c.moveTo(cx+6,cy-5);c.lineTo(cx+10,cy);c.lineTo(cx+3,cy+1);c.fill();
-    c.fillStyle=C.dm; c.font="7px 'Space Mono',monospace"; c.textAlign='center';
+    c.fillStyle=off?C.bd:C.dm; c.font="7px 'Space Mono',monospace"; c.textAlign='center';
     c.fillText('やり直し',cx,H-4); c.textAlign='left';
   } else if(id==='btnMark'){
     roundRect(c,0,0,W,H,8,C.a2,'#ff80ab');
@@ -1585,7 +1590,19 @@ function drawAllBtns(){
 document.getElementById('folderBtn').addEventListener('click',()=>document.getElementById('folderInput').click());
 document.getElementById('fileBtn').addEventListener('click',()=>document.getElementById('fileInput').click());
 document.getElementById('btnColor').addEventListener('click',()=>openColorModal());
-document.getElementById('btnHelp').addEventListener('click',()=>{document.getElementById('helpModal').style.display='flex';});
+function renderHelpList(){
+  const wrap=document.getElementById('helpList'); if(!wrap) return;
+  wrap.innerHTML='';
+  FN_ORDER.forEach(fn=>{
+    const keys=(keymap[fn]||[]).map(tokenLabel).join(' / ')||'—';
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;gap:8px;padding:5px 4px;border-bottom:1px solid #2a2a3d';
+    const k=document.createElement('span'); k.style.cssText="color:#00e5ff;font-size:11px;min-width:92px"; k.textContent=keys;
+    const l=document.createElement('span'); l.style.cssText="color:#e8e8f0;font-size:11px;flex:1"; l.textContent=FN_LABELS[fn];
+    row.appendChild(k); row.appendChild(l); wrap.appendChild(row);
+  });
+}
+document.getElementById('btnHelp').addEventListener('click',()=>{renderHelpList();document.getElementById('helpModal').style.display='flex';});
 
 // ── PWA Icon ──────────────────────────────────
 (function(){
