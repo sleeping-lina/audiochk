@@ -92,6 +92,9 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 .mk-sec{flex:1;display:flex;flex-direction:column;background:var(--bg);min-height:0}
 #markerList{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1}
 #markerList.collapsed{display:none}
+.sil-sec{display:flex;flex-direction:column;background:var(--bg);flex:0 0 auto;border-top:1px solid var(--bd)}
+#silListBox{overflow-y:auto;-webkit-overflow-scrolling:touch;max-height:26vh}
+#silListBox.collapsed{display:none}
 .mk-hdr{display:flex;align-items:center;padding:4px 8px;font-family:'Space Mono',monospace;
   font-size:9px;color:var(--dm);letter-spacing:1px;border-bottom:1px solid var(--bd);
   position:sticky;top:0;background:var(--bg);z-index:10}
@@ -132,7 +135,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v68</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v69</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -193,31 +196,12 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
         <button class="sil-adj" onclick="adjSilMin(-1)">−</button><input type="range" id="silMin" min="0.1" max="5" step="0.1" value="1.0"><button class="sil-adj" onclick="adjSilMin(1)">＋</button>
         <span class="sil-val" id="silMinV">1.0秒</span>
       </div>
-      <div class="sil-row">
-        <span class="sil-ctl-lbl" style="white-space:nowrap">検出→聞く(ms)</span>
-        <button class="sil-adj" onclick="adjComp('D2L',-1)">−</button><input type="range" id="compD2L" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjComp('D2L',1)">＋</button>
-        <span class="sil-val" id="compD2LV">0ms</span>
-      </div>
-      <div class="sil-row">
-        <span class="sil-ctl-lbl" style="white-space:nowrap">聞く→検出(ms)</span>
-        <button class="sil-adj" onclick="adjComp('L2D',-1)">−</button><input type="range" id="compL2D" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjComp('L2D',1)">＋</button>
-        <span class="sil-val" id="compL2DV">0ms</span>
-      </div>
-      <div class="sil-row">
-        <span class="sil-ctl-lbl" style="white-space:nowrap">先頭補正(ms)</span>
-        <button class="sil-adj" onclick="adjComp('head',-1)">−</button><input type="range" id="headComp" min="0" max="1000" step="10" value="0"><button class="sil-adj" onclick="adjComp('head',1)">＋</button>
-        <span class="sil-val" id="headCompV">0ms</span>
-      </div>
-      <div class="sil-row">
-        <span class="sil-ctl-lbl" style="white-space:nowrap">速度補正(ms)<span style="color:var(--dm);font-size:8px">実験</span></span>
-        <button class="sil-adj" onclick="adjComp('spd',-1)">−</button><input type="range" id="spdComp" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjComp('spd',1)">＋</button>
-        <span class="sil-val" id="spdCompV">0ms</span>
-      </div>
       <div class="sil-row" style="justify-content:center;gap:10px">
         <span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--dm)">現在の無音：</span>
         <span style="font-family:'Space Mono',monospace;font-size:14px;color:var(--a2);font-weight:700" id="silCurDur">0.0s</span>
+        <button onclick="openCompModal()" style="background:#1c1c28;border:1px solid rgba(0,229,255,.4);border-radius:5px;color:rgba(0,229,255,.85);font-family:'Space Mono',monospace;font-size:9px;padding:3px 7px;cursor:pointer">補正設定</button>
         <button onclick="resetSilPrefs()" style="background:#1c1c28;border:1px solid #2a2a3d;border-radius:5px;color:#6b6b88;font-family:'Space Mono',monospace;font-size:9px;padding:3px 7px;cursor:pointer">設定リセット</button>
-        <button onclick="clearSilData()" style="background:#1c1c28;border:1px solid rgba(255,140,80,.4);border-radius:5px;color:rgba(255,160,110,.9);font-family:'Space Mono',monospace;font-size:9px;padding:3px 7px;cursor:pointer">無音クリア</button>
+        <button onclick="openSilClearModal()" style="background:#1c1c28;border:1px solid rgba(255,140,80,.4);border-radius:5px;color:rgba(255,160,110,.9);font-family:'Space Mono',monospace;font-size:9px;padding:3px 7px;cursor:pointer">無音クリア</button>
       </div>
     </div>
   </div>
@@ -268,13 +252,13 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   </div>
   <div id="markerList"></div>
 </div>
-<div class="mk-sec">
+<div class="sil-sec">
   <div class="mk-hdr" id="silListHdr" onclick="toggleSilList()" style="cursor:pointer">
     SILENCE
     <span id="silListCount" style="color:var(--dm);margin-left:4px"></span>
     <button class="tog-btn" id="silListArrow">∧</button>
     <div class="mk-acts" onclick="event.stopPropagation()">
-      <button class="smbtn danger" onclick="clearSilData()">クリア</button>
+      <button class="smbtn danger" onclick="openSilClearModal()">クリア</button>
     </div>
   </div>
   <div id="silListBox"></div>
@@ -458,6 +442,31 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
     <button onclick="doClearCurrent()" style="width:100%;background:#1c1c28;border:1px solid #2a2a3d;border-radius:8px;color:#e8e8f0;font-family:'Space Mono',monospace;font-size:12px;padding:11px;cursor:pointer;margin-bottom:8px">このファイルのみ</button>
     <button onclick="doClearFolder()" style="width:100%;background:rgba(255,77,77,.12);border:1px solid #ff4d4d;border-radius:8px;color:#ff6b6b;font-family:'Space Mono',monospace;font-size:12px;padding:11px;cursor:pointer;margin-bottom:8px">このフォルダ全ファイル（<span id="clrCount">0</span>件）</button>
     <button onclick="closeClrModal()" style="width:100%;background:transparent;border:1px solid #2a2a3d;border-radius:8px;color:#6b6b88;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">キャンセル</button>
+  </div>
+</div>
+
+<div id="silClearModal" onclick="closeSilClrModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center">
+  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;margin:20px;max-width:320px;width:calc(100% - 40px);padding:18px">
+    <div style="font-family:'Space Mono',monospace;font-size:11px;color:#ff8c50;letter-spacing:1px;margin-bottom:6px">無音データ削除</div>
+    <div style="font-size:10px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:14px">検出済みの無音データを削除します（マークは残ります）。<br><span style="color:#ff8c80">フォルダ全体は取り消せません。</span></div>
+    <button onclick="doSilClearCurrent()" style="width:100%;background:#1c1c28;border:1px solid #2a2a3d;border-radius:8px;color:#e8e8f0;font-family:'Space Mono',monospace;font-size:12px;padding:11px;cursor:pointer;margin-bottom:8px">このファイルのみ</button>
+    <button onclick="doSilClearFolder()" style="width:100%;background:rgba(255,140,80,.12);border:1px solid #ff8c50;border-radius:8px;color:#ffa870;font-family:'Space Mono',monospace;font-size:12px;padding:11px;cursor:pointer;margin-bottom:8px">このフォルダ全ファイル（<span id="silClrCount">0</span>件）</button>
+    <button onclick="closeSilClrModal()" style="width:100%;background:transparent;border:1px solid #2a2a3d;border-radius:8px;color:#6b6b88;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">キャンセル</button>
+  </div>
+</div>
+
+<div id="compModal" onclick="closeCompModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:520;align-items:flex-start;justify-content:center;overflow-y:auto;-webkit-overflow-scrolling:touch">
+  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;margin:24px 16px;max-width:380px;width:calc(100% - 32px);padding:16px">
+    <div style="display:flex;align-items:center;margin-bottom:6px">
+      <span style="font-family:'Space Mono',monospace;font-size:11px;color:#00e5ff;letter-spacing:1px">補正設定</span>
+      <button onclick="closeCompModal()" style="margin-left:auto;background:transparent;border:none;color:#6b6b88;font-size:18px;cursor:pointer">×</button>
+    </div>
+    <div style="font-size:9px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:12px">モード切替・速度切替時の巻き戻り感を補正します。値は実機で調整してください。</div>
+    <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">検出→聞く(ms)</span><button class="sil-adj" onclick="adjComp('D2L',-1)">−</button><input type="range" id="compD2L" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjComp('D2L',1)">＋</button><span class="sil-val" id="compD2LV">0ms</span></div>
+    <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">聞く→検出(ms)</span><button class="sil-adj" onclick="adjComp('L2D',-1)">−</button><input type="range" id="compL2D" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjComp('L2D',1)">＋</button><span class="sil-val" id="compL2DV">0ms</span></div>
+    <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">先頭補正(ms)</span><button class="sil-adj" onclick="adjComp('head',-1)">−</button><input type="range" id="headComp" min="0" max="1000" step="10" value="0"><button class="sil-adj" onclick="adjComp('head',1)">＋</button><span class="sil-val" id="headCompV">0ms</span></div>
+    <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">速度補正(ms)<span style="color:var(--dm);font-size:8px">実験</span></span><button class="sil-adj" onclick="adjComp('spd',-1)">−</button><input type="range" id="spdComp" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjComp('spd',1)">＋</button><span class="sil-val" id="spdCompV">0ms</span></div>
+    <button onclick="closeCompModal()" style="margin-top:12px;width:100%;background:rgba(0,229,255,.15);border:1px solid #00e5ff;border-radius:8px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:11px;padding:10px;cursor:pointer">閉じる</button>
   </div>
 </div>
 
@@ -1018,7 +1027,7 @@ function seekTo(t){
     zoomCtr=Math.max(hs,Math.min(1-hs,f));
   }
   if(!isPlaying){ drawWave(cl); updateTime(cl); drawSeek(cl); }
-  hlMk(cl);
+  hlMk(cl); hlSil(cl);
 }
 let lastSeekSec=-1;
 function loop(){
@@ -1034,7 +1043,7 @@ function loop(){
   // Redraw seek only once per second (expensive canvas op)
   const sec=Math.floor(t);
   if(sec!==lastSeekSec){ drawSeek(t); lastSeekSec=sec; }
-  chkSil(t); hlMk(t);
+  chkSil(t); hlMk(t); hlSil(t);
   raf=requestAnimationFrame(loop);
 }
 function redrawPlayBtn(){ drawBtn('btnPlay'); }
@@ -1163,12 +1172,23 @@ function renderSilList(){
   const arr=silReg.map(s=>({start:s.start,end:s.end,dur:(s.dur!=null?s.dur:s.end-s.start)})).sort((a,b)=>a.start-b.start);
   if(cnt) cnt.textContent=arr.length?'('+arr.length+')':'';
   if(!arr.length){ box.innerHTML='<div class="mk-empty">無音区間なし<br><span style="font-size:9px;opacity:.5">検出モードで再生すると追加</span></div>'; return; }
-  box.innerHTML=arr.map(s=>`
-    <div class="mk-item" data-start="${s.start}" data-end="${s.end}">
-      <span class="m-time">${fmtMs(s.start)} – ${fmtMs(s.end)}</span>
-      <span class="m-label" style="color:var(--dm)">${s.dur.toFixed(1)}s</span>
+  box.innerHTML=arr.map((s,i)=>`
+    <div class="mk-item sil-item" id="si${i}" data-start="${s.start}" data-end="${s.end}">
+      <span class="m-num">#${i+1}</span>
+      <span class="m-time sil-jump" data-jump="${s.start}">${fmtMs(s.start)}</span>
+      <span style="color:var(--dm);font-size:10px">▸</span>
+      <span class="m-time sil-jump" data-jump="${s.end}">${fmtMs(s.end)}</span>
+      <span class="m-label" style="color:var(--dm);text-align:right">${s.dur.toFixed(1)}s</span>
       <span class="m-del" data-start="${s.start}" data-end="${s.end}">×</span>
     </div>`).join('');
+  curSilIdx=-1; hlSil(curT());
+}
+let curSilIdx=-1;
+function hlSil(t){
+  const arr=silReg.map(s=>({start:s.start,end:s.end})).sort((a,b)=>a.start-b.start);
+  let idx=-1; for(let i=0;i<arr.length;i++){ if(t>=arr[i].start-0.05 && t<=arr[i].end+0.05){ idx=i; break; } }
+  if(idx===curSilIdx) return; curSilIdx=idx;
+  document.querySelectorAll('#silListBox .sil-item').forEach((el,i)=>el.classList.toggle('cur',i===idx));
 }
 function delSilReg(start,end){
   const i=silReg.findIndex(s=>Math.abs(s.start-start)<1e-6 && Math.abs(s.end-end)<1e-6);
@@ -1181,6 +1201,8 @@ function delSilReg(start,end){
 document.getElementById('silListBox').addEventListener('click',e=>{
   const del=e.target.closest('.m-del');
   if(del){ e.stopPropagation(); delSilReg(parseFloat(del.dataset.start),parseFloat(del.dataset.end)); return; }
+  const jump=e.target.closest('.sil-jump');
+  if(jump){ e.stopPropagation(); seekTo(parseFloat(jump.dataset.jump)); return; }
   const item=e.target.closest('.mk-item');
   if(item) seekTo(parseFloat(item.dataset.start));
 });
@@ -1393,7 +1415,7 @@ function tokenLabel(t){
 }
 let captureFn=null, pendingCapTok=null;
 function anyModalOpen(){
-  return ['colorModal','helpModal','ctrlModal','timeModal','exportModal','clearModal','keymapModal']
+  return ['colorModal','helpModal','ctrlModal','timeModal','exportModal','clearModal','keymapModal','silClearModal','compModal']
     .some(id=>{const el=document.getElementById(id);return el&&el.style.display!=='none';});
 }
 function openKeymapModal(){ document.getElementById('helpModal').style.display='none'; renderKeymap(); document.getElementById('keymapModal').style.display='flex'; }
@@ -1777,6 +1799,8 @@ document.getElementById('silMin').addEventListener('input',function(){
 // 自動マーク機能は廃止（v66）。silAutoMark は常に false。
 silAutoMark=false;
 
+function openCompModal(){ document.getElementById('compModal').style.display='flex'; }
+function closeCompModal(){ document.getElementById('compModal').style.display='none'; setTimeout(()=>grabFocus({}),100); }
 // 補正スライダー（±ボタン）。kind: 'D2L'(検出→聞く) / 'L2D'(聞く→検出) / 'head'(先頭) / 'spd'(速度実験)
 function adjComp(kind,d){
   const map={D2L:['compD2L',500],L2D:['compL2D',500],head:['headComp',1000],spd:['spdComp',500]};
@@ -2016,6 +2040,42 @@ function resetSilPrefs(){
   document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒';
   saveSilPrefs(); showToast('設定をリセット');
 }
+function openSilClearModal(){
+  document.getElementById('silClrCount').textContent=playlist.length||1;
+  document.getElementById('silClearModal').style.display='flex';
+}
+function closeSilClrModal(){
+  document.getElementById('silClearModal').style.display='none';
+  setTimeout(()=>grabFocus({}),100);
+}
+function doSilClearCurrent(){
+  closeSilClrModal();
+  if(!silReg.length){ showToast('無音データなし'); return; }
+  silReg=[]; rtInSil=false;
+  document.getElementById('silCurDur').textContent='0.0s';
+  renderSilList();
+  if(detectOn&&!isPlaying) drawWave(curT());
+  drawSeek(curT()); saveMk(); showToast('このファイルの無音データを削除');
+}
+function doSilClearFolder(){
+  closeSilClrModal();
+  let n=0;
+  (playlist.length?playlist:[{name:curFileName}]).forEach(item=>{
+    if(item.name===curFileName){
+      if(silReg.length){ n++; silReg=[]; rtInSil=false; document.getElementById('silCurDur').textContent='0.0s'; }
+    } else {
+      const d=loadMk(item.name);
+      if(d&&d.silReg&&d.silReg.length){
+        n++;
+        try{ localStorage.setItem(lsKey(item.name),JSON.stringify({markers:d.markers||[],silReg:[],duration:d.duration||0,ts:Date.now()})); }catch(e){}
+      }
+    }
+  });
+  renderSilList();
+  if(detectOn&&!isPlaying) drawWave(curT());
+  drawSeek(curT()); saveMk();
+  showToast('フォルダ内 '+n+'ファイルの無音データを削除');
+}
 function clearSilData(){
   // 現在のファイルの検出済み無音をクリア（マークは消さない）
   if(!silReg.length){ showToast('無音データなし'); return; }
@@ -2075,6 +2135,8 @@ function grabFocus(e){
   const xm=document.getElementById('clearModal');
   const km=document.getElementById('keymapModal');
   const co=document.getElementById('captureOverlay');
+  const sc=document.getElementById('silClearModal');
+  const cpm=document.getElementById('compModal');
   const modalOpen = document.getElementById('colorModal').style.display!=='none' ||
                     document.getElementById('helpModal').style.display!=='none' ||
                     (cm&&cm.style.display!=='none') ||
@@ -2082,7 +2144,9 @@ function grabFocus(e){
                     (em&&em.style.display!=='none') ||
                     (xm&&xm.style.display!=='none') ||
                     (km&&km.style.display!=='none') ||
-                    (co&&co.style.display!=='none');
+                    (co&&co.style.display!=='none') ||
+                    (sc&&sc.style.display!=='none') ||
+                    (cpm&&cpm.style.display!=='none');
   if(modalOpen) return;
   const tag = e && e.target && e.target.tagName;
   if(tag==='INPUT'||tag==='BUTTON'||tag==='SELECT'||tag==='TEXTAREA') return;
