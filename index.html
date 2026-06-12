@@ -132,7 +132,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v71</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v72</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -1135,6 +1135,7 @@ function hlMk(t){
   if(idx===curMkIdx)return; curMkIdx=idx;
   document.querySelectorAll('#markerList .mk-item').forEach((el,i)=>el.classList.toggle('cur',i===idx));
   if(idx>=0){const el=document.getElementById('mi'+idx);if(el)el.scrollIntoView({block:'nearest',behavior:'smooth'});}
+  else{const box=document.getElementById('markerList');if(box)box.scrollTo({top:0,behavior:'smooth'});} // #1より前は最上部へ
 }
 function renderMarkers(){
   const list=document.getElementById('markerList');
@@ -1182,7 +1183,7 @@ function renderSilList(){
       <span class="m-time sil-jump" data-jump="${s.start}">${fmtMs(s.start)}</span>
       <span style="color:var(--dm);font-size:10px">▸</span>
       <span class="m-time sil-jump" data-jump="${s.end}">${fmtMs(s.end)}</span>
-      <span style="color:var(--a3);font-family:'Space Mono',monospace;font-size:10px;margin-left:6px">${s.dur.toFixed(2)}s</span>
+      <span style="color:var(--a3);font-family:'Space Mono',monospace;font-size:10px;margin-left:6px">(${s.dur.toFixed(2)}s)</span>
       <span class="m-del" style="margin-left:auto" data-start="${s.start}" data-end="${s.end}">×</span>
     </div>`).join('');
   curSilIdx=-1; hlSil(curT());
@@ -1190,10 +1191,11 @@ function renderSilList(){
 let curSilIdx=-1;
 function hlSil(t){
   const arr=silReg.map(s=>({start:s.start,end:s.end})).sort((a,b)=>a.start-b.start);
-  let idx=-1; for(let i=0;i<arr.length;i++){ if(t>=arr[i].start-0.05 && t<=arr[i].end+0.05){ idx=i; break; } }
+  let idx=-1; for(let i=arr.length-1;i>=0;i--){ if(arr[i].start<=t+0.05){ idx=i; break; } } // 直前の無音区間
   if(idx===curSilIdx) return; curSilIdx=idx;
   document.querySelectorAll('#silListBox .sil-item').forEach((el,i)=>el.classList.toggle('cur',i===idx));
   if(idx>=0){const el=document.getElementById('si'+idx);if(el)el.scrollIntoView({block:'nearest',behavior:'smooth'});}
+  else{const box=document.getElementById('silListBox');if(box)box.scrollTo({top:0,behavior:'smooth'});} // #1より前は最上部へ
 }
 function delSilReg(start,end){
   const i=silReg.findIndex(s=>Math.abs(s.start-start)<1e-6 && Math.abs(s.end-end)<1e-6);
