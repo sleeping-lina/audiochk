@@ -132,7 +132,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v72</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v73</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -465,6 +465,9 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
     <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">聞く→検出(ms)</span><button class="sil-adj" onclick="adjComp('L2D',-1)">−</button><input type="range" id="compL2D" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjComp('L2D',1)">＋</button><span class="sil-val" id="compL2DV">0ms</span></div>
     <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">先頭補正(ms)</span><button class="sil-adj" onclick="adjComp('head',-1)">−</button><input type="range" id="headComp" min="0" max="1000" step="10" value="0"><button class="sil-adj" onclick="adjComp('head',1)">＋</button><span class="sil-val" id="headCompV">0ms</span></div>
     <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">速度補正(ms)<span style="color:var(--dm);font-size:8px">実験</span></span><button class="sil-adj" onclick="adjComp('spd',-1)">−</button><input type="range" id="spdComp" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjComp('spd',1)">＋</button><span class="sil-val" id="spdCompV">0ms</span></div>
+    <div style="border-top:1px solid #2a2a3d;margin:10px 0 8px"></div>
+    <div style="font-size:9px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:8px">猶予：音が一瞬入っても、この時間続けて音がある時だけ無音終了とみなします。先頭が短く出る・検出漏れの対策。</div>
+    <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">猶予(ms)</span><button class="sil-adj" onclick="adjComp('rel',-1)">−</button><input type="range" id="releaseMs" min="0" max="400" step="10" value="120"><button class="sil-adj" onclick="adjComp('rel',1)">＋</button><span class="sil-val" id="releaseMsV">120ms</span></div>
     <button onclick="closeCompModal()" style="margin-top:12px;width:100%;background:rgba(0,229,255,.15);border:1px solid #00e5ff;border-radius:8px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:11px;padding:10px;cursor:pointer">閉じる</button>
   </div>
 </div>
@@ -632,6 +635,8 @@ let waCtx=null, waAnalyser=null, waSrc=null, waReady=false;
 let waBuf=null;
 let silThr=0.010, silMinSec=1.0, silAutoMark=false;
 let compD2L=0, compL2D=0, headComp=0, spdComp=0; // 検出→聞く / 聞く→検出 / 先頭補正 / 速度補正(実験) (ms)
+let releaseMs=120; // 無音終了の猶予(ヒステリシス)
+let rtLoudStart=-1; // 無音中に音が立ち上がった時刻（猶予判定用）
 let rtInSil=false, rtSilStart=0;
 // Timestamped ring buffer: each entry = {rms, t}
 const RT_MAX=600;  // max entries stored
@@ -649,7 +654,7 @@ function ensureWAGraph(){
   waAnalyser.connect(waCtx.destination);
   waReady=true;
 }
-function resetRTSilence(){ rtInSil=false; rtBuf=[]; }
+function resetRTSilence(){ rtInSil=false; rtBuf=[]; rtLoudStart=-1; }
 
 let rtTimerId=null;
 let stopTime=0; // timestamp of last stop() call
@@ -667,6 +672,7 @@ function rtLoop(){
   if(rtBuf.length>RT_MAX) rtBuf.shift();
 
   if(rms<silThr){
+    rtLoudStart=-1; // 閾値割れ＝音は途切れた。保留中の立ち上がりを取り消し（スパイク無視）
     if(!rtInSil){ rtInSil=true;
       // For head silence: if within first (0.3s + headComp) start from 0
       rtSilStart=t<(0.3+headComp/1000)?0:Math.max(0,t-(waAnalyser.fftSize/waCtx.sampleRate)); }
@@ -674,15 +680,22 @@ function rtLoop(){
     document.getElementById('silStatus').textContent='無音中…';
   } else {
     if(rtInSil){
+      // 猶予：releaseMs 連続で音がある時だけ無音終了。終了時刻は立ち上がり(rtLoudStart)＝本当の発話開始。
+      if(rtLoudStart<0) rtLoudStart=t;
+      if(t-rtLoudStart < releaseMs/1000){
+        document.getElementById('silStatus').textContent='無音中…'; // まだ猶予中＝無音継続
+      } else {
       rtInSil=false;
-      const dur=t-rtSilStart;
+      const endT=rtLoudStart;
+      const dur=endT-rtSilStart;
+      rtLoudStart=-1;
       document.getElementById('silCurDur').textContent=dur.toFixed(1)+'s';
       document.getElementById('silStatus').textContent='音あり';
       if(dur>=silMinSec){
         // 重なり判定：既存区間と重なる場合は再追加しない（保存済み/再生済みの重複ハイライト防止）
-        const overlap=silReg.some(s=> rtSilStart < s.end+0.3 && t > s.start-0.3);
+        const overlap=silReg.some(s=> rtSilStart < s.end+0.3 && endT > s.start-0.3);
         if(!overlap){
-          silReg.push({start:rtSilStart,end:t,dur});
+          silReg.push({start:rtSilStart,end:endT,dur});
           silReg.sort((a,b)=>a.start-b.start);
           if(silAutoMark){
             saveH();
@@ -694,6 +707,7 @@ function rtLoop(){
           saveMk(); // 自動マークOFFでも無音データを永続化（移動/再起動で消えないように）
           renderSilList();
         }
+      }
       }
     } else {
       document.getElementById('silStatus').textContent='音あり';
@@ -1803,7 +1817,7 @@ document.getElementById('silMin').addEventListener('input',function(){
   document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒';
 });
 // 4つの補正スライダー（ドラッグ）
-[['compD2L',v=>compD2L=v],['compL2D',v=>compL2D=v],['headComp',v=>headComp=v],['spdComp',v=>spdComp=v]].forEach(([id,set])=>{
+[['compD2L',v=>compD2L=v],['compL2D',v=>compL2D=v],['headComp',v=>headComp=v],['spdComp',v=>spdComp=v],['releaseMs',v=>releaseMs=v]].forEach(([id,set])=>{
   const el=document.getElementById(id);
   if(el) el.addEventListener('input',function(){ set(parseInt(this.value)||0); document.getElementById(id+'V').textContent=(parseInt(this.value)||0)+'ms'; saveSilPrefs(); });
 });
@@ -1814,11 +1828,11 @@ function openCompModal(){ document.getElementById('compModal').style.display='fl
 function closeCompModal(){ document.getElementById('compModal').style.display='none'; setTimeout(()=>grabFocus({}),100); }
 // 補正スライダー（±ボタン）。kind: 'D2L'(検出→聞く) / 'L2D'(聞く→検出) / 'head'(先頭) / 'spd'(速度実験)
 function adjComp(kind,d){
-  const map={D2L:['compD2L',500],L2D:['compL2D',500],head:['headComp',1000],spd:['spdComp',500]};
+  const map={D2L:['compD2L',500],L2D:['compL2D',500],head:['headComp',1000],spd:['spdComp',500],rel:['releaseMs',400]};
   const [id,mx]=map[kind];
-  let v=({D2L:compD2L,L2D:compL2D,head:headComp,spd:spdComp})[kind];
+  let v=({D2L:compD2L,L2D:compL2D,head:headComp,spd:spdComp,rel:releaseMs})[kind];
   v=Math.max(0,Math.min(mx, v + d*10));
-  if(kind==='D2L')compD2L=v; else if(kind==='L2D')compL2D=v; else if(kind==='head')headComp=v; else spdComp=v;
+  if(kind==='D2L')compD2L=v; else if(kind==='L2D')compL2D=v; else if(kind==='head')headComp=v; else if(kind==='spd')spdComp=v; else releaseMs=v;
   const el=document.getElementById(id); if(el) el.value=v;
   document.getElementById(id+'V').textContent=v+'ms';
   saveSilPrefs();
@@ -2103,7 +2117,7 @@ function clearSilData(){
   drawSeek(curT()); saveMk(); showToast('無音データをクリア');
 }
 function saveSilPrefs(){
-  try{ localStorage.setItem('ac_silprefs',JSON.stringify({silThr,silMinSec,compD2L,compL2D,headComp,spdComp})); }catch(e){}
+  try{ localStorage.setItem('ac_silprefs',JSON.stringify({silThr,silMinSec,compD2L,compL2D,headComp,spdComp,releaseMs})); }catch(e){}
 }
 function setCompUI(id,val){ const el=document.getElementById(id); if(el) el.value=val; const v=document.getElementById(id+'V'); if(v) v.textContent=val+'ms'; }
 function loadSilPrefs(){
@@ -2118,7 +2132,8 @@ function loadSilPrefs(){
     if(d.compL2D>=0) compL2D=d.compL2D;
     if(d.headComp>=0) headComp=d.headComp;
     if(d.spdComp>=0) spdComp=d.spdComp;
-    setCompUI('compD2L',compD2L); setCompUI('compL2D',compL2D); setCompUI('headComp',headComp); setCompUI('spdComp',spdComp);
+    if(d.releaseMs>=0) releaseMs=d.releaseMs;
+    setCompUI('compD2L',compD2L); setCompUI('compL2D',compL2D); setCompUI('headComp',headComp); setCompUI('spdComp',spdComp); setCompUI('releaseMs',releaseMs);
   }catch(e){}
 }
 
