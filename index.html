@@ -132,7 +132,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v75</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v76</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -463,7 +463,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
     <div style="font-size:9px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:12px">モード切替・速度切替時の巻き戻り感を補正します。値は実機で調整してください。</div>
     <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">検出→聞く(ms)</span><button class="sil-adj" onclick="adjComp('D2L',-1)">−</button><input type="range" id="compD2L" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjComp('D2L',1)">＋</button><span class="sil-val" id="compD2LV">0ms</span></div>
     <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">聞く→検出(ms)</span><button class="sil-adj" onclick="adjComp('L2D',-1)">−</button><input type="range" id="compL2D" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjComp('L2D',1)">＋</button><span class="sil-val" id="compL2DV">0ms</span></div>
-    <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">時刻補正(ms)</span><button class="sil-adj" onclick="adjComp('head',-1)">−</button><input type="range" id="timeOff" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjComp('head',1)">＋</button><span class="sil-val" id="timeOffV">0ms</span></div>
+    <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">時刻補正(ms)</span><button class="sil-adj" onclick="adjComp('head',-1)">−</button><input type="range" id="timeOff" min="0" max="500" step="10" value="100"><button class="sil-adj" onclick="adjComp('head',1)">＋</button><span class="sil-val" id="timeOffV">100ms</span></div>
     <div style="font-size:8px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.4;margin:-2px 0 8px">時刻補正：検出した無音区間の開始/終了に一律で足す秒数。他のソフトと比べ全体が早い場合に。全削除してから調整。</div>
     <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">速度補正(ms)</span><button class="sil-adj" onclick="adjComp('spd',-1)">−</button><input type="range" id="spdComp" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjComp('spd',1)">＋</button><span class="sil-val" id="spdCompV">0ms</span></div>
     <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">重なり許容(ms)</span><button class="sil-adj" onclick="adjComp('ovl',-1)">−</button><input type="range" id="overlapTol" min="0" max="500" step="10" value="50"><button class="sil-adj" onclick="adjComp('ovl',1)">＋</button><span class="sil-val" id="overlapTolV">50ms</span></div>
@@ -645,7 +645,7 @@ async function load(file){
 let waCtx=null, waAnalyser=null, waSrc=null, waReady=false;
 let waBuf=null;
 let silThr=0.010, silMinSec=1.0, silAutoMark=false;
-let compD2L=0, compL2D=0, timeOff=0, spdComp=0; // 検出→聞く / 聞く→検出 / 先頭補正 / 速度補正(実験) (ms)
+let compD2L=0, compL2D=0, timeOff=100, spdComp=0; // 検出→聞く / 聞く→検出 / 時刻補正 / 速度補正 (ms)
 let releaseMs=0; // 無音終了の猶予(ヒステリシス)。0=オフ
 let overlapTol=50; // 重なり許容(ms)：これより大きく重なる区間は追加しない
 let rtLoudStart=-1; // 無音中に音が立ち上がった時刻（猶予判定用）
@@ -773,7 +773,7 @@ function drawLiveWave(){
   }
   // Currently growing silence
   if(rtInSil){
-    const sx=toPx(rtSilStart), ex=lineX;
+    const sx=toPx(rtSilStart+timeOff/1000), ex=lineX;
     if(sx<lineX){
       const rx=Math.max(0,sx), rw=lineX-rx;
       c.fillStyle=`rgba(${scR},${scG},${scB},0.18)`;
@@ -789,11 +789,12 @@ function drawLiveWave(){
 
   // ── Waveform bars ──
   {
+    const wOff=timeOff/1000; // 解析音と再生位置のズレぶん右へ（無音ハイライトと一致させる）
     const pxPerSample=(1/60)/secPerPx;
     const bw=Math.max(1,pxPerSample);
     for(let i=0;i<rtBuf.length;i++){
       const{rms,t}=rtBuf[i];
-      const x=toPx(t);
+      const x=toPx(t+wOff);
       if(x+bw<0||x>lineX+4) continue;
       const h=Math.max(1,Math.min(mid-1,rms*8*mid));
       c.fillStyle=rms<silThr?colorSilBar.replace(',1)',', .7)').replace(',1.0)',', .7)'):'rgba(0,229,255,.75)';
@@ -1889,12 +1890,13 @@ function toggleDetect(){
   audioEl = detectOn ? audioDet : audioPlay; // swap active element
   // 方向別補正：検出→聞く=compD2L / 聞く→検出=compL2D
   const comp = detectOn ? compL2D : compD2L;
-  try{ audioEl.currentTime=Math.max(0,Math.min(duration||t, t + comp/1000)); }catch(e){} // 位置引き継ぎ＋先読み補正
+  const nt = Math.max(0,Math.min(duration||t, t + comp/1000)); // 補正後の実位置
+  try{ audioEl.currentTime=nt; }catch(e){} // 位置引き継ぎ＋先読み補正
   audioEl.playbackRate=activeRate(); setPitch(audioEl);
   setDetectUI(); applyDetectLayout(); updateListMode();
-  // redraw
-  if(detectOn){ drawWave(t); } // static until play rebuilds live bars
-  drawSeek(t); updateTime(t);
+  // redraw（表示は実位置ntに合わせる＝マーク位置と表示が一致）
+  if(detectOn){ drawWave(nt); } // static until play rebuilds live bars
+  drawSeek(nt); updateTime(nt); hlMk(nt); hlSil(nt);
   redrawPlayBtn();
   showToast(detectOn?'検出モード（1.0倍・波形/無音）':'聞くモード（'+fmtSpd(playbackRate)+'・なめらか）');
   if(wasPlaying) play(); // resume in the new mode
