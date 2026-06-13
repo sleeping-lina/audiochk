@@ -132,7 +132,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v74</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v75</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -464,8 +464,10 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
     <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">検出→聞く(ms)</span><button class="sil-adj" onclick="adjComp('D2L',-1)">−</button><input type="range" id="compD2L" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjComp('D2L',1)">＋</button><span class="sil-val" id="compD2LV">0ms</span></div>
     <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">聞く→検出(ms)</span><button class="sil-adj" onclick="adjComp('L2D',-1)">−</button><input type="range" id="compL2D" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjComp('L2D',1)">＋</button><span class="sil-val" id="compL2DV">0ms</span></div>
     <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">時刻補正(ms)</span><button class="sil-adj" onclick="adjComp('head',-1)">−</button><input type="range" id="timeOff" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjComp('head',1)">＋</button><span class="sil-val" id="timeOffV">0ms</span></div>
-    <div style="font-size:8px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.4;margin:-2px 0 8px">時刻補正：検出した無音区間の開始/終了に一律で足す秒数。Audacity等と比べ全体が早い場合に。全削除してから調整。</div>
-    <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">速度補正(ms)<span style="color:var(--dm);font-size:8px">実験</span></span><button class="sil-adj" onclick="adjComp('spd',-1)">−</button><input type="range" id="spdComp" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjComp('spd',1)">＋</button><span class="sil-val" id="spdCompV">0ms</span></div>
+    <div style="font-size:8px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.4;margin:-2px 0 8px">時刻補正：検出した無音区間の開始/終了に一律で足す秒数。他のソフトと比べ全体が早い場合に。全削除してから調整。</div>
+    <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">速度補正(ms)</span><button class="sil-adj" onclick="adjComp('spd',-1)">−</button><input type="range" id="spdComp" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjComp('spd',1)">＋</button><span class="sil-val" id="spdCompV">0ms</span></div>
+    <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">重なり許容(ms)</span><button class="sil-adj" onclick="adjComp('ovl',-1)">−</button><input type="range" id="overlapTol" min="0" max="500" step="10" value="50"><button class="sil-adj" onclick="adjComp('ovl',1)">＋</button><span class="sil-val" id="overlapTolV">50ms</span></div>
+    <div style="font-size:8px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.4;margin:-2px 0 8px">重なり許容：この秒数より大きく重なる区間は追加しません（隣接する別区間は追加）。</div>
     <div style="border-top:1px solid #2a2a3d;margin:10px 0 8px"></div>
     <div style="font-size:9px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:8px">猶予：音が一瞬入っても、この時間続けて音がある時だけ無音終了とみなします（0=オフ）。</div>
     <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">猶予(ms)</span><button class="sil-adj" onclick="adjComp('rel',-1)">−</button><input type="range" id="releaseMs" min="0" max="400" step="10" value="0"><button class="sil-adj" onclick="adjComp('rel',1)">＋</button><span class="sil-val" id="releaseMsV">0ms</span></div>
@@ -511,7 +513,8 @@ function onEnded(){
       const recStart = rtSilStart===0 ? 0 : rtSilStart+off;
       const recEnd = Math.min(endT, endT+off); // 末尾は伸ばさない
       const recDur = recEnd-recStart;
-      const overlap=silReg.some(s=> recStart < s.end-0.05 && recEnd > s.start+0.05);
+      const otol=overlapTol/1000;
+      const overlap=silReg.some(s=> recStart < s.end-otol && recEnd > s.start+otol);
       if(!overlap){
         silReg.push({start:recStart,end:recEnd,dur:recDur});
         silReg.sort((a,b)=>a.start-b.start);
@@ -644,6 +647,7 @@ let waBuf=null;
 let silThr=0.010, silMinSec=1.0, silAutoMark=false;
 let compD2L=0, compL2D=0, timeOff=0, spdComp=0; // 検出→聞く / 聞く→検出 / 先頭補正 / 速度補正(実験) (ms)
 let releaseMs=0; // 無音終了の猶予(ヒステリシス)。0=オフ
+let overlapTol=50; // 重なり許容(ms)：これより大きく重なる区間は追加しない
 let rtLoudStart=-1; // 無音中に音が立ち上がった時刻（猶予判定用）
 let rtInSil=false, rtSilStart=0;
 // Timestamped ring buffer: each entry = {rms, t}
@@ -706,7 +710,8 @@ function rtLoop(){
         const recEnd = Math.min(duration||endT+off, endT+off);
         const recDur = recEnd-recStart;
         // 重なり判定：実際に重なる区間がある時だけ追加しない（境界0.05s許容＝隣接は別区間として追加）
-        const overlap=silReg.some(s=> recStart < s.end-0.05 && recEnd > s.start+0.05);
+        const otol=overlapTol/1000;
+      const overlap=silReg.some(s=> recStart < s.end-otol && recEnd > s.start+otol);
         if(!overlap){
           silReg.push({start:recStart,end:recEnd,dur:recDur});
           silReg.sort((a,b)=>a.start-b.start);
@@ -1830,7 +1835,7 @@ document.getElementById('silMin').addEventListener('input',function(){
   document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒';
 });
 // 4つの補正スライダー（ドラッグ）
-[['compD2L',v=>compD2L=v],['compL2D',v=>compL2D=v],['timeOff',v=>timeOff=v],['spdComp',v=>spdComp=v],['releaseMs',v=>releaseMs=v]].forEach(([id,set])=>{
+[['compD2L',v=>compD2L=v],['compL2D',v=>compL2D=v],['timeOff',v=>timeOff=v],['spdComp',v=>spdComp=v],['releaseMs',v=>releaseMs=v],['overlapTol',v=>overlapTol=v]].forEach(([id,set])=>{
   const el=document.getElementById(id);
   if(el) el.addEventListener('input',function(){ set(parseInt(this.value)||0); document.getElementById(id+'V').textContent=(parseInt(this.value)||0)+'ms'; saveSilPrefs(); });
 });
@@ -1841,11 +1846,11 @@ function openCompModal(){ document.getElementById('compModal').style.display='fl
 function closeCompModal(){ document.getElementById('compModal').style.display='none'; setTimeout(()=>grabFocus({}),100); }
 // 補正スライダー（±ボタン）。kind: 'D2L'(検出→聞く) / 'L2D'(聞く→検出) / 'head'(先頭) / 'spd'(速度実験)
 function adjComp(kind,d){
-  const map={D2L:['compD2L',500],L2D:['compL2D',500],head:['timeOff',500],spd:['spdComp',500],rel:['releaseMs',400]};
+  const map={D2L:['compD2L',500],L2D:['compL2D',500],head:['timeOff',500],spd:['spdComp',500],rel:['releaseMs',400],ovl:['overlapTol',500]};
   const [id,mx]=map[kind];
-  let v=({D2L:compD2L,L2D:compL2D,head:timeOff,spd:spdComp,rel:releaseMs})[kind];
+  let v=({D2L:compD2L,L2D:compL2D,head:timeOff,spd:spdComp,rel:releaseMs,ovl:overlapTol})[kind];
   v=Math.max(0,Math.min(mx, v + d*10));
-  if(kind==='D2L')compD2L=v; else if(kind==='L2D')compL2D=v; else if(kind==='head')timeOff=v; else if(kind==='spd')spdComp=v; else releaseMs=v;
+  if(kind==='D2L')compD2L=v; else if(kind==='L2D')compL2D=v; else if(kind==='head')timeOff=v; else if(kind==='spd')spdComp=v; else if(kind==='rel')releaseMs=v; else overlapTol=v;
   const el=document.getElementById(id); if(el) el.value=v;
   document.getElementById(id+'V').textContent=v+'ms';
   saveSilPrefs();
@@ -2130,7 +2135,7 @@ function clearSilData(){
   drawSeek(curT()); saveMk(); showToast('無音データをクリア');
 }
 function saveSilPrefs(){
-  try{ localStorage.setItem('ac_silprefs',JSON.stringify({silThr,silMinSec,compD2L,compL2D,timeOff,spdComp,releaseMs})); }catch(e){}
+  try{ localStorage.setItem('ac_silprefs',JSON.stringify({silThr,silMinSec,compD2L,compL2D,timeOff,spdComp,releaseMs,overlapTol})); }catch(e){}
 }
 function setCompUI(id,val){ const el=document.getElementById(id); if(el) el.value=val; const v=document.getElementById(id+'V'); if(v) v.textContent=val+'ms'; }
 function loadSilPrefs(){
@@ -2146,7 +2151,8 @@ function loadSilPrefs(){
     if(d.timeOff>=0) timeOff=d.timeOff; else if(d.headComp>=0) timeOff=d.headComp; // 旧先頭補正→時刻補正
     if(d.spdComp>=0) spdComp=d.spdComp;
     if(d.releaseMs>=0 && d.releaseMs!==120) releaseMs=d.releaseMs; // 旧既定120はオフ(0)扱い
-    setCompUI('compD2L',compD2L); setCompUI('compL2D',compL2D); setCompUI('timeOff',timeOff); setCompUI('spdComp',spdComp); setCompUI('releaseMs',releaseMs);
+    if(d.overlapTol>=0) overlapTol=d.overlapTol;
+    setCompUI('compD2L',compD2L); setCompUI('compL2D',compL2D); setCompUI('timeOff',timeOff); setCompUI('spdComp',spdComp); setCompUI('releaseMs',releaseMs); setCompUI('overlapTol',overlapTol);
   }catch(e){}
 }
 
