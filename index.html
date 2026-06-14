@@ -132,7 +132,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v77</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v78</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -1167,9 +1167,11 @@ function addMk(){
   renderMarkers(); drawWave(t); drawSeek(t); hlMk(t); saveMk(); showToast('🔖 '+fmtMs(t));
 }
 function delMk(i){ saveH(); markers.splice(i,1); renderMarkers(); drawWave(curT()); drawSeek(curT()); saveMk(); }
-function saveH(){hist.push(JSON.parse(JSON.stringify(markers)));redoSt=[];if(hist.length>60)hist.shift();}
-function undo(){if(!hist.length)return;redoSt.push(JSON.parse(JSON.stringify(markers)));markers=hist.pop();renderMarkers();drawWave(curT());drawSeek(curT());saveMk();showToast('取り消し');}
-function redo(){if(!redoSt.length)return;hist.push(JSON.parse(JSON.stringify(markers)));markers=redoSt.pop();renderMarkers();drawWave(curT());drawSeek(curT());saveMk();showToast('やり直し');}
+function snapState(){ return {m:JSON.parse(JSON.stringify(markers)), s:JSON.parse(JSON.stringify(silReg))}; }
+function restoreState(st){ markers=JSON.parse(JSON.stringify(st.m||[])); silReg=JSON.parse(JSON.stringify(st.s||[])); }
+function saveH(){hist.push(snapState());redoSt=[];if(hist.length>60)hist.shift();}
+function undo(){if(!hist.length)return;redoSt.push(snapState());restoreState(hist.pop());renderMarkers();renderSilList();if(detectOn&&!isPlaying)drawWave(curT());drawSeek(curT());saveMk();showToast('取り消し');}
+function redo(){if(!redoSt.length)return;hist.push(snapState());restoreState(redoSt.pop());renderMarkers();renderSilList();if(detectOn&&!isPlaying)drawWave(curT());drawSeek(curT());saveMk();showToast('やり直し');}
 function hlMk(t){
   let idx=-1; for(let i=markers.length-1;i>=0;i--){if(markers[i].time<=t+0.05){idx=i;break;}}
   if(idx===curMkIdx)return; curMkIdx=idx;
@@ -1240,8 +1242,10 @@ function hlSil(t){
 function delSilReg(start,end){
   const i=silReg.findIndex(s=>Math.abs(s.start-start)<1e-6 && Math.abs(s.end-end)<1e-6);
   if(i<0) return;
+  saveH(); // 取り消し用にスナップショット
   silReg.splice(i,1);
   renderSilList();
+  drawBtn('btnUndo'); drawBtn('btnRedo');
   if(detectOn&&!isPlaying) drawWave(curT());
   drawSeek(curT()); saveMk();
 }
@@ -2109,9 +2113,11 @@ function closeSilClrModal(){
 function doSilClearCurrent(){
   closeSilClrModal();
   if(!silReg.length){ showToast('無音データなし'); return; }
+  saveH(); // 取り消し用
   silReg=[]; rtInSil=false;
   document.getElementById('silCurDur').textContent='0.0s';
   renderSilList();
+  drawBtn('btnUndo'); drawBtn('btnRedo');
   if(detectOn&&!isPlaying) drawWave(curT());
   drawSeek(curT()); saveMk(); showToast('このファイルの無音データを削除');
 }
