@@ -132,7 +132,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v79</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v80</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -757,8 +757,9 @@ function drawLiveWave(){
   // ── Silence regions (same toPx mapping) ──
   for(const silItem of silReg){
     const sx=toPx(silItem.start), ex=toPx(silItem.end);
-    if(ex<0||sx>W) continue;
-    const rx=Math.max(0,sx), rw=Math.min(W,ex)-rx;
+    if(ex<0||sx>lineX) continue;            // 再生ラインより右(未来)は描かない
+    const rx=Math.max(0,sx), rw=Math.min(lineX,ex)-rx;  // 右端は lineX までにクランプ
+    if(rw<=0) continue;
     c.fillStyle=colorSilFill;
     c.fillRect(rx,0,rw,H);
     if(rw>18){
@@ -810,7 +811,7 @@ function drawLiveWave(){
   // ── Markers ──
   for(const m of markers){
     const mx=toPx(m.time);
-    if(mx<0||mx>W) continue;
+    if(mx<0||mx>lineX) continue;            // 再生ラインより右(未来)は描かない
     c.strokeStyle=colorMarkLine; c.lineWidth=1.5;
     c.beginPath(); c.moveTo(mx,0); c.lineTo(mx,H); c.stroke();
     c.fillStyle=colorMarkLine;
@@ -898,8 +899,9 @@ function drawWave(ct){
   const[scR2,scG2,scB2]=(colorSilBar.match(/\d+/g)||['255','140','80']).slice(0,3).map(Number);
   for(const silItem of silReg){
     const sx=toPx(silItem.start), ex=toPx(silItem.end);
-    if(ex<0||sx>W) continue;
-    const rx=Math.max(0,sx), rw=Math.min(W,ex)-rx;
+    if(ex<0||sx>lineX) continue;            // 再生ラインより右(未来)は描かない
+    const rx=Math.max(0,sx), rw=Math.min(lineX,ex)-rx;
+    if(rw<=0) continue;
     c.fillStyle=`rgba(${scR2},${scG2},${scB2},0.15)`;
     c.fillRect(rx,0,rw,H);
     if(rw>18){
@@ -923,7 +925,7 @@ function drawWave(ct){
   // Markers
   for(const m of markers){
     const mx=toPx(m.time);
-    if(mx<0||mx>W) continue;
+    if(mx<0||mx>lineX) continue;            // 再生ラインより右(未来)は描かない
     c.strokeStyle=colorMarkLine; c.lineWidth=1.5;
     c.beginPath(); c.moveTo(mx,0); c.lineTo(mx,H); c.stroke();
     c.fillStyle=colorMarkLine;
@@ -1013,8 +1015,8 @@ function curT(){return audioEl.currentTime||0;}
 function play(){
   if(!objURL||isPlaying)return;
   if(Date.now()-stopTime<200)return; // debounce: ignore rapid play after stop
-  // 再開補正：iOSは一時停止→再生でわずかに巻き戻ることがある。その分だけ先送り（ジャンプ後の再生には適用しない）。
-  if(resumeComp>0 && canResumeComp && audioEl.currentTime>0.05){
+  // 再開補正：聞くモードのみ。iOSの一時停止→再生のわずかな巻き戻りを先送り（ジャンプ後の再生・検出モードには適用しない）。
+  if(resumeComp>0 && canResumeComp && !detectOn && audioEl.currentTime>0.05){
     try{ audioEl.currentTime=Math.min(duration||audioEl.currentTime, audioEl.currentTime+resumeComp/1000); }catch(e){}
   }
   canResumeComp=false;
