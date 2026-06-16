@@ -132,7 +132,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v80</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v81</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -569,7 +569,8 @@ function loadPrefs(){
   }catch(e){}
 }
 function lsKey(f){ return 'ac_mk4_'+f; }
-function saveMk(){ try{ localStorage.setItem(lsKey(curFileName),JSON.stringify({markers,silReg,duration,ts:Date.now()})); }catch(e){} }
+let lsWarned=false; // localStorage保存失敗の通知は1回だけ（連続トースト防止）
+function saveMk(){ try{ localStorage.setItem(lsKey(curFileName),JSON.stringify({markers,silReg,duration,ts:Date.now()})); lsWarned=false; }catch(e){ if(!lsWarned){ lsWarned=true; showToast('保存に失敗（端末の保存容量が上限の可能性）'); } } }
 function loadMk(fname){ try{ const d=JSON.parse(localStorage.getItem(lsKey(fname))||'{}'); return d.markers?d:null; }catch(e){return null;} }
 
 // ── File input ────────────────────────────────
@@ -615,6 +616,9 @@ async function load(file){
   const cached=loadMk(file.name);
   if(cached){ markers=cached.markers||[]; silReg=cached.silReg||[]; duration=cached.duration||0; }
   else markers=[];
+  // 並びを保証（hlMk/hlSil が「開始時刻でソート済み」を前提にするため。古い/外部importデータ対策）
+  markers.sort((a,b)=>a.time-b.time);
+  silReg.sort((a,b)=>a.start-b.start);
   renderMarkers(); renderSilList();
 
   await new Promise(res=>{
@@ -1230,8 +1234,8 @@ function renderSilList(){
 }
 let curSilIdx=-1;
 function hlSil(t){
-  const arr=silReg.map(s=>({start:s.start,end:s.end})).sort((a,b)=>a.start-b.start);
-  let idx=-1; for(let i=arr.length-1;i>=0;i--){ if(arr[i].start<=t+0.05){ idx=i; break; } } // 直前の無音区間
+  // silReg は開始時刻でソート済み（load/import/検出時に保証）。毎フレームのコピー＆ソートを廃止。
+  let idx=-1; for(let i=silReg.length-1;i>=0;i--){ if(silReg[i].start<=t+0.05){ idx=i; break; } } // 直前の無音区間
   if(idx===curSilIdx) return; curSilIdx=idx;
   document.querySelectorAll('#silListBox .sil-item').forEach((el,i)=>el.classList.toggle('cur',i===idx));
   if(idx>=0){const el=document.getElementById('si'+idx);if(el)el.scrollIntoView({block:'nearest',behavior:'smooth'});}
@@ -1338,9 +1342,9 @@ document.getElementById('importData').addEventListener('change',function(){
         if(!e||!e.file||!Array.isArray(e.markers))return;
         const sil=(Array.isArray(e.silences)?e.silences:[]).map(s=>({start:s.start,end:s.end,dur:s.dur}));
         try{ localStorage.setItem(lsKey(e.file),JSON.stringify({markers:e.markers,silReg:sil,duration:e.duration||0,ts:Date.now()})); n++; }catch(err){}
-        if(e.file===curFileName){ saveH(); markers=e.markers; silReg=sil; }
+        if(e.file===curFileName){ saveH(); markers=e.markers; silReg=sil; markers.sort((a,b)=>a.time-b.time); silReg.sort((a,b)=>a.start-b.start); }
       });
-      renderMarkers();
+      renderMarkers(); renderSilList();
       if(detectOn&&!isPlaying) drawWave(curT());
       drawSeek(curT());
       showToast(n+'ファイル分を復元');
@@ -1349,6 +1353,7 @@ document.getElementById('importData').addEventListener('change',function(){
       if(!Array.isArray(d.markers))throw 0;
       saveH(); markers=d.markers;
       silReg=Array.isArray(d.silences)?d.silences.map(s=>({start:s.start,end:s.end,dur:s.dur})):[];
+      markers.sort((a,b)=>a.time-b.time); silReg.sort((a,b)=>a.start-b.start);
       renderMarkers(); renderSilList();
       if(detectOn&&!isPlaying) drawWave(curT());
       drawSeek(curT()); saveMk();
@@ -1467,9 +1472,10 @@ function tokenLabel(t){
   return t;
 }
 let captureFn=null, pendingCapTok=null;
+// モーダルID一覧（単一の真実：anyModalOpen と grabFocus が共用。新モーダルはここに足すだけ）
+const MODAL_IDS=['colorModal','helpModal','ctrlModal','timeModal','exportModal','clearModal','keymapModal','silClearModal','settingsModal'];
 function anyModalOpen(){
-  return ['colorModal','helpModal','ctrlModal','timeModal','exportModal','clearModal','keymapModal','silClearModal','settingsModal']
-    .some(id=>{const el=document.getElementById(id);return el&&el.style.display!=='none';});
+  return MODAL_IDS.some(id=>{const el=document.getElementById(id);return el&&el.style.display!=='none';});
 }
 function openKeymapModal(){ document.getElementById('helpModal').style.display='none'; renderKeymap(); document.getElementById('keymapModal').style.display='flex'; }
 function closeKeymapModal(){ endCapture(); document.getElementById('keymapModal').style.display='none'; setTimeout(()=>grabFocus({}),100); }
@@ -2205,24 +2211,9 @@ const focusTrap = document.getElementById('focusTrap');
 
 function grabFocus(e){
   // Don't steal focus when a modal is open or when user taps an input/button
-  const cm=document.getElementById('ctrlModal');
-  const tm=document.getElementById('timeModal');
-  const em=document.getElementById('exportModal');
-  const xm=document.getElementById('clearModal');
-  const km=document.getElementById('keymapModal');
+  // モーダル判定は anyModalOpen() に一本化（MODAL_IDS）。captureOverlay は一覧外なので明示的に追加。
   const co=document.getElementById('captureOverlay');
-  const sc=document.getElementById('silClearModal');
-  const cpm=document.getElementById('settingsModal');
-  const modalOpen = document.getElementById('colorModal').style.display!=='none' ||
-                    document.getElementById('helpModal').style.display!=='none' ||
-                    (cm&&cm.style.display!=='none') ||
-                    (tm&&tm.style.display!=='none') ||
-                    (em&&em.style.display!=='none') ||
-                    (xm&&xm.style.display!=='none') ||
-                    (km&&km.style.display!=='none') ||
-                    (co&&co.style.display!=='none') ||
-                    (sc&&sc.style.display!=='none') ||
-                    (cpm&&cpm.style.display!=='none');
+  const modalOpen = anyModalOpen() || (co&&co.style.display!=='none');
   if(modalOpen) return;
   const tag = e && e.target && e.target.tagName;
   const ty  = e && e.target && e.target.type;
