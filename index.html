@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="Audio Check">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+JP:wght@300;400;700&display=swap');
-:root{--bg:#0a0a0f;--sf:#13131a;--s2:#1c1c28;--bd:#2a2a3d;--ac:#00e5ff;--a2:#ff4081;--a3:#69ff47;--tx:#e8e8f0;--dm:#6b6b88}
+:root{--bg:#0a0a0f;--sf:#13131a;--s2:#1c1c28;--bd:#2a2a3d;--ac:#00e5ff;--a2:#ff4081;--a3:#69ff47;--tx:#e8e8f0;--dm:#6b6b88;--or:#ff8c42;--tap:rgba(0,229,255,.30)}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden}
 body{background:var(--bg);color:var(--tx);font-family:'Noto Sans JP',sans-serif;font-weight:300;
@@ -96,10 +96,13 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   font-size:9px;color:var(--dm);letter-spacing:1px;border-bottom:1px solid var(--bd);
   position:sticky;top:0;background:var(--bg);z-index:10}
 .mk-acts{display:flex;gap:3px;margin-left:auto}
-.smbtn{background:var(--s2);border:1px solid var(--bd);border-radius:4px;color:var(--dm);
-  font-size:9px;font-family:'Space Mono',monospace;padding:2px 5px;cursor:pointer;white-space:nowrap}
+.smbtn{background:var(--s2);border:1px solid var(--tap);border-radius:4px;color:var(--tx);
+  font-size:11px;font-family:'Space Mono',monospace;padding:3px 6px;min-width:26px;text-align:center;cursor:pointer;white-space:nowrap;line-height:1.2}
 .smbtn:active{opacity:.6}
-.smbtn.danger{border-color:var(--a2);color:var(--a2)}
+.smbtn.danger{border-color:var(--a2);color:var(--a2);font-size:9px}
+.smbtn.add{background:var(--a2);border-color:#ff80ab;color:#fff;font-weight:700;font-size:15px;padding:1px 9px;line-height:1}
+.smbtn.u-btn,.smbtn.r-btn{font-size:14px;line-height:1}
+.smbtn.off{opacity:.35;color:var(--dm)}
 .mk-item{display:flex;align-items:center;gap:5px;padding:7px 8px;border-bottom:1px solid var(--bd);cursor:pointer;transition:background .1s}
 .mk-item.cur{background:rgba(0,229,255,.07)}
 .mk-item.cur .m-time{color:var(--ac)}
@@ -111,7 +114,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 .mk-empty{text-align:center;padding:18px;color:var(--dm);font-size:11px;line-height:2}
 /* io */
 .io-bar{display:flex;gap:4px;padding:4px 8px;background:var(--sf);border-top:1px solid var(--bd);flex-shrink:0}
-.iobtn{flex:1;background:var(--s2);border:1px solid var(--bd);border-radius:5px;color:var(--dm);
+.iobtn{flex:1;background:var(--s2);border:1px solid var(--tap);border-radius:5px;color:var(--dm);
   font-size:10px;font-family:'Space Mono',monospace;padding:4px;cursor:pointer;text-align:center}
 .iobtn:active{opacity:.6}
 #toast{position:fixed;bottom:48px;left:50%;transform:translateX(-50%) translateY(10px);
@@ -132,7 +135,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v81</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v82</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -198,45 +201,41 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 </div>
 <div class="ctrl-wrap">
   <div class="crow">
-    <canvas class="cbtn" id="btnPrevMk" width="40" height="44" data-w="40" data-h="44"></canvas>
-    <canvas class="cbtn" id="btnUndo" width="50" height="44" data-w="50" data-h="44"></canvas>
-    <canvas class="cbtn" id="btnMark" width="76" height="44" data-w="76" data-h="44"></canvas>
-    <canvas class="cbtn" id="btnRedo" width="50" height="44" data-w="50" data-h="44"></canvas>
-    <canvas class="cbtn" id="btnNextMk" width="40" height="44" data-w="40" data-h="44"></canvas>
-  </div>
-  <div class="crow">
     <canvas class="cbtn" id="btnHeadTail0" width="44" height="44" data-w="44" data-h="44"></canvas>
-    <canvas class="cbtn" id="btnBack01" width="34" height="34" data-w="34" data-h="34"></canvas>
+    <canvas class="cbtn" id="btnBack01" width="44" height="44" data-w="44" data-h="44"></canvas>
     <canvas class="cbtn" id="btnBackN" width="44" height="44" data-w="44" data-h="44"></canvas>
     <canvas class="cbtn" id="btnPlay" width="56" height="56" data-w="56" data-h="56"></canvas>
     <canvas class="cbtn" id="btnFwdN" width="44" height="44" data-w="44" data-h="44"></canvas>
-    <canvas class="cbtn" id="btnFwd01" width="34" height="34" data-w="34" data-h="34"></canvas>
+    <canvas class="cbtn" id="btnFwd01" width="44" height="44" data-w="44" data-h="44"></canvas>
     <canvas class="cbtn" id="btnHeadTail1" width="44" height="44" data-w="44" data-h="44"></canvas>
   </div>
 </div>
 
 <div class="mk-sec" id="mkSec">
-  <div class="mk-hdr" id="mkHdr" onclick="toggleMkList()" style="cursor:pointer">
+  <div class="mk-hdr" id="mkHdr">
     MARKERS
     <span id="mkCount" style="color:var(--dm);margin-left:4px"></span>
-    <button class="tog-btn" id="mkArrow">∧</button>
-    <div class="mk-acts" onclick="event.stopPropagation()">
-      <button class="smbtn" id="prevMrkBtn">◀ prev</button>
-      <button class="smbtn" id="nextMrkBtn">next ▶</button>
-      <button class="smbtn danger" id="clearAllBtn">全削除</button>
+    <button class="smbtn add" id="addMkBtn" title="マーク追加" style="margin-left:6px">＋</button>
+    <div class="mk-acts">
+      <button class="smbtn" id="prevMrkBtn" title="前のマーク">◀</button>
+      <button class="smbtn" id="nextMrkBtn" title="次のマーク">▶</button>
+      <button class="smbtn u-btn" id="undoMkBtn" title="取り消し">↶</button>
+      <button class="smbtn r-btn" id="redoMkBtn" title="やり直し">↷</button>
+      <button class="smbtn danger" id="clearAllBtn" style="margin-left:6px">全削除</button>
     </div>
   </div>
   <div id="markerList"></div>
 </div>
 <div class="mk-sec" id="silSec" style="display:none">
-  <div class="mk-hdr" id="silListHdr" onclick="toggleSilList()" style="cursor:pointer">
+  <div class="mk-hdr" id="silListHdr">
     SILENCE
     <span id="silListCount" style="color:var(--dm);margin-left:4px"></span>
-    <button class="tog-btn" id="silListArrow">∧</button>
-    <div class="mk-acts" onclick="event.stopPropagation()">
-      <button class="smbtn" id="prevSilBtn">◀ prev</button>
-      <button class="smbtn" id="nextSilBtn">next ▶</button>
-      <button class="smbtn" onclick="openSilClearModal()" style="border-color:rgba(255,140,80,.5);color:rgba(255,160,110,.95)">全削除</button>
+    <div class="mk-acts">
+      <button class="smbtn" id="prevSilBtn" title="前の無音">◀</button>
+      <button class="smbtn" id="nextSilBtn" title="次の無音">▶</button>
+      <button class="smbtn u-btn" id="undoSilBtn" title="取り消し">↶</button>
+      <button class="smbtn r-btn" id="redoSilBtn" title="やり直し">↷</button>
+      <button class="smbtn" id="silClearBtn2" onclick="openSilClearModal()" style="border-color:rgba(255,140,80,.5);color:rgba(255,160,110,.95);margin-left:6px">全削除</button>
     </div>
   </div>
   <div id="silListBox"></div>
@@ -1171,7 +1170,7 @@ function addMk(){
 function delMk(i){ saveH(); markers.splice(i,1); renderMarkers(); drawWave(curT()); drawSeek(curT()); saveMk(); }
 function snapState(){ return {m:JSON.parse(JSON.stringify(markers)), s:JSON.parse(JSON.stringify(silReg))}; }
 function restoreState(st){ markers=JSON.parse(JSON.stringify(st.m||[])); silReg=JSON.parse(JSON.stringify(st.s||[])); }
-function saveH(){hist.push(snapState());redoSt=[];if(hist.length>60)hist.shift();}
+function saveH(){hist.push(snapState());redoSt=[];if(hist.length>60)hist.shift();if(typeof updateUndoRedoUI==='function')updateUndoRedoUI();}
 function undo(){if(!hist.length)return;redoSt.push(snapState());restoreState(hist.pop());renderMarkers();renderSilList();if(detectOn&&!isPlaying)drawWave(curT());drawSeek(curT());saveMk();showToast('取り消し');}
 function redo(){if(!redoSt.length)return;hist.push(snapState());restoreState(redoSt.pop());renderMarkers();renderSilList();if(detectOn&&!isPlaying)drawWave(curT());drawSeek(curT());saveMk();showToast('やり直し');}
 function hlMk(t){
@@ -1196,7 +1195,7 @@ function renderMarkers(){
       <span class="m-label">${esc(m.note||'')}</span>
       <span class="m-del" data-idx="${i}">×</span>
     </div>`).join('');
-  if(typeof drawBtn==='function'){ drawBtn('btnUndo'); drawBtn('btnRedo'); }
+  if(typeof updateUndoRedoUI==='function'){ updateUndoRedoUI(); }
 }
 // Event delegation — no inline handlers (fixes iOS crash)
 document.getElementById('markerList').addEventListener('click',e=>{
@@ -1209,12 +1208,6 @@ document.getElementById('markerList').addEventListener('click',e=>{
 });
 
 // ── 無音区間一覧 ──
-let silListOpen=true;
-function toggleSilList(){
-  silListOpen=!silListOpen;
-  document.getElementById('silListBox').classList.toggle('collapsed',!silListOpen);
-  document.getElementById('silListArrow').textContent=silListOpen?'∧':'∨';
-}
 function renderSilList(){
   const box=document.getElementById('silListBox'); if(!box) return;
   const cnt=document.getElementById('silListCount');
@@ -1223,7 +1216,7 @@ function renderSilList(){
   if(!arr.length){ box.innerHTML='<div class="mk-empty">無音区間なし<br><span style="font-size:9px;opacity:.5">検出モードで再生すると追加</span></div>'; return; }
   box.innerHTML=arr.map((s,i)=>`
     <div class="mk-item sil-item" id="si${i}" data-start="${s.start}" data-end="${s.end}">
-      <span class="m-num">#${i+1}</span>
+      <span class="m-num" style="color:var(--or)">#${i+1}</span>
       <span class="m-time sil-jump" data-jump="${s.start}">${fmtMs(s.start)}</span>
       <span style="color:var(--dm);font-size:10px">▸</span>
       <span class="m-time sil-jump" data-jump="${s.end}">${fmtMs(s.end)}</span>
@@ -1247,7 +1240,7 @@ function delSilReg(start,end){
   saveH(); // 取り消し用にスナップショット
   silReg.splice(i,1);
   renderSilList();
-  drawBtn('btnUndo'); drawBtn('btnRedo');
+  updateUndoRedoUI();
   if(detectOn&&!isPlaying) drawWave(curT());
   drawSeek(curT()); saveMk();
 }
@@ -1260,20 +1253,17 @@ document.getElementById('silListBox').addEventListener('click',e=>{
   if(item) seekTo(parseFloat(item.dataset.start));
 });
 
-document.getElementById('btnMark').addEventListener('click',addMk);
-// Marker list collapse
-let mkListOpen=true;
-function toggleMkList(){
-  mkListOpen=!mkListOpen;
-  document.getElementById('markerList').classList.toggle('collapsed',!mkListOpen);
-  // ▼ = list visible (open), ▲ = list hidden (closed)
-  document.getElementById('mkArrow').textContent=mkListOpen?'∧':'∨';
+// マーク追加・取消・やり直しは一覧ヘッダーへ移設（v82）
+document.getElementById('addMkBtn').addEventListener('click',addMk);
+['undoMkBtn','undoSilBtn'].forEach(id=>document.getElementById(id).addEventListener('click',undo));
+['redoMkBtn','redoSilBtn'].forEach(id=>document.getElementById(id).addEventListener('click',redo));
+// ヘッダーの取消/やり直しボタンの有効・無効表示
+function updateUndoRedoUI(){
+  document.querySelectorAll('.u-btn').forEach(b=>b.classList.toggle('off',!hist.length));
+  document.querySelectorAll('.r-btn').forEach(b=>b.classList.toggle('off',!redoSt.length));
 }
-document.getElementById('btnPrevMk').addEventListener('click',()=>document.getElementById('prevMrkBtn').click());
-document.getElementById('btnNextMk').addEventListener('click',()=>document.getElementById('nextMrkBtn').click());
-document.getElementById('btnUndo').addEventListener('click',undo);
-document.getElementById('btnRedo').addEventListener('click',redo);
 document.getElementById('clearAllBtn').addEventListener('click',openClearModal);
+updateUndoRedoUI(); // 起動時の初期状態（取消/やり直しは無効）
 function openClearModal(){
   document.getElementById('clrCount').textContent=playlist.length||1;
   document.getElementById('clearModal').style.display='flex';
@@ -1608,7 +1598,7 @@ function drawBtn(id){
 
   if(id==='btnHeadTail0'){
     // ⏮ = |◀◀  bar on left, both triangles point LEFT (apex left)
-    roundRect(c,0,0,W,H,6,C.bg,C.bd);
+    roundRect(c,0,0,W,H,W/2,C.bg,'rgba(0,229,255,.3)');
     c.fillStyle=C.ac;
     // vertical bar on left
     c.fillRect(cx-11,cy-7,2,14);
@@ -1618,7 +1608,7 @@ function drawBtn(id){
     c.beginPath();c.moveTo(cx+1,cy);c.lineTo(cx+9,cy-7);c.lineTo(cx+9,cy+7);c.fill();
   } else if(id==='btnHeadTail1'){
     // ⏭ = ▶▶|  bar on right, both triangles point RIGHT (apex right)
-    roundRect(c,0,0,W,H,6,C.bg,C.bd);
+    roundRect(c,0,0,W,H,W/2,C.bg,'rgba(0,229,255,.3)');
     c.fillStyle=C.ac;
     // vertical bar on right
     c.fillRect(cx+9,cy-7,2,14);
@@ -1694,15 +1684,15 @@ function drawBtn(id){
     c.fillStyle='rgba(255,255,255,.75)'; c.font="7px 'Space Mono',monospace"; c.textAlign='center';
     c.fillText('マーク追加',cx,H-3); c.textAlign='left';
   } else if(id==='btnBack01'){
-    roundRect(c,0,0,W,H,50,C.bg,C.bd);
+    roundRect(c,0,0,W,H,50,C.bg,'rgba(0,229,255,.3)');
     c.fillStyle=C.tx; c.font="bold 9px 'Space Mono',monospace"; c.textAlign='center';
     c.fillText('-.1',cx,cy+4); c.textAlign='left';
   } else if(id==='btnFwd01'){
-    roundRect(c,0,0,W,H,50,C.bg,C.bd);
+    roundRect(c,0,0,W,H,50,C.bg,'rgba(0,229,255,.3)');
     c.fillStyle=C.tx; c.font="bold 9px 'Space Mono',monospace"; c.textAlign='center';
     c.fillText('+.1',cx,cy+4); c.textAlign='left';
   } else if(id==='btnBackN'){
-    roundRect(c,0,0,W,H,50,C.bg,C.bd);
+    roundRect(c,0,0,W,H,50,C.bg,'rgba(0,229,255,.3)');
     c.strokeStyle=C.tx; c.lineWidth=2; c.lineCap='round'; c.lineJoin='round';
     // double chevron left
     c.beginPath();c.moveTo(cx,cy-6);c.lineTo(cx-5,cy);c.lineTo(cx,cy+6);c.stroke();
@@ -1710,7 +1700,7 @@ function drawBtn(id){
     c.fillStyle=C.ac; c.font="bold 8px 'Space Mono',monospace"; c.textAlign='center';
     c.fillText(String(skipSec),cx+8,cy+3); c.textAlign='left';
   } else if(id==='btnFwdN'){
-    roundRect(c,0,0,W,H,50,C.bg,C.bd);
+    roundRect(c,0,0,W,H,50,C.bg,'rgba(0,229,255,.3)');
     c.strokeStyle=C.tx; c.lineWidth=2; c.lineCap='round'; c.lineJoin='round';
     c.beginPath();c.moveTo(cx,cy-6);c.lineTo(cx+5,cy);c.lineTo(cx,cy+6);c.stroke();
     c.beginPath();c.moveTo(cx-5,cy-6);c.lineTo(cx,cy);c.lineTo(cx-5,cy+6);c.stroke();
@@ -1730,7 +1720,6 @@ function drawBtn(id){
 
 function drawAllBtns(){
   ['folderBtn','fileBtn','btnColor','btnHelp',
-   'btnPrevMk','btnUndo','btnMark','btnRedo','btnNextMk',
    'btnHeadTail0','btnBack01','btnBackN','btnPlay','btnFwdN','btnFwd01','btnHeadTail1'].forEach(drawBtn);
 }
 
@@ -2132,7 +2121,7 @@ function doSilClearCurrent(){
   silReg=[]; rtInSil=false;
   document.getElementById('silCurDur').textContent='--';
   renderSilList();
-  drawBtn('btnUndo'); drawBtn('btnRedo');
+  updateUndoRedoUI();
   if(detectOn&&!isPlaying) drawWave(curT());
   drawSeek(curT()); saveMk(); showToast('このファイルの無音データを削除');
 }
