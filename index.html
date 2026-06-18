@@ -50,7 +50,7 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
 .sil-row{display:flex;align-items:center;gap:6px;margin-bottom:4px}
 .sil-row:last-child{margin-bottom:0}
 .sil-ctl-lbl{font-size:9px;color:var(--dm);font-family:'Space Mono',monospace;white-space:nowrap;min-width:76px}
-.sil-val{font-family:'Space Mono',monospace;font-size:10px;color:var(--tx);min-width:44px;text-align:right}
+.sil-val{font-family:'Space Mono',monospace;font-size:10px;color:var(--tx);min-width:52px;flex-shrink:0;text-align:right;padding-right:2px}
 .sil-row input[type=range]{flex:1;height:3px;-webkit-appearance:none;border-radius:2px;background:var(--bd);outline:none}
 .sil-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--a2)}
 
@@ -59,7 +59,7 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
 .spd-inner2{padding:4px 8px 5px}
 .spd-row{display:flex;gap:3px;align-items:center;justify-content:center;flex-wrap:wrap}
 .spd-row::-webkit-scrollbar{display:none}
-.spb{background:var(--s2);border:1px solid var(--bd);border-radius:4px;color:var(--dm);
+.spb{background:var(--s2);border:1px solid var(--tap);border-radius:4px;color:var(--dm);
   font-family:'Space Mono',monospace;font-size:10px;padding:5px 6px;cursor:pointer;white-space:nowrap;flex-shrink:0;min-width:38px;text-align:center}
 .spb.on{background:var(--ac);color:#000;border-color:var(--ac);font-weight:700}
 .spb:active{opacity:.7}
@@ -96,13 +96,15 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   font-size:9px;color:var(--dm);letter-spacing:1px;border-bottom:1px solid var(--bd);
   position:sticky;top:0;background:var(--bg);z-index:10}
 .mk-acts{display:flex;gap:3px;margin-left:auto}
-.smbtn{background:var(--s2);border:1px solid var(--tap);border-radius:4px;color:var(--tx);
-  font-size:11px;font-family:'Space Mono',monospace;padding:3px 6px;min-width:26px;text-align:center;cursor:pointer;white-space:nowrap;line-height:1.2}
+.smbtn{display:inline-flex;align-items:center;justify-content:center;background:var(--s2);border:1px solid var(--tap);border-radius:4px;color:var(--tx);
+  font-size:12px;font-family:'Space Mono',monospace;padding:0 6px;min-width:30px;height:28px;cursor:pointer;white-space:nowrap;line-height:1}
 .smbtn:active{opacity:.6}
+.smbtn svg{display:block}
 .smbtn.danger{border-color:var(--a2);color:var(--a2);font-size:9px}
-.smbtn.add{background:var(--a2);border-color:#ff80ab;color:#fff;font-weight:700;font-size:15px;padding:1px 9px;line-height:1}
-.smbtn.u-btn,.smbtn.r-btn{font-size:14px;line-height:1}
-.smbtn.off{opacity:.35;color:var(--dm)}
+.smbtn.pk{border-color:var(--a2);color:var(--a2)}
+.smbtn.og{border-color:var(--or);color:var(--or)}
+.smbtn.add{background:var(--a2);border:1px solid var(--a2);color:#0a0a0f;font-weight:700;font-size:17px;padding:0 9px}
+.smbtn.off{opacity:.35}
 .mk-item{display:flex;align-items:center;gap:5px;padding:7px 8px;border-bottom:1px solid var(--bd);cursor:pointer;transition:background .1s}
 .mk-item.cur{background:rgba(0,229,255,.07)}
 .mk-item.cur .m-time{color:var(--ac)}
@@ -135,7 +137,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v82</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v83</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -217,10 +219,10 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
     <span id="mkCount" style="color:var(--dm);margin-left:4px"></span>
     <button class="smbtn add" id="addMkBtn" title="マーク追加" style="margin-left:6px">＋</button>
     <div class="mk-acts">
-      <button class="smbtn" id="prevMrkBtn" title="前のマーク">◀</button>
-      <button class="smbtn" id="nextMrkBtn" title="次のマーク">▶</button>
-      <button class="smbtn u-btn" id="undoMkBtn" title="取り消し">↶</button>
-      <button class="smbtn r-btn" id="redoMkBtn" title="やり直し">↷</button>
+      <button class="smbtn pk" id="prevMrkBtn" title="前のマーク">◀</button>
+      <button class="smbtn pk" id="nextMrkBtn" title="次のマーク">▶</button>
+      <button class="smbtn pk u-btn" id="undoMkBtn" title="取り消し"><svg width="15" height="13" viewBox="0 0 15 13"><path d="M4 4 A4.5 4.5 0 1 1 3 8.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M1.5 1.5 L3.5 4.8 L6.3 3.7 Z" fill="currentColor"/></svg></button>
+      <button class="smbtn pk r-btn" id="redoMkBtn" title="やり直し"><svg width="15" height="13" viewBox="0 0 15 13"><path d="M11 4 A4.5 4.5 0 1 0 12 8.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M13.5 1.5 L11.5 4.8 L8.7 3.7 Z" fill="currentColor"/></svg></button>
       <button class="smbtn danger" id="clearAllBtn" style="margin-left:6px">全削除</button>
     </div>
   </div>
@@ -231,11 +233,11 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
     SILENCE
     <span id="silListCount" style="color:var(--dm);margin-left:4px"></span>
     <div class="mk-acts">
-      <button class="smbtn" id="prevSilBtn" title="前の無音">◀</button>
-      <button class="smbtn" id="nextSilBtn" title="次の無音">▶</button>
-      <button class="smbtn u-btn" id="undoSilBtn" title="取り消し">↶</button>
-      <button class="smbtn r-btn" id="redoSilBtn" title="やり直し">↷</button>
-      <button class="smbtn" id="silClearBtn2" onclick="openSilClearModal()" style="border-color:rgba(255,140,80,.5);color:rgba(255,160,110,.95);margin-left:6px">全削除</button>
+      <button class="smbtn og" id="prevSilBtn" title="前の無音">◀</button>
+      <button class="smbtn og" id="nextSilBtn" title="次の無音">▶</button>
+      <button class="smbtn og u-btn" id="undoSilBtn" title="取り消し"><svg width="15" height="13" viewBox="0 0 15 13"><path d="M4 4 A4.5 4.5 0 1 1 3 8.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M1.5 1.5 L3.5 4.8 L6.3 3.7 Z" fill="currentColor"/></svg></button>
+      <button class="smbtn og r-btn" id="redoSilBtn" title="やり直し"><svg width="15" height="13" viewBox="0 0 15 13"><path d="M11 4 A4.5 4.5 0 1 0 12 8.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M13.5 1.5 L11.5 4.8 L8.7 3.7 Z" fill="currentColor"/></svg></button>
+      <button class="smbtn og" id="silClearBtn2" onclick="openSilClearModal()" style="margin-left:6px">全削除</button>
     </div>
   </div>
   <div id="silListBox"></div>
@@ -1598,7 +1600,7 @@ function drawBtn(id){
 
   if(id==='btnHeadTail0'){
     // ⏮ = |◀◀  bar on left, both triangles point LEFT (apex left)
-    roundRect(c,0,0,W,H,W/2,C.bg,'rgba(0,229,255,.3)');
+    circle(c,cx,cy,cx-1.5,'rgba(0,229,255,.10)',C.ac,1.6);
     c.fillStyle=C.ac;
     // vertical bar on left
     c.fillRect(cx-11,cy-7,2,14);
@@ -1608,7 +1610,7 @@ function drawBtn(id){
     c.beginPath();c.moveTo(cx+1,cy);c.lineTo(cx+9,cy-7);c.lineTo(cx+9,cy+7);c.fill();
   } else if(id==='btnHeadTail1'){
     // ⏭ = ▶▶|  bar on right, both triangles point RIGHT (apex right)
-    roundRect(c,0,0,W,H,W/2,C.bg,'rgba(0,229,255,.3)');
+    circle(c,cx,cy,cx-1.5,'rgba(0,229,255,.10)',C.ac,1.6);
     c.fillStyle=C.ac;
     // vertical bar on right
     c.fillRect(cx+9,cy-7,2,14);
@@ -1630,23 +1632,23 @@ function drawBtn(id){
     c.fillStyle='rgba(255,255,255,.8)';c.font="7px 'Space Mono',monospace";c.textAlign='center';
     c.fillText('NEXT',cx,H-4);c.textAlign='left';
   } else if(id==='folderBtn'){
-    roundRect(c,0,0,W,H,6,'#0d1f2a','rgba(0,229,255,.3)');
+    roundRect(c,.75,.75,W-1.5,H-1.5,6,'#0d1f2a','rgba(0,229,255,.3)');
     c.fillStyle='rgba(0,229,255,.8)';
     const fx=cx-7,fy=cy-5,fw=14,fh=10;
     c.beginPath();c.moveTo(fx,fy+2);c.lineTo(fx+5,fy+2);c.lineTo(fx+6,fy);c.lineTo(fx+fw,fy);c.lineTo(fx+fw,fy+fh);c.lineTo(fx,fy+fh);c.closePath();c.fill();
   } else if(id==='fileBtn'){
-    roundRect(c,0,0,W,H,6,'#0d1f2a','rgba(0,229,255,.3)');
+    roundRect(c,.75,.75,W-1.5,H-1.5,6,'#0d1f2a','rgba(0,229,255,.3)');
     c.fillStyle='rgba(0,229,255,.8)';
     circle(c,cx-2,cy+4,3,'rgba(0,229,255,.8)');
     c.fillRect(cx,cy-7,2,11); c.fillRect(cx,cy-7,6,2);
   } else if(id==='btnColor'){
-    roundRect(c,0,0,W,H,6,'#0d1f2a','rgba(0,229,255,.3)');
+    roundRect(c,.75,.75,W-1.5,H-1.5,6,'#0d1f2a','rgba(0,229,255,.3)');
     // palette icon: 4 color circles
     const cols=['#00e5ff','#ff4081','#ffdd00','rgba(255,140,80,1)'];
     const pos=[[cx-5,cy-4],[cx+5,cy-4],[cx-5,cy+4],[cx+5,cy+4]];
     cols.forEach((col,i)=>{ c.fillStyle=col; c.beginPath(); c.arc(pos[i][0],pos[i][1],3.5,0,Math.PI*2); c.fill(); });
   } else if(id==='btnHelp'){
-    roundRect(c,0,0,W,H,6,'#0d1f2a','rgba(0,229,255,.3)');
+    roundRect(c,.75,.75,W-1.5,H-1.5,6,'#0d1f2a','rgba(0,229,255,.3)');
     c.strokeStyle='rgba(0,229,255,.8)'; c.lineWidth=1.5;
     roundRect(c,cx-9,cy-5,18,10,2,null,'rgba(0,229,255,.8)');
     c.fillStyle='rgba(0,229,255,.8)';
@@ -1684,36 +1686,35 @@ function drawBtn(id){
     c.fillStyle='rgba(255,255,255,.75)'; c.font="7px 'Space Mono',monospace"; c.textAlign='center';
     c.fillText('マーク追加',cx,H-3); c.textAlign='left';
   } else if(id==='btnBack01'){
-    roundRect(c,0,0,W,H,50,C.bg,'rgba(0,229,255,.3)');
-    c.fillStyle=C.tx; c.font="bold 9px 'Space Mono',monospace"; c.textAlign='center';
+    circle(c,cx,cy,cx-1.5,'rgba(0,229,255,.10)',C.ac,1.6);
+    c.fillStyle=C.ac; c.font="bold 11px 'Space Mono',monospace"; c.textAlign='center';
     c.fillText('-.1',cx,cy+4); c.textAlign='left';
   } else if(id==='btnFwd01'){
-    roundRect(c,0,0,W,H,50,C.bg,'rgba(0,229,255,.3)');
-    c.fillStyle=C.tx; c.font="bold 9px 'Space Mono',monospace"; c.textAlign='center';
+    circle(c,cx,cy,cx-1.5,'rgba(0,229,255,.10)',C.ac,1.6);
+    c.fillStyle=C.ac; c.font="bold 11px 'Space Mono',monospace"; c.textAlign='center';
     c.fillText('+.1',cx,cy+4); c.textAlign='left';
   } else if(id==='btnBackN'){
-    roundRect(c,0,0,W,H,50,C.bg,'rgba(0,229,255,.3)');
-    c.strokeStyle=C.tx; c.lineWidth=2; c.lineCap='round'; c.lineJoin='round';
-    // double chevron left
-    c.beginPath();c.moveTo(cx,cy-6);c.lineTo(cx-5,cy);c.lineTo(cx,cy+6);c.stroke();
-    c.beginPath();c.moveTo(cx+5,cy-6);c.lineTo(cx,cy);c.lineTo(cx+5,cy+6);c.stroke();
-    c.fillStyle=C.ac; c.font="bold 8px 'Space Mono',monospace"; c.textAlign='center';
-    c.fillText(String(skipSec),cx+8,cy+3); c.textAlign='left';
+    circle(c,cx,cy,cx-1.5,'rgba(0,229,255,.10)',C.ac,1.6);
+    c.fillStyle=C.ac;
+    // double left filled triangles
+    c.beginPath();c.moveTo(cx-1,cy-6);c.lineTo(cx-6,cy);c.lineTo(cx-1,cy+6);c.fill();
+    c.beginPath();c.moveTo(cx+4,cy-6);c.lineTo(cx-1,cy);c.lineTo(cx+4,cy+6);c.fill();
+    c.font="bold 8px 'Space Mono',monospace"; c.textAlign='center';
+    c.fillText(String(skipSec),cx+9,cy+3); c.textAlign='left';
   } else if(id==='btnFwdN'){
-    roundRect(c,0,0,W,H,50,C.bg,'rgba(0,229,255,.3)');
-    c.strokeStyle=C.tx; c.lineWidth=2; c.lineCap='round'; c.lineJoin='round';
-    c.beginPath();c.moveTo(cx,cy-6);c.lineTo(cx+5,cy);c.lineTo(cx,cy+6);c.stroke();
-    c.beginPath();c.moveTo(cx-5,cy-6);c.lineTo(cx,cy);c.lineTo(cx-5,cy+6);c.stroke();
-    c.fillStyle=C.ac; c.font="bold 8px 'Space Mono',monospace"; c.textAlign='center';
-    c.fillText(String(skipSec),cx-8,cy+3); c.textAlign='left';
+    circle(c,cx,cy,cx-1.5,'rgba(0,229,255,.10)',C.ac,1.6);
+    c.fillStyle=C.ac;
+    c.beginPath();c.moveTo(cx+1,cy-6);c.lineTo(cx+6,cy);c.lineTo(cx+1,cy+6);c.fill();
+    c.beginPath();c.moveTo(cx-4,cy-6);c.lineTo(cx+1,cy);c.lineTo(cx-4,cy+6);c.fill();
+    c.font="bold 8px 'Space Mono',monospace"; c.textAlign='center';
+    c.fillText(String(skipSec),cx-9,cy+3); c.textAlign='left';
   } else if(id==='btnPlay'){
-    circle(c,cx,cy,cx-1,C.ac);
-    circle(c,cx,cy,cx-4,'rgba(255,255,255,.1)');
-    c.fillStyle='#0a0a0f';
+    circle(c,cx,cy,cx-1.5,'rgba(0,229,255,.12)',C.ac,2);
+    c.fillStyle=C.ac;
     if(isPlaying){
-      c.fillRect(cx-8,cy-9,5,18); c.fillRect(cx+3,cy-9,5,18);
+      c.fillRect(cx-7,cy-10,5,20); c.fillRect(cx+2,cy-10,5,20);
     } else {
-      c.beginPath();c.moveTo(cx-5,cy-10);c.lineTo(cx-5,cy+10);c.lineTo(cx+12,cy);c.fill();
+      c.beginPath();c.moveTo(cx-6,cy-11);c.lineTo(cx-6,cy+11);c.lineTo(cx+12,cy);c.fill();
     }
   }
 }
