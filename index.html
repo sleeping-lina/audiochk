@@ -45,13 +45,13 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
 /* silence detect */
 .sil-section{flex-shrink:0;background:var(--sf);border-bottom:1px solid var(--bd)}
 .sil-header{display:flex;align-items:center;padding:3px 8px;cursor:pointer;gap:6px}
-.sil-lbl{font-family:'Space Mono',monospace;font-size:9px;color:var(--dm);letter-spacing:1px}
+.sil-lbl{font-family:'Space Mono',monospace;font-size:9px;color:var(--or);letter-spacing:1px;font-weight:700}
 .sil-status{font-family:'Space Mono',monospace;font-size:10px;color:var(--a3)}
 .sil-row{display:flex;align-items:center;gap:6px;margin-bottom:4px}
 .sil-row:last-child{margin-bottom:0}
 .sil-ctl-lbl{font-size:9px;color:var(--dm);font-family:'Space Mono',monospace;white-space:nowrap;min-width:76px}
 .sil-val{font-family:'Space Mono',monospace;font-size:10px;color:var(--tx);min-width:52px;flex-shrink:0;text-align:right;padding-right:2px}
-.sil-row input[type=range]{flex:1;height:3px;-webkit-appearance:none;border-radius:2px;background:var(--bd);outline:none}
+.sil-row input[type=range]{flex:1;min-width:0;height:3px;-webkit-appearance:none;border-radius:2px;background:var(--bd);outline:none}
 .sil-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--a2)}
 
 /* speed */
@@ -137,7 +137,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v83</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v84</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -176,7 +176,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
     <span class="sil-status" id="silCurDur" style="margin-left:6px;color:var(--a2);font-weight:700">--</span>
     <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
       <div style="display:flex;align-items:center;gap:4px;cursor:pointer" onclick="event.stopPropagation();toggleDetect()" id="detectToggle">
-        <span style="font-size:8px;color:var(--dm);font-family:'Space Mono',monospace">無音検出</span>
+        <span style="font-size:8px;color:var(--or);font-family:'Space Mono',monospace">無音検出</span>
         <div id="detectTrack" style="width:32px;height:18px;border-radius:9px;background:rgba(0,229,255,.3);border:1px solid #00e5ff;position:relative;transition:background .2s">
           <div id="detectThumb" style="width:14px;height:14px;border-radius:50%;background:#00e5ff;position:absolute;top:1px;left:15px;transition:left .2s,background .2s"></div>
         </div>
@@ -215,7 +215,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 
 <div class="mk-sec" id="mkSec">
   <div class="mk-hdr" id="mkHdr">
-    MARKERS
+    <span style="color:var(--a2);font-weight:700">MARKERS</span>
     <span id="mkCount" style="color:var(--dm);margin-left:4px"></span>
     <button class="smbtn add" id="addMkBtn" title="マーク追加" style="margin-left:6px">＋</button>
     <div class="mk-acts">
@@ -223,21 +223,21 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
       <button class="smbtn pk" id="nextMrkBtn" title="次のマーク">▶</button>
       <button class="smbtn pk u-btn" id="undoMkBtn" title="取り消し"><svg width="15" height="13" viewBox="0 0 15 13"><path d="M4 4 A4.5 4.5 0 1 1 3 8.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M1.5 1.5 L3.5 4.8 L6.3 3.7 Z" fill="currentColor"/></svg></button>
       <button class="smbtn pk r-btn" id="redoMkBtn" title="やり直し"><svg width="15" height="13" viewBox="0 0 15 13"><path d="M11 4 A4.5 4.5 0 1 0 12 8.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M13.5 1.5 L11.5 4.8 L8.7 3.7 Z" fill="currentColor"/></svg></button>
-      <button class="smbtn danger" id="clearAllBtn" style="margin-left:6px">全削除</button>
+      <button class="smbtn danger" id="clearAllBtn" style="margin-left:6px">クリア</button>
     </div>
   </div>
   <div id="markerList"></div>
 </div>
 <div class="mk-sec" id="silSec" style="display:none">
   <div class="mk-hdr" id="silListHdr">
-    SILENCE
+    <span style="color:var(--or);font-weight:700">SILENCE</span>
     <span id="silListCount" style="color:var(--dm);margin-left:4px"></span>
     <div class="mk-acts">
       <button class="smbtn og" id="prevSilBtn" title="前の無音">◀</button>
       <button class="smbtn og" id="nextSilBtn" title="次の無音">▶</button>
       <button class="smbtn og u-btn" id="undoSilBtn" title="取り消し"><svg width="15" height="13" viewBox="0 0 15 13"><path d="M4 4 A4.5 4.5 0 1 1 3 8.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M1.5 1.5 L3.5 4.8 L6.3 3.7 Z" fill="currentColor"/></svg></button>
       <button class="smbtn og r-btn" id="redoSilBtn" title="やり直し"><svg width="15" height="13" viewBox="0 0 15 13"><path d="M11 4 A4.5 4.5 0 1 0 12 8.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M13.5 1.5 L11.5 4.8 L8.7 3.7 Z" fill="currentColor"/></svg></button>
-      <button class="smbtn og" id="silClearBtn2" onclick="openSilClearModal()" style="margin-left:6px">全削除</button>
+      <button class="smbtn og" id="silClearBtn2" onclick="openSilClearModal()" style="margin-left:6px;font-size:9px">クリア</button>
     </div>
   </div>
   <div id="silListBox"></div>
