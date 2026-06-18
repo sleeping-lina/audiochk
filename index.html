@@ -137,7 +137,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v84</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v85</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -165,7 +165,9 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   <span id="timeTotal">/ --:--:--</span>
   <span style="color:var(--bd);margin:0 2px">|</span>
   <span id="silInfo" style="flex:1"></span>
-
+  <button id="reportBtn" onclick="openReportPopup()" title="ファイル名と時間を拡大表示" aria-label="拡大表示" style="background:#0a0a0f;border:1px solid var(--tap);border-radius:6px;padding:4px 7px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+    <svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 6 V2 H6 M14 6 V2 H10 M2 10 V14 H6 M14 10 V14 H10" fill="none" stroke="#00e5ff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
 </div>
 <div class="seek-wrap" id="seekWrap"><canvas id="seekCanvas"></canvas></div>
 <!-- Live silence detection panel -->
@@ -173,7 +175,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   <div class="sil-header" id="silHeader">
     <span class="sil-lbl">SILENCE DETECT</span>
     <span class="sil-status" id="silStatus" style="margin-left:8px">停止中</span>
-    <span class="sil-status" id="silCurDur" style="margin-left:6px;color:var(--a2);font-weight:700">--</span>
+    <span class="sil-status" id="silCurDur" style="margin-left:6px;color:var(--a2);font-weight:700;display:none">--</span>
     <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
       <div style="display:flex;align-items:center;gap:4px;cursor:pointer" onclick="event.stopPropagation();toggleDetect()" id="detectToggle">
         <span style="font-size:8px;color:var(--or);font-family:'Space Mono',monospace">無音検出</span>
@@ -363,6 +365,14 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 </div>
 
 <!-- Time input modal — segmented HH:MM:SS -->
+<div id="reportModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:540;align-items:center;justify-content:center;padding:24px" onclick="closeReportPopup()">
+  <div onclick="event.stopPropagation()" style="background:#000;border:1px solid #00e5ff;border-radius:16px;padding:26px 22px;max-width:440px;width:100%;text-align:center;box-shadow:0 0 28px rgba(0,229,255,.18);position:relative">
+    <button onclick="closeReportPopup()" aria-label="閉じる" style="position:absolute;top:8px;right:13px;background:transparent;border:none;color:#6b6b88;font-size:20px;cursor:pointer">×</button>
+    <div id="rpLabel" style="font-family:'Space Mono',monospace;font-size:10px;color:#6b6b88;letter-spacing:1px;margin-bottom:14px">報告用</div>
+    <div id="rpName" style="font-size:18px;color:#e8e8f0;font-weight:700;word-break:break-all;line-height:1.45;margin-bottom:16px">--</div>
+    <div id="rpTime" style="font-family:'Space Mono',monospace;font-size:38px;color:#00e5ff;letter-spacing:1px">--:--:--</div>
+  </div>
+</div>
 <div id="timeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:center;justify-content:center" onclick="closeTimeModal()">
   <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;padding:20px;min-width:280px">
     <div style="font-family:'Space Mono',monospace;font-size:10px;color:#6b6b88;letter-spacing:1px;margin-bottom:14px;text-align:center">タイムジャンプ</div>
@@ -1465,7 +1475,7 @@ function tokenLabel(t){
 }
 let captureFn=null, pendingCapTok=null;
 // モーダルID一覧（単一の真実：anyModalOpen と grabFocus が共用。新モーダルはここに足すだけ）
-const MODAL_IDS=['colorModal','helpModal','ctrlModal','timeModal','exportModal','clearModal','keymapModal','silClearModal','settingsModal'];
+const MODAL_IDS=['colorModal','helpModal','ctrlModal','timeModal','exportModal','clearModal','keymapModal','silClearModal','settingsModal','reportModal'];
 function anyModalOpen(){
   return MODAL_IDS.some(id=>{const el=document.getElementById(id);return el&&el.style.display!=='none';});
 }
@@ -1771,6 +1781,27 @@ function openTimeInput(){
 }
 function closeTimeModal(){
   document.getElementById('timeModal').style.display='none';
+  setTimeout(()=>grabFocus({}),100);
+}
+// 報告用ポップアップ：ファイル名＋フォーカス中マークのタイム
+// 表示内容は reportValue() に集約。将来「設定で表示内容を選択」を足す際はここを差し替えるだけにする。
+function reportValue(){
+  const t0=curT();
+  // 再生位置の直前のマーク（一覧でハイライト中のものと同じ定義）。無ければ現在位置。
+  let idx=-1; for(let i=markers.length-1;i>=0;i--){ if(markers[i].time<=t0+0.05){ idx=i; break; } }
+  if(idx>=0) return { label:'マーク #'+(idx+1), time:markers[idx].time };
+  return { label:'再生位置', time:t0 };
+}
+function fmtReport(s){ if(!isFinite(s)||s<0) return '--:--:--'; const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=Math.floor(s%60); return p2(h)+':'+p2(m)+':'+p2(sc); }
+function openReportPopup(){
+  const v=reportValue();
+  document.getElementById('rpName').textContent = curFileName||'(ファイル未選択)';
+  document.getElementById('rpTime').textContent = fmtReport(v.time);
+  document.getElementById('rpLabel').textContent = '報告用 — '+v.label;
+  document.getElementById('reportModal').style.display='flex';
+}
+function closeReportPopup(){
+  document.getElementById('reportModal').style.display='none';
   setTimeout(()=>grabFocus({}),100);
 }
 function commitTimeInput(){
