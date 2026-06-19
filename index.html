@@ -111,8 +111,8 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 .m-num{font-family:'Space Mono',monospace;font-size:9px;color:var(--a2);min-width:16px}
 .m-time{font-family:'Space Mono',monospace;font-size:11px;color:var(--tx);white-space:nowrap}
 .m-label{color:var(--dm);font-size:10px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.m-del{color:var(--dm);font-size:12px;padding:2px 3px;cursor:pointer;border-radius:3px;flex-shrink:0}
-.m-del:active{background:rgba(255,64,129,.2);color:var(--a2)}
+.m-del{display:inline-flex;align-items:center;justify-content:center;color:var(--dm);font-size:14px;width:30px;height:28px;cursor:pointer;border:1px solid var(--bd);border-radius:5px;flex-shrink:0;margin-left:6px}
+.m-del:active{background:rgba(255,64,129,.25);color:var(--a2);border-color:var(--a2)}
 .mk-empty{text-align:center;padding:18px;color:var(--dm);font-size:11px;line-height:2}
 /* io */
 .io-bar{display:flex;gap:4px;padding:4px 8px;background:var(--sf);border-top:1px solid var(--bd);flex-shrink:0}
@@ -137,7 +137,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v85</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v86</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -1090,7 +1090,8 @@ function loop(){
     if(f<zoomCtr-hs*.5||f>zoomCtr+hs*.5)
       zoomCtr=Math.max(hs,Math.min(1-hs,f));
   }
-  if(detectOn){ if(waReady) drawLiveWave(); else drawWave(t); } // 聞くモードは波形非表示なので省略
+  if(detectOn){ if(waReady) drawLiveWave(); else drawWave(t); }
+  else { drawWave(t); } // 聞くモードも波形を流す（静的タイムライン＋再生ライン＋マーク＋無音）
   updateTime(t);
   // Redraw seek only once per second (expensive canvas op)
   const sec=Math.floor(t);
@@ -1183,8 +1184,8 @@ function delMk(i){ saveH(); markers.splice(i,1); renderMarkers(); drawWave(curT(
 function snapState(){ return {m:JSON.parse(JSON.stringify(markers)), s:JSON.parse(JSON.stringify(silReg))}; }
 function restoreState(st){ markers=JSON.parse(JSON.stringify(st.m||[])); silReg=JSON.parse(JSON.stringify(st.s||[])); }
 function saveH(){hist.push(snapState());redoSt=[];if(hist.length>60)hist.shift();if(typeof updateUndoRedoUI==='function')updateUndoRedoUI();}
-function undo(){if(!hist.length)return;redoSt.push(snapState());restoreState(hist.pop());renderMarkers();renderSilList();if(detectOn&&!isPlaying)drawWave(curT());drawSeek(curT());saveMk();showToast('取り消し');}
-function redo(){if(!redoSt.length)return;hist.push(snapState());restoreState(redoSt.pop());renderMarkers();renderSilList();if(detectOn&&!isPlaying)drawWave(curT());drawSeek(curT());saveMk();showToast('やり直し');}
+function undo(){if(!hist.length)return;redoSt.push(snapState());restoreState(hist.pop());renderMarkers();renderSilList();if(!isPlaying)drawWave(curT());drawSeek(curT());saveMk();showToast('取り消し');}
+function redo(){if(!redoSt.length)return;hist.push(snapState());restoreState(redoSt.pop());renderMarkers();renderSilList();if(!isPlaying)drawWave(curT());drawSeek(curT());saveMk();showToast('やり直し');}
 function hlMk(t){
   let idx=-1; for(let i=markers.length-1;i>=0;i--){if(markers[i].time<=t+0.05){idx=i;break;}}
   if(idx===curMkIdx)return; curMkIdx=idx;
@@ -1397,7 +1398,8 @@ const DEFAULT_KEYMAP={
   speed6:['6','Numpad6'],
   undo:['z'],
   redo:['y'],
-  detect:['d']
+  detect:['d'],
+  timejump:['t']
 };
 function defKeymapCopy(){ const m={}; for(const k in DEFAULT_KEYMAP) m[k]=DEFAULT_KEYMAP[k].slice(); return m; }
 function loadKeymap(){
@@ -1460,11 +1462,12 @@ function doAction(fn){
     case 'undo': undo(); break;
     case 'redo': redo(); break;
     case 'detect': toggleDetect(); break;
+    case 'timejump': openTimeInput(); break;
   }
 }
 // ── Keymap editor (stage B) ──
-const FN_ORDER=['playpause','markadd','markdel','skipback','skipfwd','fineback','finefwd','prevmark','nextmark','prevsil','nextsil','prevfile','nextfile','head','tail','speedreset','speed1','speed2','speed3','speed4','speed5','speed6','undo','redo','detect'];
-const FN_LABELS={playpause:'再生/停止',markadd:'マーク追加',markdel:'マーク削除',skipback:'−N秒スキップ',skipfwd:'+N秒スキップ',fineback:'−0.1秒',finefwd:'+0.1秒',prevmark:'前のマーク',nextmark:'次のマーク',prevsil:'前の無音',nextsil:'次の無音',prevfile:'前のファイル',nextfile:'次のファイル',head:'先頭へ',tail:'末尾へ',speedreset:'速度リセット(×1.0)',speed1:'速度プリセット1',speed2:'速度プリセット2',speed3:'速度プリセット3',speed4:'速度プリセット4',speed5:'速度プリセット5',speed6:'速度プリセット6',undo:'取り消し',redo:'やり直し',detect:'無音検出 ON/OFF'};
+const FN_ORDER=['playpause','markadd','markdel','skipback','skipfwd','fineback','finefwd','prevmark','nextmark','prevsil','nextsil','prevfile','nextfile','head','tail','timejump','speedreset','speed1','speed2','speed3','speed4','speed5','speed6','undo','redo','detect'];
+const FN_LABELS={playpause:'再生/停止',markadd:'マーク追加',markdel:'マーク削除',skipback:'−N秒スキップ',skipfwd:'+N秒スキップ',fineback:'−0.1秒',finefwd:'+0.1秒',prevmark:'前のマーク',nextmark:'次のマーク',prevsil:'前の無音',nextsil:'次の無音',prevfile:'前のファイル',nextfile:'次のファイル',head:'先頭へ',tail:'末尾へ',timejump:'タイムジャンプ',speedreset:'速度リセット(×1.0)',speed1:'速度プリセット1',speed2:'速度プリセット2',speed3:'速度プリセット3',speed4:'速度プリセット4',speed5:'速度プリセット5',speed6:'速度プリセット6',undo:'取り消し',redo:'やり直し',detect:'無音検出 ON/OFF'};
 function tokenLabel(t){
   if(t===' ')return'Space';
   const m={ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',Backspace:'BS',Delete:'Del',Enter:'Enter',Escape:'Esc',Tab:'Tab',Home:'Home',End:'End'};
@@ -1797,7 +1800,7 @@ function openReportPopup(){
   const v=reportValue();
   document.getElementById('rpName').textContent = curFileName||'(ファイル未選択)';
   document.getElementById('rpTime').textContent = fmtReport(v.time);
-  document.getElementById('rpLabel').textContent = '報告用 — '+v.label;
+  document.getElementById('rpLabel').textContent = v.label;
   document.getElementById('reportModal').style.display='flex';
 }
 function closeReportPopup(){
@@ -1912,7 +1915,7 @@ function setDetectUI(){
 }
 function applyDetectLayout(){
   const wa=document.getElementById('waveArea');
-  if(wa) wa.style.display = detectOn ? '' : 'none'; // 聞くモードは波形エリアを隠して省スペース
+  if(wa) wa.style.display = ''; // 波形エリアは常時表示（聞く=静的タイムライン＋再生ライン＋マーク＋無音）
   const st=document.getElementById('silStatus');
   if(st) st.textContent = detectOn ? (isPlaying?'検出中':'停止中') : '聞くモード';
   if(!detectOn){ const cd=document.getElementById('silCurDur'); if(cd) cd.textContent='--'; }
@@ -1942,7 +1945,7 @@ function toggleDetect(){
   audioEl.playbackRate=activeRate(); setPitch(audioEl);
   setDetectUI(); applyDetectLayout(); updateListMode();
   // redraw（表示は実位置ntに合わせる＝マーク位置と表示が一致）
-  if(detectOn){ drawWave(nt); } // static until play rebuilds live bars
+  drawWave(nt); // 両モードで静的描画（検出は再生開始でliveに切替）
   drawSeek(nt); updateTime(nt); hlMk(nt); hlSil(nt);
   redrawPlayBtn();
   showToast(detectOn?'検出モード（1.0倍・波形/無音）':'聞くモード（'+fmtSpd(playbackRate)+'・なめらか）');
