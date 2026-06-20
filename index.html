@@ -137,7 +137,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v86</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v87</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -368,9 +368,11 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="reportModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:540;align-items:center;justify-content:center;padding:24px" onclick="closeReportPopup()">
   <div onclick="event.stopPropagation()" style="background:#000;border:1px solid #00e5ff;border-radius:16px;padding:26px 22px;max-width:440px;width:100%;text-align:center;box-shadow:0 0 28px rgba(0,229,255,.18);position:relative">
     <button onclick="closeReportPopup()" aria-label="閉じる" style="position:absolute;top:8px;right:13px;background:transparent;border:none;color:#6b6b88;font-size:20px;cursor:pointer">×</button>
-    <div id="rpLabel" style="font-family:'Space Mono',monospace;font-size:10px;color:#6b6b88;letter-spacing:1px;margin-bottom:14px">報告用</div>
-    <div id="rpName" style="font-size:18px;color:#e8e8f0;font-weight:700;word-break:break-all;line-height:1.45;margin-bottom:16px">--</div>
-    <div id="rpTime" style="font-family:'Space Mono',monospace;font-size:38px;color:#00e5ff;letter-spacing:1px">--:--:--</div>
+    <div id="rpName" style="font-size:18px;color:#e8e8f0;font-weight:700;word-break:break-all;line-height:1.45;margin-bottom:20px">--</div>
+    <div style="font-family:'Space Mono',monospace;font-size:10px;color:#6b6b88;letter-spacing:1px;margin-bottom:4px">再生 / 総時間</div>
+    <div style="margin-bottom:18px"><span id="rpCur" style="font-family:'Space Mono',monospace;font-size:32px;color:#00e5ff;letter-spacing:1px">--:--:--</span><span id="rpTot" style="font-family:'Space Mono',monospace;font-size:16px;color:#6b6b88;margin-left:8px">/ --:--:--</span></div>
+    <div style="font-family:'Space Mono',monospace;font-size:10px;color:#6b6b88;letter-spacing:1px;margin-bottom:4px">直近マーク <span id="rpMarkLbl" style="color:#ff4081"></span></div>
+    <div id="rpMark" style="font-family:'Space Mono',monospace;font-size:24px;color:#ff4081">--:--:--</div>
   </div>
 </div>
 <div id="timeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:center;justify-content:center" onclick="closeTimeModal()">
@@ -534,7 +536,7 @@ function onEnded(){
     rtInSil=false;
   }
   isPlaying=false; redrawPlayBtn(); cancelAnimationFrame(raf);
-  document.getElementById('silStatus').textContent='終了';
+  document.getElementById('silStatus').textContent=detectOn?'終了':'聞くモード';
   if(detectOn){ if(waReady) drawLiveWave(); else drawWave(audioEl.currentTime); }
   drawSeek(audioEl.currentTime||duration);
 }
@@ -618,7 +620,7 @@ async function load(file){
   waveData=null; silReg=[]; duration=0;
   rtBuf=[];
   resetRTSilence();
-  document.getElementById('silStatus').textContent='停止中';
+  document.getElementById('silStatus').textContent=detectOn?'停止中':'聞くモード';
   document.getElementById('silCurDur').textContent='--';
   const fnEl=document.getElementById('fileName'); fnEl.textContent=file.name; fnEl.style.color='#dfe2f0';
   document.getElementById('timeTotal').textContent='/ --:--:--';
@@ -793,11 +795,11 @@ function drawLiveWave(){
     }
   }
 
-  // ── Threshold lines ──
+  // ── Threshold lines ──（再生ラインより右には描かない）
   const thrH=Math.min(mid-2,silThr*8*mid);
   c.strokeStyle=`rgba(${scR},${scG},${scB},.3)`; c.lineWidth=1;
-  c.beginPath(); c.moveTo(0,mid-thrH); c.lineTo(W,mid-thrH);
-  c.moveTo(0,mid+thrH); c.lineTo(W,mid+thrH); c.stroke();
+  c.beginPath(); c.moveTo(0,mid-thrH); c.lineTo(lineX,mid-thrH);
+  c.moveTo(0,mid+thrH); c.lineTo(lineX,mid+thrH); c.stroke();
 
   // ── Waveform bars ──
   {
@@ -814,8 +816,8 @@ function drawLiveWave(){
     }
   }
 
-  // ── Center line ──
-  c.fillStyle=colorCenter; c.fillRect(0,mid-.5,W,1);
+  // ── Center line ──（再生ラインより右には描かない）
+  c.fillStyle=colorCenter; c.fillRect(0,mid-.5,lineX,1);
 
   // ── Detection line (center, fixed) ──
   c.strokeStyle=colorAc; c.lineWidth=2;
@@ -833,16 +835,15 @@ function drawLiveWave(){
     c.beginPath(); c.moveTo(mx-3,0); c.lineTo(mx+3,0); c.lineTo(mx,6); c.fill();
   }
 
-  // ── Right panel: last *completed* silence duration ──
+  // ── Right panel: 現在の無音（加算）→ 終了で確定値を保持。再生ラインより右は真っ黒 ──
   const rightW=W-lineX-4;
   if(rightW>20){
-    c.fillStyle='#0d0d16';
-    c.fillRect(lineX+2,0,rightW,H);
-    // Only show completed silences (not growing)
-    let lastSil=null;
-    for(const sr of silReg){ if(sr.end<=ct+0.1) lastSil=sr; }
-    if(lastSil){
-      const durStr=lastSil.dur.toFixed(1)+'s';
+    c.fillStyle='#000';
+    c.fillRect(lineX+1.5,0,W-lineX-1.5,H);
+    let durStr=null;
+    if(rtInSil){ durStr=Math.max(0,ct-rtSilStart).toFixed(1)+'s'; }           // 無音継続中＝加算
+    else { let lastSil=null; for(const sr of silReg){ if(sr.end<=ct+0.1) lastSil=sr; } if(lastSil) durStr=lastSil.dur.toFixed(1)+'s'; } // 終了後＝確定値を保持
+    if(durStr){
       let fs=Math.min(H*0.55, rightW*0.45);
       c.font=`bold ${Math.floor(fs)}px 'Space Mono',monospace`;
       c.fillStyle=colorSilText;
@@ -930,8 +931,8 @@ function drawWave(ct){
   c.fillStyle='rgba(0,184,212,.4)'; c.fillRect(0,mid-1,toPx(ct),2);
   c.fillStyle='rgba(30,58,74,.8)';  c.fillRect(toPx(ct),mid-1,W-toPx(ct),2);
 
-  // Center line
-  c.fillStyle=colorCenter; c.fillRect(0,mid-.5,W,1);
+  // Center line（再生ラインより右には描かない）
+  c.fillStyle=colorCenter; c.fillRect(0,mid-.5,lineX,1);
 
   // Playhead line
   c.strokeStyle=colorAc; c.lineWidth=2;
@@ -947,10 +948,10 @@ function drawWave(ct){
     c.beginPath(); c.moveTo(mx-3,0); c.lineTo(mx+3,0); c.lineTo(mx,6); c.fill();
   }
 
-  // Right panel: last silence
+  // Right panel: last silence（再生ラインより右は真っ黒）
   const rightW=W-lineX-4;
   if(rightW>16){
-    c.fillStyle='#0d0d16'; c.fillRect(lineX+2,0,rightW,H);
+    c.fillStyle='#000'; c.fillRect(lineX+1.5,0,W-lineX-1.5,H);
     let lastSil=null;
     for(const sr of silReg){ if(sr.end<=ct+0.1) lastSil=sr; }
     if(lastSil){
@@ -1057,7 +1058,7 @@ function stop(){
   cancelAnimationFrame(raf); raf=null;
   if(rtTimerId){ clearTimeout(rtTimerId); rtTimerId=null; }
   resetRTSilence();
-  document.getElementById('silStatus').textContent='停止中';
+  document.getElementById('silStatus').textContent=detectOn?'停止中':'聞くモード';
   document.getElementById('silCurDur').textContent='--';
   // Sync zoomCtr to current position so static wave shows correct window
   if(duration>0){
@@ -1399,7 +1400,8 @@ const DEFAULT_KEYMAP={
   undo:['z'],
   redo:['y'],
   detect:['d'],
-  timejump:['t']
+  timejump:['t'],
+  report:['i']
 };
 function defKeymapCopy(){ const m={}; for(const k in DEFAULT_KEYMAP) m[k]=DEFAULT_KEYMAP[k].slice(); return m; }
 function loadKeymap(){
@@ -1463,11 +1465,12 @@ function doAction(fn){
     case 'redo': redo(); break;
     case 'detect': toggleDetect(); break;
     case 'timejump': openTimeInput(); break;
+    case 'report': openReportPopup(); break;
   }
 }
 // ── Keymap editor (stage B) ──
-const FN_ORDER=['playpause','markadd','markdel','skipback','skipfwd','fineback','finefwd','prevmark','nextmark','prevsil','nextsil','prevfile','nextfile','head','tail','timejump','speedreset','speed1','speed2','speed3','speed4','speed5','speed6','undo','redo','detect'];
-const FN_LABELS={playpause:'再生/停止',markadd:'マーク追加',markdel:'マーク削除',skipback:'−N秒スキップ',skipfwd:'+N秒スキップ',fineback:'−0.1秒',finefwd:'+0.1秒',prevmark:'前のマーク',nextmark:'次のマーク',prevsil:'前の無音',nextsil:'次の無音',prevfile:'前のファイル',nextfile:'次のファイル',head:'先頭へ',tail:'末尾へ',timejump:'タイムジャンプ',speedreset:'速度リセット(×1.0)',speed1:'速度プリセット1',speed2:'速度プリセット2',speed3:'速度プリセット3',speed4:'速度プリセット4',speed5:'速度プリセット5',speed6:'速度プリセット6',undo:'取り消し',redo:'やり直し',detect:'無音検出 ON/OFF'};
+const FN_ORDER=['playpause','markadd','markdel','skipback','skipfwd','fineback','finefwd','prevmark','nextmark','prevsil','nextsil','prevfile','nextfile','head','tail','timejump','report','speedreset','speed1','speed2','speed3','speed4','speed5','speed6','undo','redo','detect'];
+const FN_LABELS={playpause:'再生/停止',markadd:'マーク追加',markdel:'マーク削除',skipback:'−N秒スキップ',skipfwd:'+N秒スキップ',fineback:'−0.1秒',finefwd:'+0.1秒',prevmark:'前のマーク',nextmark:'次のマーク',prevsil:'前の無音',nextsil:'次の無音',prevfile:'前のファイル',nextfile:'次のファイル',head:'先頭へ',tail:'末尾へ',timejump:'タイムジャンプ',report:'情報ポップアップ',speedreset:'速度リセット(×1.0)',speed1:'速度プリセット1',speed2:'速度プリセット2',speed3:'速度プリセット3',speed4:'速度プリセット4',speed5:'速度プリセット5',speed6:'速度プリセット6',undo:'取り消し',redo:'やり直し',detect:'無音検出 ON/OFF'};
 function tokenLabel(t){
   if(t===' ')return'Space';
   const m={ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',Backspace:'BS',Delete:'Del',Enter:'Enter',Escape:'Esc',Tab:'Tab',Home:'Home',End:'End'};
@@ -1786,24 +1789,32 @@ function closeTimeModal(){
   document.getElementById('timeModal').style.display='none';
   setTimeout(()=>grabFocus({}),100);
 }
-// 報告用ポップアップ：ファイル名＋フォーカス中マークのタイム
-// 表示内容は reportValue() に集約。将来「設定で表示内容を選択」を足す際はここを差し替えるだけにする。
+// 報告用ポップアップ：ファイル名＋再生/総時間＋直近マーク
+// 表示内容は refreshReport() に集約。将来「設定で表示項目を選択」を足す際はここを拡張するだけにする。
 function reportValue(){
   const t0=curT();
-  // 再生位置の直前のマーク（一覧でハイライト中のものと同じ定義）。無ければ現在位置。
   let idx=-1; for(let i=markers.length-1;i>=0;i--){ if(markers[i].time<=t0+0.05){ idx=i; break; } }
-  if(idx>=0) return { label:'マーク #'+(idx+1), time:markers[idx].time };
-  return { label:'再生位置', time:t0 };
+  if(idx>=0) return { label:'#'+(idx+1), time:markers[idx].time, idx };
+  return { label:'なし', time:null, idx:-1 };
 }
 function fmtReport(s){ if(!isFinite(s)||s<0) return '--:--:--'; const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=Math.floor(s%60); return p2(h)+':'+p2(m)+':'+p2(sc); }
-function openReportPopup(){
+let reportTimer=null;
+function refreshReport(){
+  document.getElementById('rpCur').textContent = fmtReport(curT());
+  document.getElementById('rpTot').textContent = '/ '+fmtReport(duration);
   const v=reportValue();
+  document.getElementById('rpMark').textContent = v.time==null ? '--:--:--' : fmtReport(v.time);
+  document.getElementById('rpMarkLbl').textContent = v.label;
+}
+function openReportPopup(){
   document.getElementById('rpName').textContent = curFileName||'(ファイル未選択)';
-  document.getElementById('rpTime').textContent = fmtReport(v.time);
-  document.getElementById('rpLabel').textContent = v.label;
+  refreshReport();
   document.getElementById('reportModal').style.display='flex';
+  if(reportTimer) clearInterval(reportTimer);
+  reportTimer=setInterval(refreshReport,150); // 開いている間はリアルタイム追従
 }
 function closeReportPopup(){
+  if(reportTimer){ clearInterval(reportTimer); reportTimer=null; }
   document.getElementById('reportModal').style.display='none';
   setTimeout(()=>grabFocus({}),100);
 }
