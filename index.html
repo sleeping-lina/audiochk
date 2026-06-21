@@ -137,7 +137,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v87</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v88</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -164,7 +164,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   <span id="timeDisp" onclick="openTimeInput()" style="cursor:pointer;border-bottom:1px solid rgba(0,229,255,.3)">00:00:00.0</span>
   <span id="timeTotal">/ --:--:--</span>
   <span style="color:var(--bd);margin:0 2px">|</span>
-  <span id="silInfo" style="flex:1"></span>
+  <span style="flex:1"></span>
   <button id="reportBtn" onclick="openReportPopup()" title="ファイル名と時間を拡大表示" aria-label="拡大表示" style="background:#0a0a0f;border:1px solid var(--tap);border-radius:6px;padding:4px 7px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
     <svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 6 V2 H6 M14 6 V2 H10 M2 10 V14 H6 M14 10 V14 H10" fill="none" stroke="#00e5ff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </button>
@@ -370,7 +370,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
     <button onclick="closeReportPopup()" aria-label="閉じる" style="position:absolute;top:8px;right:13px;background:transparent;border:none;color:#6b6b88;font-size:20px;cursor:pointer">×</button>
     <div id="rpName" style="font-size:18px;color:#e8e8f0;font-weight:700;word-break:break-all;line-height:1.45;margin-bottom:20px">--</div>
     <div style="font-family:'Space Mono',monospace;font-size:10px;color:#6b6b88;letter-spacing:1px;margin-bottom:4px">再生 / 総時間</div>
-    <div style="margin-bottom:18px"><span id="rpCur" style="font-family:'Space Mono',monospace;font-size:32px;color:#00e5ff;letter-spacing:1px">--:--:--</span><span id="rpTot" style="font-family:'Space Mono',monospace;font-size:16px;color:#6b6b88;margin-left:8px">/ --:--:--</span></div>
+    <div style="margin-bottom:18px"><span id="rpCur" style="font-family:'Space Mono',monospace;font-size:32px;color:#00e5ff;letter-spacing:1px">--:--:--</span><span id="rpTot" style="font-family:'Space Mono',monospace;font-size:16px;color:#ffffff;margin-left:8px">/ --:--:--</span></div>
     <div style="font-family:'Space Mono',monospace;font-size:10px;color:#6b6b88;letter-spacing:1px;margin-bottom:4px">直近マーク <span id="rpMarkLbl" style="color:#ff4081"></span></div>
     <div id="rpMark" style="font-family:'Space Mono',monospace;font-size:24px;color:#ff4081">--:--:--</div>
   </div>
@@ -846,7 +846,7 @@ function drawLiveWave(){
     if(durStr){
       let fs=Math.min(H*0.55, rightW*0.45);
       c.font=`bold ${Math.floor(fs)}px 'Space Mono',monospace`;
-      c.fillStyle=colorSilText;
+      c.fillStyle='#69ff47'; // 右端の無音秒数は緑（インジケータ・停止中と同色）
       c.textAlign='center';
       c.fillText(durStr, lineX+2+rightW/2, mid+fs*0.35);
       c.textAlign='left';
@@ -957,7 +957,7 @@ function drawWave(ct){
     if(lastSil){
       const fs=Math.min(H*0.55,rightW*0.45);
       c.font=`bold ${Math.floor(fs)}px 'Space Mono',monospace`;
-      c.fillStyle=colorSilText;
+      c.fillStyle='#69ff47'; // 右端の無音秒数は緑
       c.textAlign='center'; c.fillText(lastSil.dur.toFixed(1)+'s',lineX+2+rightW/2,mid+fs*0.35); c.textAlign='left';
     }
   }
@@ -1104,6 +1104,7 @@ function redrawPlayBtn(){ drawBtn('btnPlay'); }
 function updateTime(t){document.getElementById('timeDisp').textContent=fmtMs(t);}
 function chkSil(t){
   const el=document.getElementById('silInfo');
+  if(!el) return; // silInfoは廃止（無音は波形エリアで確認）
   for(const sr of silReg){
     if(t>=sr.start&&t<=sr.end){el.textContent='■ '+sr.dur.toFixed(2)+'s';return;}
     if(t>sr.end&&t-sr.end<1.5){el.textContent='無音 '+sr.dur.toFixed(2)+'s 通過';return;}
@@ -1562,6 +1563,14 @@ function onKey(e){
     document.getElementById('captureLabel').textContent='登録キー: '+tokenLabel(pendingCapTok);
     document.getElementById('captureDbg').textContent='key='+kd+'  code='+cd;
     const cf=document.getElementById('captureConfirm'); cf.style.display=''; 
+    return;
+  }
+  // 情報ポップアップ表示中：reportキー(I)で閉じる（トグル）。他キーは抑止
+  if(document.getElementById('reportModal').style.display!=='none'){
+    if(!e.ctrlKey&&!e.metaKey){
+      const tok=keyToken(e);
+      if((keymap['report']||[]).includes(tok)){ e.preventDefault(); closeReportPopup(); }
+    }
     return;
   }
   // モーダル表示中はショートカットを発火させない
