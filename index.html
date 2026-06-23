@@ -133,7 +133,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v91</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v92</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -1960,8 +1960,9 @@ function toggleDetect(){
   try{ localStorage.setItem('ac_detect', detectOn?'1':'0'); }catch(e){}
   audioEl = detectOn ? audioDet : audioPlay; // swap active element
   // 方向別補正：検出→聞く=compD2L / 聞く→検出=compL2D
+  // 補正は再生中の切替（プレーヤー間の引き継ぎ遅延を埋める）でのみ適用。停止中は実時間を維持＝表示が動かない
   const comp = detectOn ? compL2D : compD2L;
-  const nt = Math.max(0,Math.min(duration||t, t + comp/1000)); // 補正後の実位置
+  const nt = wasPlaying ? Math.max(0,Math.min(duration||t, t + comp/1000)) : t;
   try{ audioEl.currentTime=nt; }catch(e){} // 位置引き継ぎ＋先読み補正
   audioEl.playbackRate=activeRate(); setPitch(audioEl);
   setDetectUI(); applyDetectLayout(); updateListMode();
