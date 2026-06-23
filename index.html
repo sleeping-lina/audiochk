@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="Audio Check">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+JP:wght@300;400;700&display=swap');
-:root{--bg:#0a0a0f;--sf:#13131a;--s2:#1c1c28;--bd:#2a2a3d;--ac:#00e5ff;--a2:#ff4081;--a3:#69ff47;--tx:#e8e8f0;--dm:#6b6b88;--or:#ff8c42;--sil:#ff8c42;--tap:rgba(0,229,255,.30)}
+:root{--bg:#0a0a0f;--sf:#13131a;--s2:#1c1c28;--bd:#2a2a3d;--ac:#00e5ff;--a2:#ff4081;--a3:#69ff47;--tx:#e8e8f0;--dm:#9a9ac0;--or:#ff8c42;--sil:#ff8c42;--tap:rgba(0,229,255,.30)}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden}
 body{background:var(--bg);color:var(--tx);font-family:'Noto Sans JP',sans-serif;font-weight:300;
@@ -67,7 +67,7 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
 /* sil-arrow replaced by tog-btn */
 .sil-body{max-height:0;overflow:hidden;transition:max-height .25s}
 .sil-body.open{max-height:160px}
-.sil-adj{background:var(--s2);border:1px solid var(--bd);border-radius:4px;color:var(--tx);
+.sil-adj{background:var(--s2);border:1px solid var(--tap);border-radius:4px;color:var(--tx);
   font-size:13px;width:24px;height:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0}
 .sil-adj:active{opacity:.6}
 /* controls */
@@ -123,12 +123,12 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 .iobtn:active{opacity:.6}
 #toast{position:fixed;bottom:48px;left:50%;transform:translateX(-50%) translateY(10px);
   background:var(--s2);border:1px solid var(--ac);color:var(--ac);font-family:'Space Mono',monospace;
-  font-size:10px;padding:4px 12px;border-radius:20px;opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap;z-index:200}
+  font-size:10px;padding:4px 12px;border-radius:20px;opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap;z-index:600}
 /* toggle button style */
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 #lbar{position:fixed;top:0;left:0;height:2px;background:var(--ac);width:0%;transition:width .3s;z-index:300}
 .settabs{display:flex;gap:4px;margin-bottom:10px;flex-shrink:0}
-.settab{flex:1;background:#1c1c28;border:1px solid #2a2a3d;border-radius:6px;color:#6b6b88;font-family:'Space Mono',monospace;font-size:10px;padding:7px 2px;cursor:pointer;letter-spacing:.3px}
+.settab{flex:1;background:#1c1c28;border:1px solid var(--tap);border-radius:6px;color:#9a9ac0;font-family:'Space Mono',monospace;font-size:10px;padding:7px 2px;cursor:pointer;letter-spacing:.3px}
 .settab.on{background:rgba(0,229,255,.12);border-color:#00e5ff;color:#00e5ff}
 </style>
 </head>
@@ -136,7 +136,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v93</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v94</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -257,17 +257,17 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <!-- Color panel modal -->
 <!-- Keymap (shortcut) editor modal -->
 <div id="keymapModal" onclick="closeKeymapModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:545;align-items:flex-start;justify-content:center;overflow-y:auto;-webkit-overflow-scrolling:touch">
-  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;margin:20px 12px;max-width:400px;width:calc(100% - 24px);padding:16px">
+  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid var(--tap);border-radius:12px;margin:20px 12px;max-width:400px;width:calc(100% - 24px);padding:16px">
     <div style="display:flex;align-items:center;margin-bottom:6px">
       <span style="font-family:'Space Mono',monospace;font-size:11px;color:#00e5ff;letter-spacing:1px">ショートカット設定</span>
-      <button onclick="closeKeymapModal()" style="margin-left:auto;background:transparent;border:none;color:#6b6b88;font-size:18px;cursor:pointer">×</button>
+      <button onclick="closeKeymapModal()" style="margin-left:auto;background:transparent;border:none;color:#9a9ac0;font-size:18px;cursor:pointer">×</button>
     </div>
-    <div style="font-size:9px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:10px">各機能の「＋」を押し、登録したいキー（コントローラー/キーボード）を押すか一覧から選びます。チップの×で削除。</div>
+    <div style="font-size:9px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:10px">各機能の「＋」を押し、登録したいキー（コントローラー/キーボード）を押すか一覧から選びます。チップの×で削除。</div>
     <div id="keymapList"></div>
     <div style="display:flex;gap:8px;margin-top:12px">
-      <button onclick="backToHelp()" style="flex:1;background:#1c1c28;border:1px solid #2a2a3d;border-radius:7px;color:#9a9ab0;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">戻る</button>
-      <button onclick="resetKeymap()" style="flex:1;background:#1c1c28;border:1px solid #2a2a3d;border-radius:7px;color:#6b6b88;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">既定に戻す</button>
-      <button onclick="closeKeymapModal()" style="flex:1;background:rgba(0,229,255,.15);border:1px solid #00e5ff;border-radius:7px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">閉じる</button>
+      <button onclick="backToHelp()" style="flex:1;background:#1c1c28;border:1px solid var(--tap);border-radius:7px;color:rgba(0,229,255,.72);font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">戻る</button>
+      <button onclick="resetKeymap()" style="flex:1;background:#1c1c28;border:1px solid var(--tap);border-radius:7px;color:rgba(0,229,255,.72);font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">既定に戻す</button>
+      <button onclick="document.getElementById('keymapModal').style.display='none';closeSettings(true)" style="flex:1;background:#1c1c28;border:1px solid var(--tap);border-radius:7px;color:rgba(0,229,255,.72);font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">閉じる</button>
     </div>
   </div>
 </div>
@@ -276,11 +276,11 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="captureOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:560;align-items:center;justify-content:center">
   <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid #00e5ff;border-radius:12px;margin:16px;max-width:420px;width:calc(100% - 32px);padding:16px">
     <div id="captureLabel" style="font-family:'Space Mono',monospace;font-size:12px;color:#00e5ff;text-align:center;margin-bottom:6px">キーを押してください</div>
-    <div style="font-size:9px;color:#6b6b88;font-family:'Space Mono',monospace;text-align:center;margin-bottom:12px">コントローラー/キーボードのキーを押す、または下から選択</div>
+    <div style="font-size:9px;color:#9a9ac0;font-family:'Space Mono',monospace;text-align:center;margin-bottom:12px">コントローラー/キーボードのキーを押す、または下から選択</div>
     <div id="keyGrid" style="display:flex;flex-wrap:wrap;gap:5px;justify-content:center;max-height:42vh;overflow-y:auto"></div>
-    <div id="captureDbg" style="margin-top:10px;font-family:'Space Mono',monospace;font-size:9px;color:#6b6b88;text-align:center;line-height:1.4;min-height:14px"></div>
+    <div id="captureDbg" style="margin-top:10px;font-family:'Space Mono',monospace;font-size:9px;color:#9a9ac0;text-align:center;line-height:1.4;min-height:14px"></div>
     <div style="display:flex;gap:8px;margin-top:10px">
-      <button onclick="endCapture()" style="flex:1;background:#1c1c28;border:1px solid #2a2a3d;border-radius:8px;color:#9a9ab0;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">キャンセル</button>
+      <button onclick="endCapture()" style="flex:1;background:#1c1c28;border:1px solid var(--tap);border-radius:8px;color:rgba(0,229,255,.72);font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">キャンセル</button>
       <button id="captureConfirm" onclick="confirmCapture()" style="display:none;flex:1;background:rgba(0,229,255,.15);border:1px solid #00e5ff;border-radius:8px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">このキーを登録</button>
     </div>
   </div>
@@ -289,20 +289,20 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <!-- Time input modal — segmented HH:MM:SS -->
 <div id="reportModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:540;align-items:center;justify-content:center;padding:24px" onclick="closeReportPopup()">
   <div onclick="event.stopPropagation()" style="background:#000;border:1px solid #00e5ff;border-radius:16px;padding:26px 22px;max-width:440px;width:100%;text-align:center;box-shadow:0 0 28px rgba(0,229,255,.18);position:relative">
-    <button onclick="closeReportPopup()" aria-label="閉じる" style="position:absolute;top:8px;right:13px;background:transparent;border:none;color:#6b6b88;font-size:20px;cursor:pointer">×</button>
+    <button onclick="closeReportPopup()" aria-label="閉じる" style="position:absolute;top:8px;right:13px;background:transparent;border:none;color:#9a9ac0;font-size:20px;cursor:pointer">×</button>
     <div id="rpName" style="font-size:18px;color:#e8e8f0;font-weight:700;word-break:break-all;line-height:1.45;margin-bottom:20px">--</div>
-    <div style="font-family:'Space Mono',monospace;font-size:10px;color:#6b6b88;letter-spacing:1px;margin-bottom:4px">再生 / 総時間</div>
+    <div style="font-family:'Space Mono',monospace;font-size:10px;color:#9a9ac0;letter-spacing:1px;margin-bottom:4px">再生 / 総時間</div>
     <div style="margin-bottom:18px"><span id="rpCur" style="font-family:'Space Mono',monospace;font-size:32px;color:#00e5ff;letter-spacing:1px">--:--:--</span><span id="rpTot" style="font-family:'Space Mono',monospace;font-size:16px;color:#ffffff;margin-left:8px">/ --:--:--</span></div>
-    <div style="font-family:'Space Mono',monospace;font-size:10px;color:#6b6b88;letter-spacing:1px;margin-bottom:4px">直近マーク <span id="rpMarkLbl" style="color:#ff4081"></span></div>
+    <div style="font-family:'Space Mono',monospace;font-size:10px;color:#9a9ac0;letter-spacing:1px;margin-bottom:4px">直近マーク <span id="rpMarkLbl" style="color:#ff4081"></span></div>
     <div id="rpMark" style="font-family:'Space Mono',monospace;font-size:24px;color:#ff4081">--:--:--</div>
   </div>
 </div>
 <div id="timeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:center;justify-content:center" onclick="closeTimeModal()">
-  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;padding:20px;min-width:280px">
-    <div style="font-family:'Space Mono',monospace;font-size:10px;color:#6b6b88;letter-spacing:1px;margin-bottom:14px;text-align:center">タイムジャンプ</div>
+  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid var(--tap);border-radius:12px;padding:20px;min-width:280px">
+    <div style="font-family:'Space Mono',monospace;font-size:10px;color:#9a9ac0;letter-spacing:1px;margin-bottom:14px;text-align:center">タイムジャンプ</div>
     <div style="display:flex;align-items:center;justify-content:center;gap:4px;margin-bottom:8px">
       <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
-        <span style="font-family:'Space Mono',monospace;font-size:9px;color:#6b6b88">時</span>
+        <span style="font-family:'Space Mono',monospace;font-size:9px;color:#9a9ac0">時</span>
         <input id="ti_h" type="text" inputmode="numeric" maxlength="2" placeholder="00"
           autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
           onfocus="this.select()" ontouchstart="this.select()"
@@ -311,7 +311,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
       </div>
       <span style="color:#3a3a5a;font-size:28px;margin-top:14px">:</span>
       <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
-        <span style="font-family:'Space Mono',monospace;font-size:9px;color:#6b6b88">分</span>
+        <span style="font-family:'Space Mono',monospace;font-size:9px;color:#9a9ac0">分</span>
         <input id="ti_m" type="text" inputmode="numeric" maxlength="2" placeholder="00"
           autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
           onfocus="this.select()" ontouchstart="this.select()"
@@ -320,7 +320,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
       </div>
       <span style="color:#3a3a5a;font-size:28px;margin-top:14px">:</span>
       <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
-        <span style="font-family:'Space Mono',monospace;font-size:9px;color:#6b6b88">秒</span>
+        <span style="font-family:'Space Mono',monospace;font-size:9px;color:#9a9ac0">秒</span>
         <input id="ti_s" type="text" inputmode="numeric" maxlength="2" placeholder="00"
           autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
           onfocus="this.select()" ontouchstart="this.select()"
@@ -328,9 +328,9 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
           color:#00e5ff;font-family:'Space Mono',monospace;font-size:28px;text-align:center;outline:none;-webkit-appearance:none">
       </div>
     </div>
-    <div style="font-family:'Space Mono',monospace;font-size:9px;color:#6b6b88;text-align:center;margin-bottom:12px">タップで全選択・即入力</div>
+    <div style="font-family:'Space Mono',monospace;font-size:9px;color:#9a9ac0;text-align:center;margin-bottom:12px">タップで全選択・即入力</div>
     <div style="display:flex;gap:8px">
-      <button onclick="closeTimeModal()" style="flex:1;padding:10px;background:#1c1c28;border:1px solid #2a2a3d;border-radius:8px;color:#6b6b88;font-family:'Space Mono',monospace;font-size:12px;cursor:pointer">キャンセル</button>
+      <button onclick="closeTimeModal()" style="flex:1;padding:10px;background:#1c1c28;border:1px solid var(--tap);border-radius:8px;color:rgba(0,229,255,.72);font-family:'Space Mono',monospace;font-size:12px;cursor:pointer">キャンセル</button>
       <button onclick="commitTimeInput()" style="flex:1;padding:10px;background:rgba(0,229,255,.15);border:1px solid #00e5ff;border-radius:8px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:12px;cursor:pointer">ジャンプ</button>
     </div>
   </div>
@@ -338,77 +338,77 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 
 <!-- Export choice modal -->
 <div id="exportModal" onclick="closeExpModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center">
-  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;margin:20px;max-width:320px;width:calc(100% - 40px);padding:18px">
+  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid var(--tap);border-radius:12px;margin:20px;max-width:320px;width:calc(100% - 40px);padding:18px">
     <div style="font-family:'Space Mono',monospace;font-size:11px;color:#00e5ff;letter-spacing:1px;margin-bottom:6px">EXPORT</div>
-    <div style="font-size:10px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:14px">どの範囲を書き出しますか？<br>フォルダ全体＝いま開いているフォルダ内の全ファイル</div>
+    <div style="font-size:10px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:14px">どの範囲を書き出しますか？<br>フォルダ全体＝いま開いているフォルダ内の全ファイル</div>
     <button onclick="doExport('cur')" style="width:100%;background:rgba(0,229,255,.12);border:1px solid #00e5ff;border-radius:8px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:12px;padding:11px;cursor:pointer;margin-bottom:8px">現在のファイルのみ</button>
-    <button onclick="doExport('all')" style="width:100%;background:#1c1c28;border:1px solid #2a2a3d;border-radius:8px;color:#e8e8f0;font-family:'Space Mono',monospace;font-size:12px;padding:11px;cursor:pointer;margin-bottom:8px">フォルダ全体（<span id="expCount">0</span>件）</button>
-    <button onclick="closeExpModal()" style="width:100%;background:transparent;border:1px solid #2a2a3d;border-radius:8px;color:#6b6b88;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">キャンセル</button>
+    <button onclick="doExport('all')" style="width:100%;background:#1c1c28;border:1px solid var(--tap);border-radius:8px;color:#e8e8f0;font-family:'Space Mono',monospace;font-size:12px;padding:11px;cursor:pointer;margin-bottom:8px">フォルダ全体（<span id="expCount">0</span>件）</button>
+    <button onclick="closeExpModal()" style="width:100%;background:transparent;border:1px solid var(--tap);border-radius:8px;color:rgba(0,229,255,.72);font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">キャンセル</button>
   </div>
 </div>
 
 <!-- Clear marks choice modal -->
 <div id="plModal" onclick="closePlModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center">
-  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;margin:20px;max-width:360px;width:calc(100% - 40px);max-height:72vh;display:flex;flex-direction:column;overflow:hidden">
+  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid var(--tap);border-radius:12px;margin:20px;max-width:360px;width:calc(100% - 40px);max-height:72vh;display:flex;flex-direction:column;overflow:hidden">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 14px 11px;flex-shrink:0">
-      <span style="font-family:'Space Mono',monospace;font-size:11px;color:#00e5ff;letter-spacing:1px">ファイル一覧 <span id="plModalCount" style="color:#6b6b88"></span></span>
-      <button onclick="closePlModal()" aria-label="閉じる" style="background:transparent;border:none;color:#6b6b88;font-size:22px;line-height:1;cursor:pointer;padding:0 4px">×</button>
+      <span style="font-family:'Space Mono',monospace;font-size:11px;color:#00e5ff;letter-spacing:1px">ファイル一覧 <span id="plModalCount" style="color:#9a9ac0"></span></span>
+      <button onclick="closePlModal()" aria-label="閉じる" style="background:transparent;border:none;color:#9a9ac0;font-size:22px;line-height:1;cursor:pointer;padding:0 4px">×</button>
     </div>
     <div id="plListBox" style="overflow-y:auto;-webkit-overflow-scrolling:touch;border-top:1px solid #2a2a3d"></div>
   </div>
 </div>
 
 <div id="clearModal" onclick="closeClrModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center">
-  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;margin:20px;max-width:320px;width:calc(100% - 40px);padding:18px">
+  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid var(--tap);border-radius:12px;margin:20px;max-width:320px;width:calc(100% - 40px);padding:18px">
     <div style="font-family:'Space Mono',monospace;font-size:11px;color:#ff4d4d;letter-spacing:1px;margin-bottom:6px">マーク全削除</div>
-    <div style="font-size:10px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:14px">削除する範囲を選んでください。<br><span style="color:#ff8c80">フォルダ全体は取り消せません。</span></div>
-    <button onclick="doClearCurrent()" style="width:100%;background:#1c1c28;border:1px solid #2a2a3d;border-radius:8px;color:#e8e8f0;font-family:'Space Mono',monospace;font-size:12px;padding:11px;cursor:pointer;margin-bottom:8px">このファイルのみ</button>
+    <div style="font-size:10px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:14px">削除する範囲を選んでください。<br><span style="color:#ff8c80">フォルダ全体は取り消せません。</span></div>
+    <button onclick="doClearCurrent()" style="width:100%;background:#1c1c28;border:1px solid var(--tap);border-radius:8px;color:#e8e8f0;font-family:'Space Mono',monospace;font-size:12px;padding:11px;cursor:pointer;margin-bottom:8px">このファイルのみ</button>
     <button onclick="doClearFolder()" style="width:100%;background:rgba(255,77,77,.12);border:1px solid #ff4d4d;border-radius:8px;color:#ff6b6b;font-family:'Space Mono',monospace;font-size:12px;padding:11px;cursor:pointer;margin-bottom:8px">このフォルダ全ファイル（<span id="clrCount">0</span>件）</button>
-    <button onclick="closeClrModal()" style="width:100%;background:transparent;border:1px solid #2a2a3d;border-radius:8px;color:#6b6b88;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">キャンセル</button>
+    <button onclick="closeClrModal()" style="width:100%;background:transparent;border:1px solid var(--tap);border-radius:8px;color:rgba(0,229,255,.72);font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">キャンセル</button>
   </div>
 </div>
 
 <div id="silClearModal" onclick="closeSilClrModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center">
-  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;margin:20px;max-width:320px;width:calc(100% - 40px);padding:18px">
+  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid var(--tap);border-radius:12px;margin:20px;max-width:320px;width:calc(100% - 40px);padding:18px">
     <div style="font-family:'Space Mono',monospace;font-size:11px;color:#ff8c50;letter-spacing:1px;margin-bottom:6px">無音データ削除</div>
-    <div style="font-size:10px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:14px">検出済みの無音データを削除します（マークは残ります）。<br><span style="color:#ff8c80">フォルダ全体は取り消せません。</span></div>
-    <button onclick="doSilClearCurrent()" style="width:100%;background:#1c1c28;border:1px solid #2a2a3d;border-radius:8px;color:#e8e8f0;font-family:'Space Mono',monospace;font-size:12px;padding:11px;cursor:pointer;margin-bottom:8px">このファイルのみ</button>
+    <div style="font-size:10px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:14px">検出済みの無音データを削除します（マークは残ります）。<br><span style="color:#ff8c80">フォルダ全体は取り消せません。</span></div>
+    <button onclick="doSilClearCurrent()" style="width:100%;background:#1c1c28;border:1px solid var(--tap);border-radius:8px;color:#e8e8f0;font-family:'Space Mono',monospace;font-size:12px;padding:11px;cursor:pointer;margin-bottom:8px">このファイルのみ</button>
     <button onclick="doSilClearFolder()" style="width:100%;background:rgba(255,140,80,.12);border:1px solid #ff8c50;border-radius:8px;color:#ffa870;font-family:'Space Mono',monospace;font-size:12px;padding:11px;cursor:pointer;margin-bottom:8px">このフォルダ全ファイル（<span id="silClrCount">0</span>件）</button>
-    <button onclick="closeSilClrModal()" style="width:100%;background:transparent;border:1px solid #2a2a3d;border-radius:8px;color:#6b6b88;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">キャンセル</button>
+    <button onclick="closeSilClrModal()" style="width:100%;background:transparent;border:1px solid var(--tap);border-radius:8px;color:rgba(0,229,255,.72);font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">キャンセル</button>
   </div>
 </div>
 
 <div id="settingsModal" onclick="closeSettings(false)" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:520;align-items:flex-start;justify-content:center;overflow-y:auto;-webkit-overflow-scrolling:touch">
-  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;margin:20px auto;max-width:380px;width:calc(100% - 32px);padding:16px;max-height:calc(100vh - 40px);display:flex;flex-direction:column;overflow:hidden">
+  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid var(--tap);border-radius:12px;margin:20px auto;max-width:380px;width:calc(100% - 32px);padding:16px;max-height:calc(100vh - 40px);display:flex;flex-direction:column;overflow:hidden">
     <div style="display:flex;align-items:center;margin-bottom:10px;flex-shrink:0">
       <span style="font-family:'Space Mono',monospace;font-size:11px;color:#00e5ff;letter-spacing:1px">設定</span>
-      <button onclick="closeSettings(false)" style="margin-left:auto;background:transparent;border:none;color:#6b6b88;font-size:18px;cursor:pointer">×</button>
+      <button onclick="closeSettings(false)" style="margin-left:auto;background:transparent;border:none;color:#9a9ac0;font-size:18px;cursor:pointer">×</button>
     </div>
     <div class="settabs">
-      <button class="settab on" data-tab="detect" onclick="setSettingsTab('detect')">検出・補正</button>
-      <button class="settab" data-tab="play" onclick="setSettingsTab('play')">再生</button>
+      <button class="settab on" data-tab="play" onclick="setSettingsTab('play')">再生</button>
+      <button class="settab" data-tab="detect" onclick="setSettingsTab('detect')">検出・補正</button>
       <button class="settab" data-tab="color" onclick="setSettingsTab('color')">カラー</button>
-      <button class="settab" data-tab="keys" onclick="setSettingsTab('keys')">ｷｰ操作</button>
+      <button class="settab" data-tab="keys" onclick="setSettingsTab('keys')">キー操作</button>
     </div>
     <div style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0">
       <div id="tab-detect" class="setpanel">
-      <div style="font-family:'Space Mono',monospace;font-size:9px;color:#6b6b88;letter-spacing:1px;margin-bottom:8px">── 検出設定 ──────────</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-family:'Space Mono',monospace;font-size:9px;color:#b6b9d6;letter-spacing:1px;white-space:nowrap">検出設定</span><span style="flex:1;height:1px;background:var(--tap)"></span></div>
       <div style="font-size:8.5px;color:var(--dm);font-family:'Space Mono',monospace;line-height:1.4;margin-bottom:8px">検出ON＝1.0倍で波形/無音表示・検出OFF＝聞くモード（任意倍速でなめらか・波形は非表示）</div>
       <div class="sil-row"><span class="sil-ctl-lbl">感度（閾値）</span><button class="sil-adj" onclick="adjSilThr(-1)">−</button><input type="range" id="silThr" min="0.004" max="0.08" step="0.002" value="0.004"><button class="sil-adj" onclick="adjSilThr(1)">＋</button><span class="sil-val" id="silThrV">0.004</span></div>
       <div class="sil-row"><span class="sil-ctl-lbl">最短無音秒数</span><button class="sil-adj" onclick="adjSilMin(-1)">−</button><input type="range" id="silMin" min="0.1" max="5" step="0.1" value="0.5"><button class="sil-adj" onclick="adjSilMin(1)">＋</button><span class="sil-val" id="silMinV">0.5秒</span></div>
-      <div style="font-family:'Space Mono',monospace;font-size:9px;color:#6b6b88;letter-spacing:1px;margin:14px 0 8px">── 補正設定 ──────────</div>
-      <div style="font-size:9px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:10px">モード切替・速度切替時の巻き戻り感などを補正します。値は実機で調整してください。</div>
+      <div style="display:flex;align-items:center;gap:8px;margin:14px 0 8px"><span style="font-family:'Space Mono',monospace;font-size:9px;color:#b6b9d6;letter-spacing:1px;white-space:nowrap">補正設定</span><span style="flex:1;height:1px;background:var(--tap)"></span></div>
+      <div style="font-size:9px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:10px">モード切替・速度切替時の巻き戻り感などを補正します。値は実機で調整してください。</div>
       <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">検出→聞く(ms)</span><button class="sil-adj" onclick="adjComp('D2L',-1)">−</button><input type="range" id="compD2L" min="0" max="500" step="10" value="320"><button class="sil-adj" onclick="adjComp('D2L',1)">＋</button><span class="sil-val" id="compD2LV">320ms</span></div>
       <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">聞く→検出(ms)</span><button class="sil-adj" onclick="adjComp('L2D',-1)">−</button><input type="range" id="compL2D" min="0" max="500" step="10" value="220"><button class="sil-adj" onclick="adjComp('L2D',1)">＋</button><span class="sil-val" id="compL2DV">220ms</span></div>
       <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">時刻補正(ms)</span><button class="sil-adj" onclick="adjComp('head',-1)">−</button><input type="range" id="timeOff" min="0" max="500" step="10" value="100"><button class="sil-adj" onclick="adjComp('head',1)">＋</button><span class="sil-val" id="timeOffV">100ms</span></div>
-      <div style="font-size:8px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.4;margin:-2px 0 8px">時刻補正：検出した無音区間の開始/終了に一律で足す秒数。他のソフトと比べ全体が早い場合に。全削除してから調整。</div>
+      <div style="font-size:8px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.4;margin:-2px 0 8px">時刻補正：検出した無音区間の開始/終了に一律で足す秒数。他のソフトと比べ全体が早い場合に。全削除してから調整。</div>
       <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">速度補正(ms)</span><button class="sil-adj" onclick="adjComp('spd',-1)">−</button><input type="range" id="spdComp" min="0" max="500" step="10" value="240"><button class="sil-adj" onclick="adjComp('spd',1)">＋</button><span class="sil-val" id="spdCompV">240ms</span></div>
       <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">再開補正(ms)</span><button class="sil-adj" onclick="adjComp('res',-1)">−</button><input type="range" id="resumeComp" min="0" max="500" step="10" value="50"><button class="sil-adj" onclick="adjComp('res',1)">＋</button><span class="sil-val" id="resumeCompV">50ms</span></div>
-      <div style="font-size:8px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.4;margin:-2px 0 8px">再開補正：一時停止→再生でわずかに戻る感じがある時、その分だけ先送りします（頭出し/ジャンプ後の再生には適用しません）。</div>
+      <div style="font-size:8px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.4;margin:-2px 0 8px">再開補正：一時停止→再生でわずかに戻る感じがある時、その分だけ先送りします（頭出し/ジャンプ後の再生には適用しません）。</div>
       <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">重なり許容(ms)</span><button class="sil-adj" onclick="adjComp('ovl',-1)">−</button><input type="range" id="overlapTol" min="0" max="500" step="10" value="50"><button class="sil-adj" onclick="adjComp('ovl',1)">＋</button><span class="sil-val" id="overlapTolV">50ms</span></div>
-      <div style="font-size:8px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.4;margin:-2px 0 8px">重なり許容：この秒数より大きく重なる区間は追加しません（隣接する別区間は追加）。</div>
+      <div style="font-size:8px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.4;margin:-2px 0 8px">重なり許容：この秒数より大きく重なる区間は追加しません（隣接する別区間は追加）。</div>
       <div style="border-top:1px solid #2a2a3d;margin:10px 0 8px"></div>
-      <div style="font-size:9px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:8px">猶予：音が一瞬入っても、この時間続けて音がある時だけ無音終了とみなします（0=オフ）。</div>
+      <div style="font-size:9px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:8px">猶予：音が一瞬入っても、この時間続けて音がある時だけ無音終了とみなします（0=オフ）。</div>
       <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">猶予(ms)</span><button class="sil-adj" onclick="adjComp('rel',-1)">−</button><input type="range" id="releaseMs" min="0" max="400" step="10" value="0"><button class="sil-adj" onclick="adjComp('rel',1)">＋</button><span class="sil-val" id="releaseMsV">0ms</span></div>
       </div><!-- /tab-detect -->
 
@@ -420,10 +420,10 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
         <div style="background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:8px;padding:10px">
           <div style="font-family:'Space Mono',monospace;font-size:9px;color:rgba(0,229,255,.7);margin-bottom:8px;letter-spacing:1px">SKIP 秒数</div>
           <div style="display:flex;align-items:center;gap:8px">
-            <button onclick="adjSkip(-1)" style="width:36px;height:36px;background:#1c1c28;border:1px solid #2a2a3d;border-radius:6px;color:#e8e8f0;font-size:18px;cursor:pointer">−</button>
+            <button onclick="adjSkip(-1)" style="width:36px;height:36px;background:#1c1c28;border:1px solid var(--tap);border-radius:6px;color:#e8e8f0;font-size:18px;cursor:pointer">−</button>
             <input type="number" id="skipSecM" min="1" max="60" value="5" style="flex:1;background:#1c1c28;border:1px solid #2a2a3d;border-radius:6px;color:#e8e8f0;font-family:'Space Mono',monospace;font-size:16px;padding:6px;text-align:center">
-            <button onclick="adjSkip(1)" style="width:36px;height:36px;background:#1c1c28;border:1px solid #2a2a3d;border-radius:6px;color:#e8e8f0;font-size:18px;cursor:pointer">＋</button>
-            <span style="font-family:'Space Mono',monospace;font-size:10px;color:#6b6b88">秒</span>
+            <button onclick="adjSkip(1)" style="width:36px;height:36px;background:#1c1c28;border:1px solid var(--tap);border-radius:6px;color:#e8e8f0;font-size:18px;cursor:pointer">＋</button>
+            <span style="font-family:'Space Mono',monospace;font-size:10px;color:#9a9ac0">秒</span>
           </div>
         </div>
       </div><!-- /tab-play -->
@@ -431,34 +431,34 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
       <div id="tab-color" class="setpanel" style="display:none">
         <div id="colorRows">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-            <span style="font-family:'Space Mono',monospace;font-size:10px;color:#6b6b88;flex:1">アクセント色</span>
+            <span style="font-family:'Space Mono',monospace;font-size:10px;color:#9a9ac0;flex:1">アクセント色</span>
             <input type="color" id="cpAc" value="#00e5ff" style="width:48px;height:36px;border:1px solid #2a2a3d;border-radius:6px;cursor:pointer;padding:2px;background:#1c1c28">
           </div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-            <span style="font-family:'Space Mono',monospace;font-size:10px;color:#6b6b88;flex:1">マーク線色</span>
+            <span style="font-family:'Space Mono',monospace;font-size:10px;color:#9a9ac0;flex:1">マーク線色</span>
             <input type="color" id="cpA2" value="#ffdd00" style="width:48px;height:36px;border:1px solid #2a2a3d;border-radius:6px;cursor:pointer;padding:2px;background:#1c1c28">
           </div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-            <span style="font-family:'Space Mono',monospace;font-size:10px;color:#6b6b88;flex:1">無音区間色</span>
+            <span style="font-family:'Space Mono',monospace;font-size:10px;color:#9a9ac0;flex:1">無音区間色</span>
             <input type="color" id="cpSil" value="#ff8c50" style="width:48px;height:36px;border:1px solid #2a2a3d;border-radius:6px;cursor:pointer;padding:2px;background:#1c1c28">
           </div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-            <span style="font-family:'Space Mono',monospace;font-size:10px;color:#6b6b88;flex:1">マーク色(ボタン)</span>
+            <span style="font-family:'Space Mono',monospace;font-size:10px;color:#9a9ac0;flex:1">マーク色(ボタン)</span>
             <input type="color" id="cpMk" value="#ff4081" style="width:48px;height:36px;border:1px solid #2a2a3d;border-radius:6px;cursor:pointer;padding:2px;background:#1c1c28">
           </div>
         </div>
       </div><!-- /tab-color -->
 
       <div id="tab-keys" class="setpanel" style="display:none">
-        <div style="font-family:'Space Mono',monospace;font-size:9px;color:#6b6b88;letter-spacing:1px;margin-bottom:6px">キーボード / コントローラー</div>
+        <div style="font-family:'Space Mono',monospace;font-size:9px;color:#9a9ac0;letter-spacing:1px;margin-bottom:6px">キーボード / コントローラー</div>
         <div id="helpList" style="font-family:'Space Mono',monospace"></div>
-        <div style="font-size:9px;color:#6b6b88;font-family:'Space Mono',monospace;line-height:1.5;margin-top:8px">速度プリセットの倍率は「再生」タブで変更できます。</div>
+        <div style="font-size:9px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.5;margin-top:8px">速度プリセットの倍率は「再生」タブで変更できます。</div>
         <button onclick="openKeymapModal()" style="margin-top:12px;width:100%;background:rgba(0,229,255,.12);border:1px solid #00e5ff;border-radius:8px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:11px;padding:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"><span style="font-size:16px;line-height:1">⌨</span><span>キー割り当てを変更</span></button>
       </div><!-- /tab-keys -->
     </div>
     <div style="display:flex;gap:8px;margin-top:12px;flex-shrink:0">
-      <button onclick="resetActiveTab()" style="flex:1;background:#1c1c28;border:1px solid #2a2a3d;border-radius:7px;color:#6b6b88;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">リセット</button>
-      <button onclick="closeSettings(false)" style="flex:1;background:#1c1c28;border:1px solid #2a2a3d;border-radius:7px;color:#9a9ab0;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">キャンセル</button>
+      <button onclick="resetActiveTab()" style="flex:1;background:#1c1c28;border:1px solid var(--tap);border-radius:7px;color:rgba(0,229,255,.72);font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">リセット</button>
+      <button onclick="closeSettings(false)" style="flex:1;background:#1c1c28;border:1px solid var(--tap);border-radius:7px;color:rgba(0,229,255,.72);font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">キャンセル</button>
       <button onclick="closeSettings(true)" style="flex:1;background:rgba(0,229,255,.15);border:1px solid #00e5ff;border-radius:7px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">OK</button>
     </div>
   </div>
@@ -978,7 +978,7 @@ function drawSeek(ct){
   const spr=duration/ROWS;
   for(let row=0;row<ROWS;row++){
     const rs=row*spr, re=(row+1)*spr, ry=row*RH, ly=ry+Math.floor(RH*.72);
-    c.fillStyle='#9a9db8'; c.font="9px 'Space Mono',monospace"; c.textAlign='right'; c.fillText(fmtShort(rs),LP-2,ly+3); c.textAlign='left';
+    c.fillStyle='#b6b9d6'; c.font="9px 'Space Mono',monospace"; c.textAlign='right'; c.fillText(fmtShort(rs),LP-2,ly+3); c.textAlign='left';
     const pf=ct<=rs?0:ct>=re?1:(ct-rs)/spr;
     if(pf>0){const[ap,bp2,cp]=(colorAc.match(/[0-9a-f]{2}/gi)||['00','e5','ff']).map(x=>parseInt(x,16));c.fillStyle=`rgba(${ap},${bp2},${cp},0.5)`;c.fillRect(LP,ly-1,TW*pf,2);}
     c.fillStyle='#1a2e3a'; c.fillRect(LP+TW*pf,ly-1,TW*(1-pf),2);
@@ -1567,7 +1567,7 @@ document.addEventListener('keydown', onKey, true);  // capture phase
 window.addEventListener('keydown', onKey, true);
 
 // ── Canvas Button Drawing ─────────────────────
-const C={bg:'#1c1c28',bd:'#2a2a3d',ac:'#00e5ff',a2:'#ff4081',tx:'#e8e8f0',dm:'#6b6b88'};
+const C={bg:'#1c1c28',bd:'#2a2a3d',ac:'#00e5ff',a2:'#ff4081',tx:'#e8e8f0',dm:'#9a9ac0'};
 
 function btnCanvas(id){
   const cv=document.getElementById(id); if(!cv)return null;
@@ -1876,7 +1876,7 @@ function openSettingsModal(tab){
   buildColorPanel();
   renderSpdPresets(); document.getElementById('skipSecM').value=skipSec;
   renderHelpList();
-  setSettingsTab(tab||'detect');
+  setSettingsTab(tab||'play');
   document.getElementById('settingsModal').style.display='flex';
 }
 function setSettingsTab(name){
@@ -1918,7 +1918,7 @@ function setDetectUI(){
   const track=document.getElementById('detectTrack'),thumb=document.getElementById('detectThumb'),lbl=document.getElementById('detectLbl');
   if(!track) return;
   if(detectOn){ track.style.background='rgba(0,229,255,.3)'; track.style.border='1px solid #00e5ff'; thumb.style.left='15px'; thumb.style.background='#00e5ff'; if(lbl){lbl.textContent='ON'; lbl.style.color='#00e5ff';} }
-  else { track.style.background='#2a2a3d'; track.style.border='1px solid #2a2a3d'; thumb.style.left='1px'; thumb.style.background='#6b6b88'; if(lbl){lbl.textContent='OFF'; lbl.style.color='#6b6b88';} }
+  else { track.style.background='rgba(0,229,255,.08)'; track.style.border='1px solid rgba(0,229,255,.35)'; thumb.style.left='1px'; thumb.style.background='#7fd4e8'; if(lbl){lbl.textContent='OFF'; lbl.style.color='#9a9ac0';} }
 }
 function applyDetectLayout(){
   const wa=document.getElementById('waveArea');
@@ -2059,7 +2059,7 @@ function renderSpdPresets(){
     const btn=document.querySelector(`.spb[data-speed="${s}"]`);
     const cur=btn?btn.textContent.trim():`×${s}`;
     return `<div style="display:flex;flex-direction:column;gap:3px;align-items:center">
-      <span style="font-family:'Space Mono',monospace;font-size:9px;color:#6b6b88">${i+1}</span>
+      <span style="font-family:'Space Mono',monospace;font-size:9px;color:#9a9ac0">${i+1}</span>
       <input type="text" inputmode="decimal" value="${fmtNum(s)}" data-preset="${i}"
         style="width:100%;background:#1c1c28;border:1px solid #2a2a3d;border-radius:5px;
         color:#e8e8f0;font-family:'Space Mono',monospace;font-size:12px;padding:4px;text-align:center"
