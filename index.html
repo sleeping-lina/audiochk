@@ -22,9 +22,7 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
 .fname{flex:1;font-size:10px;color:var(--dm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 #fileInput,#folderInput,#importData{display:none}
 /* playlist */
-#playlist{background:var(--s2);border-bottom:1px solid var(--bd);max-height:0;overflow:hidden;transition:max-height .2s;flex-shrink:0}
-#playlist.open{max-height:110px;overflow-y:auto;-webkit-overflow-scrolling:touch}
-.pl-item{display:flex;align-items:center;gap:5px;padding:5px 8px;cursor:pointer;border-bottom:1px solid var(--bd);font-size:11px}
+.pl-item{display:flex;align-items:center;gap:5px;padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--bd);font-size:12px}
 .pl-item.active{background:rgba(0,229,255,.08);border-left:3px solid var(--ac)}
 .pl-num{font-family:'Space Mono',monospace;font-size:9px;color:var(--dm);min-width:16px}
 .pl-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -127,12 +125,6 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   background:var(--s2);border:1px solid var(--ac);color:var(--ac);font-family:'Space Mono',monospace;
   font-size:10px;padding:4px 12px;border-radius:20px;opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap;z-index:200}
 /* toggle button style */
-.tog-btn{display:inline-flex;align-items:center;justify-content:center;
-  width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ac);
-  color:var(--ac);font-size:11px;font-family:sans-serif;cursor:pointer;
-  flex-shrink:0;line-height:1;user-select:none;-webkit-user-select:none;
-  margin-left:4px;background:transparent;padding:0}
-.tog-btn:active{background:rgba(0,229,255,.15)}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 #lbar{position:fixed;top:0;left:0;height:2px;background:var(--ac);width:0%;transition:width .3s;z-index:300}
 </style>
@@ -141,10 +133,9 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v90</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v91</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
-  <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
   <div style="display:flex;gap:3px;flex-shrink:0">
     <canvas class="cbtn" id="folderBtn" width="32" height="28" data-w="32" data-h="28"></canvas>
     <canvas class="cbtn" id="fileBtn" width="32" height="28" data-w="32" data-h="28"></canvas>
@@ -160,7 +151,6 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   style="position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;
   border:none;outline:none;background:transparent;color:transparent;z-index:-1"
   aria-hidden="true">
-<div id="playlist"></div>
 <div class="wave-wrap" id="waveArea">
   <canvas id="waveCanvas"></canvas>
 </div>
@@ -173,7 +163,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
     <button id="prevFileBtn" class="fnav" title="前のファイル" aria-label="前のファイル">
       <svg width="13" height="13" viewBox="0 0 16 16"><path d="M10.5 3 L5.5 8 L10.5 13" fill="none" stroke="#00e5ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
-    <span id="fileIdx" onclick="togglePlaylist()" title="ファイル一覧" style="font-size:11px;color:#9a9ac0;min-width:30px;text-align:center;letter-spacing:.5px;cursor:pointer;padding:0 1px">–/–</span>
+    <span id="fileIdx" onclick="openPlModal()" title="ファイル一覧" style="font-size:11px;color:#b8b8d8;min-width:30px;text-align:center;letter-spacing:.5px;cursor:pointer;border-bottom:1px solid rgba(0,229,255,.45);padding-bottom:1px">–/–</span>
     <button id="nextFileBtn" class="fnav" title="次のファイル" aria-label="次のファイル">
       <svg width="13" height="13" viewBox="0 0 16 16"><path d="M5.5 3 L10.5 8 L5.5 13" fill="none" stroke="#00e5ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
@@ -439,6 +429,16 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 </div>
 
 <!-- Clear marks choice modal -->
+<div id="plModal" onclick="closePlModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center">
+  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;margin:20px;max-width:360px;width:calc(100% - 40px);max-height:72vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 14px 11px;flex-shrink:0">
+      <span style="font-family:'Space Mono',monospace;font-size:11px;color:#00e5ff;letter-spacing:1px">ファイル一覧 <span id="plModalCount" style="color:#6b6b88"></span></span>
+      <button onclick="closePlModal()" aria-label="閉じる" style="background:transparent;border:none;color:#6b6b88;font-size:22px;line-height:1;cursor:pointer;padding:0 4px">×</button>
+    </div>
+    <div id="plListBox" style="overflow-y:auto;-webkit-overflow-scrolling:touch;border-top:1px solid #2a2a3d"></div>
+  </div>
+</div>
+
 <div id="clearModal" onclick="closeClrModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center">
   <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid #2a2a3d;border-radius:12px;margin:20px;max-width:320px;width:calc(100% - 40px);padding:18px">
     <div style="font-family:'Space Mono',monospace;font-size:11px;color:#ff4d4d;letter-spacing:1px;margin-bottom:6px">マーク全削除</div>
@@ -607,13 +607,13 @@ const AEXTS=/\.(mp3|m4a|aac|wav|ogg|flac|opus|webm|caf)$/i;
 document.getElementById('fileInput').addEventListener('change',function(){
   const f=this.files[0]; if(!f)return;
   playlist=[{name:f.name,file:f,size:f.size}]; plIdx=0;
-  setSrc(f); load(f); renderPL(); showPlToggle(false); this.value='';
+  setSrc(f); load(f); renderPL(); this.value='';
 });
 document.getElementById('folderInput').addEventListener('change',function(){
   const files=Array.from(this.files).filter(f=>AEXTS.test(f.name)||f.type.startsWith('audio/')).sort((a,b)=>a.name.localeCompare(b.name,'ja'));
   if(!files.length){ showToast('音声ファイルなし'); return; }
   playlist=files.map(f=>({name:f.name,file:f,size:f.size})); plIdx=0;
-  renderPL(); showPlToggle(true); document.getElementById('plToggleBtn').textContent='∨';
+  renderPL();
   setSrc(files[0]); load(files[0]); this.value='';
 });
 function setSrc(file){
@@ -875,7 +875,8 @@ async function buildWaveform(file){ /* realtime only — no pre-decode */ }
 
 // ── Playlist ──────────────────────────────────
 function renderPL(){
-  document.getElementById('playlist').innerHTML=playlist.map((x,i)=>`
+  const box=document.getElementById('plListBox');
+  if(box) box.innerHTML=playlist.map((x,i)=>`
     <div class="pl-item ${i===plIdx?'active':''}" onclick="plTap(${i})">
       <span class="pl-num">${i+1}</span><span class="pl-name">${esc(x.name)}</span>
     </div>`).join('');
@@ -891,17 +892,17 @@ function updateFileNav(){
   document.getElementById('prevFileBtn').disabled = plIdx<=0;
   document.getElementById('nextFileBtn').disabled = plIdx>=n-1;
 }
-function plTap(i){ const f=playlist[i].file; plIdx=i; setSrc(f); load(f); }
-function togglePlaylist(){
-  const pl=document.getElementById('playlist');
-  const btn=document.getElementById('plToggleBtn');
-  const opening=pl.classList.toggle('open');
-  if(btn) btn.textContent=opening?'∧':'∨'; // ∨=closed(click to open), ∧=open(click to close)
+function plTap(i){ const f=playlist[i].file; plIdx=i; setSrc(f); load(f); closePlModal(); }
+function openPlModal(){
+  if(playlist.length<=1) return; // 1ファイル以下は一覧不要
+  document.getElementById('plModalCount').textContent='('+playlist.length+')';
+  document.getElementById('plModal').style.display='flex';
+  const act=document.querySelector('#plListBox .pl-item.active');
+  if(act) act.scrollIntoView({block:'center'}); // 現在ファイルを中央に
 }
-function showPlToggle(show){
-  const btn=document.getElementById('plToggleBtn');
-  if(btn) btn.style.display=show?'inline-flex':'none';
-  if(!show) document.getElementById('playlist').classList.remove('open');
+function closePlModal(){
+  document.getElementById('plModal').style.display='none';
+  setTimeout(()=>grabFocus({}),100);
 }
 function prevFile(){
   if(plIdx>0){ const f=playlist[--plIdx].file; setSrc(f); load(f); renderPL(); }
@@ -1482,7 +1483,7 @@ function tokenLabel(t){
 }
 let captureFn=null, pendingCapTok=null;
 // モーダルID一覧（単一の真実：anyModalOpen と grabFocus が共用。新モーダルはここに足すだけ）
-const MODAL_IDS=['colorModal','helpModal','ctrlModal','timeModal','exportModal','clearModal','keymapModal','silClearModal','settingsModal','reportModal'];
+const MODAL_IDS=['colorModal','helpModal','ctrlModal','timeModal','exportModal','clearModal','keymapModal','silClearModal','settingsModal','reportModal','plModal'];
 function anyModalOpen(){
   return MODAL_IDS.some(id=>{const el=document.getElementById(id);return el&&el.style.display!=='none';});
 }
