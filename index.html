@@ -105,6 +105,10 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 .smbtn.og{border-color:var(--sil);color:var(--sil)}
 .smbtn.add{background:var(--a2);border:1px solid var(--a2);color:#0a0a0f;font-weight:700;font-size:17px;padding:0 9px}
 .smbtn.off{opacity:.35}
+.fnav{background:#0a0a0f;border:1px solid var(--tap);border-radius:6px;padding:3px 5px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.fnav:active{opacity:.6}
+.fnav:disabled{opacity:.3;cursor:default;border-color:var(--bd)}
+.fnav:disabled svg path{stroke:var(--dm)}
 .mk-item{display:flex;align-items:center;gap:5px;padding:7px 8px;border-bottom:1px solid var(--bd);cursor:pointer;transition:background .1s}
 .mk-item.cur{background:rgba(0,229,255,.07)}
 .mk-item.cur .m-time{color:var(--ac)}
@@ -137,7 +141,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v89</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v90</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <button id="plToggleBtn" class="tog-btn" onclick="togglePlaylist()" style="display:none" title="リスト表示">∨</button>
@@ -165,6 +169,15 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   <span id="timeTotal">/ --:--:--</span>
   <span style="color:var(--bd);margin:0 2px">|</span>
   <span style="flex:1"></span>
+  <div id="fileNav" style="display:none;align-items:center;gap:1px;flex-shrink:0;margin-right:2px">
+    <button id="prevFileBtn" class="fnav" title="前のファイル" aria-label="前のファイル">
+      <svg width="13" height="13" viewBox="0 0 16 16"><path d="M10.5 3 L5.5 8 L10.5 13" fill="none" stroke="#00e5ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <span id="fileIdx" onclick="togglePlaylist()" title="ファイル一覧" style="font-size:11px;color:#9a9ac0;min-width:30px;text-align:center;letter-spacing:.5px;cursor:pointer;padding:0 1px">–/–</span>
+    <button id="nextFileBtn" class="fnav" title="次のファイル" aria-label="次のファイル">
+      <svg width="13" height="13" viewBox="0 0 16 16"><path d="M5.5 3 L10.5 8 L5.5 13" fill="none" stroke="#00e5ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
   <button id="reportBtn" onclick="openReportPopup()" title="ファイル名と時間を拡大表示" aria-label="拡大表示" style="background:#0a0a0f;border:1px solid var(--tap);border-radius:6px;padding:4px 7px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
     <svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 6 V2 H6 M14 6 V2 H10 M2 10 V14 H6 M14 10 V14 H10" fill="none" stroke="#00e5ff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </button>
@@ -866,6 +879,17 @@ function renderPL(){
     <div class="pl-item ${i===plIdx?'active':''}" onclick="plTap(${i})">
       <span class="pl-num">${i+1}</span><span class="pl-name">${esc(x.name)}</span>
     </div>`).join('');
+  updateFileNav();
+}
+// タイム行の前後ファイルナビ（複数ファイル時のみ表示。先頭/末尾で各ボタン無効）
+function updateFileNav(){
+  const nav=document.getElementById('fileNav'); if(!nav) return;
+  const n=playlist.length;
+  if(n<=1){ nav.style.display='none'; return; }
+  nav.style.display='flex';
+  document.getElementById('fileIdx').textContent=(plIdx+1)+'/'+n;
+  document.getElementById('prevFileBtn').disabled = plIdx<=0;
+  document.getElementById('nextFileBtn').disabled = plIdx>=n-1;
 }
 function plTap(i){ const f=playlist[i].file; plIdx=i; setSrc(f); load(f); }
 function togglePlaylist(){
@@ -1093,6 +1117,8 @@ document.getElementById('btnFwdN').addEventListener('click', ()=>seekTo(curT()+s
 document.getElementById('btnBack01').addEventListener('click',()=>seekTo(curT()-.1));
 document.getElementById('btnFwd01').addEventListener('click', ()=>seekTo(curT()+.1));
 // ⏮: at head → prev file; else → head
+document.getElementById('prevFileBtn').addEventListener('click',prevFile);
+document.getElementById('nextFileBtn').addEventListener('click',nextFile);
 document.getElementById('btnHeadTail0').addEventListener('click',()=>{
   if(curT()<1.0) prevFile();
   else{ seekTo(0); }
