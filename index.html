@@ -136,7 +136,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v97</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v98</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -1805,6 +1805,7 @@ function openTimeInput(){
 }
 function closeTimeModal(){
   document.getElementById('timeModal').style.display='none';
+  restoreFocusNow();
   setTimeout(()=>grabFocus({}),100);
 }
 // 報告用ポップアップ：ファイル名＋再生/総時間＋直近マーク
@@ -1946,6 +1947,7 @@ function closeSettings(ok){
   } else { saveSilPrefs(); } // OK＝確定（各値は編集時に反映済み）
   settingsBackup=null; colorBackup=null; ctrlBackup=null;
   document.getElementById('settingsModal').style.display='none';
+  restoreFocusNow();          // ジェスチャ内で即フォーカスを戻す（8BitDo復帰）
   setTimeout(()=>grabFocus({}),100);
 }
 function resetSettings(){ applySettings(DEF_SIL); syncSettingsUI(); saveSilPrefs(); showToast('既定値に戻しました'); }
@@ -2270,6 +2272,12 @@ function grabFocus(e){
   // ボタンやレンジスライダーのタップ後は focusTrap に戻す（戻さないと8BitDo等のキーが効かなくなる）。
   if(tag==='TEXTAREA' || (tag==='INPUT' && ty!=='range' && e.target.id!=='focusTrap')) return;
   setTimeout(()=>{ focusTrap.focus({preventScroll:true}); }, 50);
+}
+// モーダルを閉じるジェスチャ内で同期的に focusTrap へ戻す
+// （iOSは setTimeout 等・ジェスチャ外の .focus() を無視するため、入力欄を持つモーダルでは8BitDoが死ぬ）
+function restoreFocusNow(){
+  try{ const a=document.activeElement; if(a && a.id!=='focusTrap' && a.blur) a.blur(); }catch(e){}
+  try{ focusTrap.focus({preventScroll:true}); }catch(e){}
 }
 
 // Re-grab focus after taps (but not when modal is open)
