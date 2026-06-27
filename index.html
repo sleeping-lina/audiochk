@@ -136,7 +136,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v95</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v96</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -746,8 +746,10 @@ function drawLiveWave(){
   const cv=document.getElementById('waveCanvas'), wa=document.getElementById('waveArea');
   if(!wa.clientWidth) return;
   const dpr=Math.min(window.devicePixelRatio||1,2), W=wa.clientWidth||320, H=72;
-  cv.width=W*dpr; cv.height=H*dpr; cv.style.width=W+'px'; cv.style.height=H+'px';
-  const c=cv.getContext('2d'); c.scale(dpr,dpr);
+  const c=cv.getContext('2d');
+  const cw=W*dpr, ch=H*dpr;
+  if(cv.width!==cw||cv.height!==ch){ cv.width=cw; cv.height=ch; cv.style.width=W+'px'; cv.style.height=H+'px'; } // サイズ変化時のみ再確保（毎フレームのバックバッファ再確保を回避）
+  c.setTransform(dpr,0,0,dpr,0,0); // 等価変換を毎回設定（scaleの累積を防ぐ）
   c.fillStyle='#0d0d16'; c.fillRect(0,0,W,H);
   const mid=H/2, ct=audioEl.currentTime;
   const lineX=Math.floor(W*0.85);
@@ -891,8 +893,10 @@ function lowerBound(arr,v,key){ let lo=0,hi=arr.length; while(lo<hi){ const mid=
 function drawWave(ct){
   const cv=document.getElementById('waveCanvas'), wa=document.getElementById('waveArea');
   const dpr=Math.min(window.devicePixelRatio||1,2), W=wa.clientWidth||320, H=72;
-  cv.width=W*dpr; cv.height=H*dpr; cv.style.width=W+'px'; cv.style.height=H+'px';
-  const c=cv.getContext('2d'); c.scale(dpr,dpr);
+  const c=cv.getContext('2d');
+  const cw=W*dpr, ch=H*dpr;
+  if(cv.width!==cw||cv.height!==ch){ cv.width=cw; cv.height=ch; cv.style.width=W+'px'; cv.style.height=H+'px'; }
+  c.setTransform(dpr,0,0,dpr,0,0);
   c.fillStyle='#0d0d16'; c.fillRect(0,0,W,H);
   if(!duration){ c.fillStyle='#1e3a4a'; c.fillRect(0,H/2-1,W,2); return; }
 
@@ -972,8 +976,10 @@ function drawSeek(ct){
   ROWS=calcRows();
   const cv=document.getElementById('seekCanvas'), sw=document.getElementById('seekWrap');
   const dpr=Math.min(window.devicePixelRatio||1,2), W=sw.clientWidth||320, TW=W-LP-4, TH=ROWS*RH;
-  cv.width=W*dpr; cv.height=TH*dpr; cv.style.width=W+'px'; cv.style.height=TH+'px';
-  const c=cv.getContext('2d'); c.scale(dpr,dpr);
+  const c=cv.getContext('2d');
+  const cw=W*dpr, ch=TH*dpr;
+  if(cv.width!==cw||cv.height!==ch){ cv.width=cw; cv.height=ch; cv.style.width=W+'px'; cv.style.height=TH+'px'; }
+  c.setTransform(dpr,0,0,dpr,0,0);
   c.fillStyle='#0d0d16'; c.fillRect(0,0,W,TH);
   if(!duration){ c.fillStyle='#444466'; c.font='10px sans-serif'; c.textAlign='center'; c.fillText('ファイルを開いてください',W/2,TH/2); c.textAlign='left'; return; }
   const spr=duration/ROWS;
