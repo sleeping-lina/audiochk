@@ -136,7 +136,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v94</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v95</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -519,6 +519,7 @@ function onEnded(){
     rtInSil=false;
   }
   isPlaying=false; redrawPlayBtn(); cancelAnimationFrame(raf);
+  releaseWakeLock();
   document.getElementById('silStatus').textContent=detectOn?'終了':'聞くモード';
   if(detectOn){ if(waReady) drawLiveWave(); else drawWave(audioEl.currentTime); }
   drawSeek(audioEl.currentTime||duration);
@@ -1022,6 +1023,24 @@ wa.style.pointerEvents='none';
 
 // ── Playback ──────────────────────────────────
 function curT(){return audioEl.currentTime||0;}
+// ── Screen Wake Lock：再生中の自動消灯/ロックを防ぐ（iOS Safari 16.4+） ──
+let wakeLock=null;
+async function requestWakeLock(){
+  try{
+    if('wakeLock' in navigator && document.visibilityState==='visible'){
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', ()=>{ wakeLock=null; });
+    }
+  }catch(e){ /* 取得失敗は無視（再生は継続） */ }
+}
+function releaseWakeLock(){
+  try{ if(wakeLock){ wakeLock.release(); wakeLock=null; } }catch(e){}
+}
+// ページ非表示でWake Lockは自動解放される→復帰時に再生中なら取り直す
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='visible' && isPlaying) requestWakeLock();
+});
+
 function play(){
   if(!objURL||isPlaying)return;
   if(Date.now()-stopTime<200)return; // debounce: ignore rapid play after stop
@@ -1040,14 +1059,17 @@ function play(){
       // Re-apply rate after play() resolves (iOS resets it)
       audioEl.playbackRate=activeRate(); setPitch(audioEl);
       isPlaying=true; redrawPlayBtn(); loop(); if(detectOn&&waReady) rtLoop();
+      requestWakeLock();
     }).catch(e=>showToast('再生失敗:'+e.message));
   } else {
     audioEl.playbackRate=activeRate(); setPitch(audioEl);
     isPlaying=true; redrawPlayBtn(); loop(); if(detectOn&&waReady) rtLoop();
+    requestWakeLock();
   }
 }
 function stop(){
   audioPlay.pause(); audioDet.pause(); isPlaying=false; stopTime=Date.now(); redrawPlayBtn();
+  releaseWakeLock();
   canResumeComp=true; // 一時停止→次のplayで再開補正を適用
   cancelAnimationFrame(raf); raf=null;
   if(rtTimerId){ clearTimeout(rtTimerId); rtTimerId=null; }
@@ -1069,14 +1091,16 @@ function seekTo(t){
 let lastSeekSec=-1;
 function loop(){
   if(!isPlaying)return;
-  const t=curT();
-  if(detectOn){ if(waReady) drawLiveWave(); else drawWave(t); }
-  else { drawWave(t); } // 聞くモードも波形を流す（静的タイムライン＋再生ライン＋マーク＋無音）
-  updateTime(t);
-  // Redraw seek only once per second (expensive canvas op)
-  const sec=Math.floor(t);
-  if(sec!==lastSeekSec){ drawSeek(t); lastSeekSec=sec; }
-  hlMk(t); hlSil(t);
+  try{
+    const t=curT();
+    if(detectOn){ if(waReady) drawLiveWave(); else drawWave(t); }
+    else { drawWave(t); } // 聞くモードも波形を流す（静的タイムライン＋再生ライン＋マーク＋無音）
+    updateTime(t);
+    // Redraw seek only once per second (expensive canvas op)
+    const sec=Math.floor(t);
+    if(sec!==lastSeekSec){ drawSeek(t); lastSeekSec=sec; }
+    hlMk(t); hlSil(t);
+  }catch(e){ if(window.console&&console.warn) console.warn('loop',e); } // 一時的な描画エラーでループを止めない
   raf=requestAnimationFrame(loop);
 }
 function redrawPlayBtn(){ drawBtn('btnPlay'); }
