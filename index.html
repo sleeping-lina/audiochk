@@ -136,7 +136,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v96</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v97</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -1044,12 +1044,16 @@ function releaseWakeLock(){
 }
 // ページ非表示でWake Lockは自動解放される→復帰時に再生中なら取り直す
 document.addEventListener('visibilitychange', ()=>{
-  if(document.visibilityState==='visible' && isPlaying) requestWakeLock();
+  if(document.visibilityState==='visible'){
+    if(isPlaying) requestWakeLock();
+    redrawAllCanvases(); // 復帰時に消えていれば描き直す
+  }
 });
 
 function play(){
   if(!objURL||isPlaying)return;
   if(Date.now()-stopTime<200)return; // debounce: ignore rapid play after stop
+  drawAllBtns(); // パージで消えた操作ボタンを復帰（8BitDoのAで全ボタンが戻る）
   // 再開補正：聞くモードのみ。iOSの一時停止→再生のわずかな巻き戻りを先送り（ジャンプ後の再生・検出モードには適用しない）。
   if(resumeComp>0 && canResumeComp && !detectOn && audioEl.currentTime>0.05){
     try{ audioEl.currentTime=Math.min(duration||audioEl.currentTime, audioEl.currentTime+resumeComp/1000); }catch(e){}
@@ -1075,6 +1079,7 @@ function play(){
 }
 function stop(){
   audioPlay.pause(); audioDet.pause(); isPlaying=false; stopTime=Date.now(); redrawPlayBtn();
+  drawAllBtns(); // パージで消えた操作ボタンを復帰
   releaseWakeLock();
   canResumeComp=true; // 一時停止→次のplayで再開補正を適用
   cancelAnimationFrame(raf); raf=null;
@@ -1104,7 +1109,7 @@ function loop(){
     updateTime(t);
     // Redraw seek only once per second (expensive canvas op)
     const sec=Math.floor(t);
-    if(sec!==lastSeekSec){ drawSeek(t); lastSeekSec=sec; }
+    if(sec!==lastSeekSec){ drawSeek(t); drawAllBtns(); lastSeekSec=sec; } // 毎秒：シーク＋操作ボタン復帰
     hlMk(t); hlSil(t);
   }catch(e){ if(window.console&&console.warn) console.warn('loop',e); } // 一時的な描画エラーでループを止めない
   raf=requestAnimationFrame(loop);
@@ -1741,6 +1746,19 @@ function drawAllBtns(){
   ['folderBtn','fileBtn',
    'btnHeadTail0','btnBack01','btnBackN','btnPlay','btnFwdN','btnFwd01','btnHeadTail1'].forEach(drawBtn);
 }
+// iOSがメモリ不足でcanvas(GPU)をパージすると全描画が消える対策：
+// 失われたら検知して全面描き直す。次回これが出れば「canvas purge」と確定。
+function redrawAllCanvases(){
+  try{ drawAllBtns(); }catch(e){}
+  try{ drawWave(curT()); }catch(e){}
+  try{ drawSeek(curT()); }catch(e){}
+}
+['waveCanvas','seekCanvas'].forEach(id=>{
+  const cv=document.getElementById(id);
+  if(!cv) return;
+  cv.addEventListener('contextlost', e=>{ e.preventDefault(); }, false); // 復帰可能にする
+  cv.addEventListener('contextrestored', ()=>{ redrawAllCanvases(); showToast('⚠描画リセット→復帰（メモリ）'); }, false);
+});
 
 // wire header canvas file buttons
 document.getElementById('folderBtn').addEventListener('click',()=>document.getElementById('folderInput').click());
