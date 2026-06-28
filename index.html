@@ -136,7 +136,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v98</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v99</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -1049,6 +1049,19 @@ document.addEventListener('visibilitychange', ()=>{
     redrawAllCanvases(); // 復帰時に消えていれば描き直す
   }
 });
+
+// ── フリーズ原因の確定診断（次の再発時にどれが起きたかをトースト表示） ──
+// ページ・ライフサイクル：iOSがメモリ等でページをサスペンド→復帰した合図
+document.addEventListener('resume', ()=>{ showToast('⚠resume：ページ復帰(サスペンド)'); }, false);
+// プロセス破棄→bfcacheから復帰
+window.addEventListener('pageshow', e=>{ if(e.persisted) showToast('⚠pageshow：bfcache復帰'); }, false);
+// メディアバッファがパージされた（再生中のemptied/abortは異常）
+[audioPlay,audioDet].forEach(el=>{
+  el.addEventListener('emptied', ()=>{ if(isPlaying) showToast('⚠media emptied（メディア消去）'); }, false);
+  el.addEventListener('abort',   ()=>{ if(isPlaying) showToast('⚠media abort'); }, false);
+});
+// JSエラー（"Script error"のクロスオリジン無害分は除外）
+window.addEventListener('error', e=>{ const m=(e&&e.message)||''; if(m && !/Script error/i.test(m)) showToast('⚠JSエラー:'+String(m).slice(0,40)); }, false);
 
 function play(){
   if(!objURL||isPlaying)return;
