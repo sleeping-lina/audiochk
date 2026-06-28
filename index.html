@@ -136,7 +136,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v100</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v101</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -592,6 +592,9 @@ document.getElementById('folderInput').addEventListener('change',function(){
 function setSrc(file){
   if(objURL) URL.revokeObjectURL(objURL);
   objURL=URL.createObjectURL(file);
+  // アクティブ側だけ先読み、非アクティブはメタデータのみ＝メディアメモリ削減（emptied/purge頻度を下げる）
+  audioPlay.preload = detectOn?'metadata':'auto';
+  audioDet.preload  = detectOn?'auto':'metadata';
   audioPlay.src=objURL; audioDet.src=objURL;
   audioPlay.load(); audioDet.load();
   setPitch(audioPlay); setPitch(audioDet);
@@ -2036,6 +2039,7 @@ function toggleDetect(){
   detectOn=!detectOn;
   try{ localStorage.setItem('ac_detect', detectOn?'1':'0'); }catch(e){}
   audioEl = detectOn ? audioDet : audioPlay; // swap active element
+  audioEl.preload='auto'; (audioEl===audioPlay?audioDet:audioPlay).preload='metadata'; // アクティブだけ先読み
   // 方向別補正：検出→聞く=compD2L / 聞く→検出=compL2D
   // 補正は再生中の切替（プレーヤー間の引き継ぎ遅延を埋める）でのみ適用。停止中は実時間を維持＝表示が動かない
   const comp = detectOn ? compL2D : compD2L;
@@ -2048,7 +2052,12 @@ function toggleDetect(){
   drawSeek(nt); updateTime(nt); hlMk(nt); hlSil(nt);
   redrawPlayBtn();
   showToast(detectOn?'検出モード（1.0倍・波形/無音）':'聞くモード（'+fmtSpd(playbackRate)+'・なめらか）');
-  if(wasPlaying) play(); // resume in the new mode
+  if(wasPlaying){ // シーク完了を待ってから再生＝切替直後に古い位置の音が鳴る/消える問題を防ぐ
+    let played=false;
+    const go=()=>{ if(played)return; played=true; audioEl.removeEventListener('seeked',go); stopTime=0; canResumeComp=false; play(); };
+    audioEl.addEventListener('seeked',go,{once:true});
+    setTimeout(go,400); // 保険：seekedが来ない/既に完了済みの場合
+  }
 }
 
 // ── Color system ──────────────────────────────
