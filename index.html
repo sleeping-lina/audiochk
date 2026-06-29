@@ -136,7 +136,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v101</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v102</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -1060,11 +1060,8 @@ document.addEventListener('visibilitychange', ()=>{
 document.addEventListener('resume', ()=>{ showToast('⚠resume：ページ復帰(サスペンド)'); }, false);
 // プロセス破棄→bfcacheから復帰
 window.addEventListener('pageshow', e=>{ if(e.persisted) showToast('⚠pageshow：bfcache復帰'); }, false);
-// メディアバッファがパージされた（再生中のemptied/abortは異常）
-[audioPlay,audioDet].forEach(el=>{
-  el.addEventListener('emptied', ()=>{ if(isPlaying) showToast('⚠media emptied（メディア消去）'); }, false);
-  el.addEventListener('abort',   ()=>{ if(isPlaying) showToast('⚠media abort'); }, false);
-});
+// （emptied/abort＝iOSのメモリ逼迫によるメディアパージ。原因確定済みのため通知は撤去。
+//   発生してもcode=3自動復旧・ボタン再描画で自己回復する）
 // JSエラー（"Script error"のクロスオリジン無害分は除外）
 window.addEventListener('error', e=>{ const m=(e&&e.message)||''; if(m && !/Script error/i.test(m)) showToast('⚠JSエラー:'+String(m).slice(0,40)); }, false);
 
