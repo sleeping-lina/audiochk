@@ -124,6 +124,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 #toast{position:fixed;bottom:48px;left:50%;transform:translateX(-50%) translateY(10px);
   background:var(--s2);border:1px solid var(--ac);color:var(--ac);font-family:'Space Mono',monospace;
   font-size:10px;padding:4px 12px;border-radius:20px;opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap;z-index:600}
+#toast.err{background:#2a1416;border-color:#ff4d4d;color:#ff6a6a;font-size:11px;padding:6px 14px;white-space:normal;max-width:84%;text-align:center;line-height:1.4}
 /* toggle button style */
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 #lbar{position:fixed;top:0;left:0;height:2px;background:var(--ac);width:0%;transition:width .3s;z-index:300}
@@ -136,7 +137,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v102</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v103</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -527,7 +528,7 @@ function onEnded(){
 }
 [audioPlay,audioDet].forEach(el=>{
   el.addEventListener('ended',onEnded);
-  el.addEventListener('error',()=>{ if(el===audioEl){ const code=el.error?el.error.code:0; if(code===3||code===2){ recoverMedia(); } else { showToast('エラー code='+code); } } });
+  el.addEventListener('error',()=>{ if(el===audioEl){ const code=el.error?el.error.code:0; if(code===3||code===2){ recoverMedia(); } else { showToast('⚠ 音声エラー code='+code,true); } } });
   // iOSが稀にplaybackRateを勝手に戻す場合の保険：戻された時だけ即補正。
   // （旧: play後100/500msのタイマー再適用＝切替もたつきの主因。廃止）
   el.addEventListener('ratechange',()=>{
@@ -1055,25 +1056,26 @@ document.addEventListener('visibilitychange', ()=>{
   }
 });
 
-// ── フリーズ原因の確定診断（次の再発時にどれが起きたかをトースト表示） ──
-// ページ・ライフサイクル：iOSがメモリ等でページをサスペンド→復帰した合図
-document.addEventListener('resume', ()=>{ showToast('⚠resume：ページ復帰(サスペンド)'); }, false);
-// プロセス破棄→bfcacheから復帰
-window.addEventListener('pageshow', e=>{ if(e.persisted) showToast('⚠pageshow：bfcache復帰'); }, false);
-// （emptied/abort＝iOSのメモリ逼迫によるメディアパージ。原因確定済みのため通知は撤去。
-//   発生してもcode=3自動復旧・ボタン再描画で自己回復する）
+// ── 異常イベントの通知（赤トースト：ユーザーが「今のはエラー」と分かるように） ──
+document.addEventListener('resume', ()=>{ showToast('⚠ ページが一時停止→復帰しました',true); }, false);
+window.addEventListener('pageshow', e=>{ if(e.persisted) showToast('⚠ ページが再読込されました',true); }, false);
+// メモリ逼迫で音声バッファがパージ（巨大ファイル/WAVで起きやすい。自動復帰）
+[audioPlay,audioDet].forEach(el=>{
+  el.addEventListener('emptied', ()=>{ if(isPlaying) showToast('⚠ メモリ逼迫で音声が中断（巨大ファイル）。自動復帰します',true); }, false);
+  el.addEventListener('abort',   ()=>{ if(isPlaying) showToast('⚠ 音声が中断されました（abort）',true); }, false);
+});
 // JSエラー（"Script error"のクロスオリジン無害分は除外）
-window.addEventListener('error', e=>{ const m=(e&&e.message)||''; if(m && !/Script error/i.test(m)) showToast('⚠JSエラー:'+String(m).slice(0,40)); }, false);
+window.addEventListener('error', e=>{ const m=(e&&e.message)||''; if(m && !/Script error/i.test(m)) showToast('⚠ JSエラー: '+String(m).slice(0,50),true); }, false);
 
 // MEDIA_ERR_DECODE(code3)/NETWORK(code2)：要素が永久エラー状態になり再起動以外で復旧不能になる問題への自動復旧。
 // 同じBlobを再読込してエラーを解除し、直前位置へシークして（再生中なら）再開する。暴走防止に3秒クールダウン。
 function recoverMedia(){
   if(!objURL) return;
   const now=Date.now();
-  if(now-lastRecover<3000){ showToast('復旧できませんでした（連続エラー）'); return; }
+  if(now-lastRecover<3000){ showToast('⚠ 復旧できませんでした（連続エラー）',true); return; }
   lastRecover=now;
   const pos=lastGoodTime||0, wasPlaying=isPlaying;
-  showToast('音声を復旧中…');
+  showToast('⚠ デコードエラー(code3)→自動復旧中…',true);
   try{ audioPlay.pause(); audioDet.pause(); }catch(e){}
   isPlaying=false; redrawPlayBtn();
   if(raf){ cancelAnimationFrame(raf); raf=null; }
@@ -1928,7 +1930,7 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 let lT=null;
 function showLd(on){const b=document.getElementById('lbar');b.style.width=on?'65%':'100%';clearTimeout(lT);if(!on)lT=setTimeout(()=>{b.style.width='0%';},350);}
 let tT=null;
-function showToast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');clearTimeout(tT);tT=setTimeout(()=>el.classList.remove('show'),2000);}
+function showToast(msg,isError){const el=document.getElementById('toast');el.textContent=msg;el.classList.toggle('err',!!isError);el.classList.add('show');clearTimeout(tT);tT=setTimeout(()=>el.classList.remove('show'),isError?5000:2000);}
 window.addEventListener('resize',()=>{drawWave(curT());drawSeek(curT());drawAllBtns();});
 
 // ── Silence detection UI wiring ───────────────
