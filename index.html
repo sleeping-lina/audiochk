@@ -137,7 +137,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v103</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v104</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -486,6 +486,7 @@ let markers=[], hist=[], redoSt=[];
 let silReg=[];
 let silMaxDur=0; // 既知の最長無音(秒)。drawWaveのカリングで「手前に伸びる長い無音」を取りこぼさないため
 let lastGoodTime=0, lastRecover=0; // 直近の有効再生位置／最終復旧時刻（MEDIA_ERR_DECODE自動復旧用）
+let cbPrevSpd=0; // v104: 確認モード(checkback)復帰用の元速度（0=非確認中）
 let raf=null;
 let playlist=[], plIdx=-1, skipSec=5;
 let curMkIdx=-1;
@@ -1069,31 +1070,42 @@ window.addEventListener('error', e=>{ const m=(e&&e.message)||''; if(m && !/Scri
 
 // MEDIA_ERR_DECODE(code3)/NETWORK(code2)：要素が永久エラー状態になり再起動以外で復旧不能になる問題への自動復旧。
 // 同じBlobを再読込してエラーを解除し、直前位置へシークして（再生中なら）再開する。暴走防止に3秒クールダウン。
-function recoverMedia(){
+function recoverMedia(forcePlay){ // v104: forcePlay=play()から呼ばれた時に復旧後の再生を保証
   if(!objURL) return;
   const now=Date.now();
   if(now-lastRecover<3000){ showToast('⚠ 復旧できませんでした（連続エラー）',true); return; }
   lastRecover=now;
-  const pos=lastGoodTime||0, wasPlaying=isPlaying;
+  const pos=lastGoodTime||0, wasPlaying=isPlaying||!!forcePlay;
   showToast('⚠ デコードエラー(code3)→自動復旧中…',true);
   try{ audioPlay.pause(); audioDet.pause(); }catch(e){}
   isPlaying=false; redrawPlayBtn();
   if(raf){ cancelAnimationFrame(raf); raf=null; }
   if(rtTimerId){ clearTimeout(rtTimerId); rtTimerId=null; }
   try{ audioPlay.load(); audioDet.load(); }catch(e){} // 同じsrcを再読込してエラー状態を解除
+  let rcDone=false; // v104: 二重実行防止（onReady/タイムアウトの排他）
   const onReady=()=>{
+    if(rcDone) return; rcDone=true; clearTimeout(rcTmo);
     audioEl.removeEventListener('loadeddata',onReady);
     try{ audioEl.currentTime=Math.min(duration||pos,pos); }catch(e){}
     try{ drawWave(pos); drawSeek(pos); updateTime(pos); }catch(e){}
     if(wasPlaying){ stopTime=0; canResumeComp=false; play(); }
     showToast('音声を復旧しました');
   };
+  // v104: loadeddataが来ない場合の保険（「自動復旧中…」のまま無反応を防ぐ）
+  const rcTmo=setTimeout(()=>{
+    if(rcDone) return; rcDone=true;
+    audioEl.removeEventListener('loadeddata',onReady);
+    showToast('⚠ 復旧に失敗しました。ファイルを読み込み直してください',true);
+  },5000);
   audioEl.addEventListener('loadeddata',onReady,{once:true});
 }
 
 function play(){
   if(!objURL||isPlaying)return;
   if(Date.now()-stopTime<200)return; // debounce: ignore rapid play after stop
+  // v104: 非アクティブ中にcode3/2で死んだ要素の検知（errorイベントはel===audioElの時しか処理されず、
+  // モード切替で死んだ要素がアクティブになっても再発火しないため、ここで拾って自動復旧→復旧後に再生）
+  if(audioEl.error && (audioEl.error.code===3||audioEl.error.code===2)){ recoverMedia(true); return; }
   try{ (audioEl===audioPlay?audioDet:audioPlay).pause(); }catch(e){} // 重複再生防止（音が重なる対策）
   drawAllBtns(); // パージで消えた操作ボタンを復帰（8BitDoのAで全ボタンが戻る）
   // 再開補正：聞くモードのみ。iOSの一時停止→再生のわずかな巻き戻りを先送り（ジャンプ後の再生・検出モードには適用しない）。
@@ -1213,7 +1225,8 @@ const SPD_BUTTONS=()=>Array.from(document.querySelectorAll('.spb[data-speed]'));
 // Speed label: integers always show ".0" (1.0, 2.0); others as-is (0.25, 1.5)
 function fmtNum(s){ return Number.isInteger(s)?s.toFixed(1):String(s); }
 function fmtSpd(s){ return '×'+fmtNum(s); }
-function setSpd(s){
+function setSpd(s,fromCb){ // v104: fromCb=checkback内部からの呼び出し（確認モードを解除しない）
+  if(!fromCb) cbPrevSpd=0; // 手動で速度を変えたら確認モードは解除（次のcheckbackは新規の確認として動く）
   playbackRate=s;
   if(!detectOn){
     audioEl.playbackRate=s; setPitch(audioEl); // 検出モードは1.0固定（切替時に適用）
@@ -1223,6 +1236,25 @@ function setSpd(s){
   document.querySelectorAll('.spb').forEach(b=>b.classList.toggle('on',parseFloat(b.dataset.speed)===s));
   showToast(fmtSpd(s));
   savePrefs();
+}
+// v104: 確認ワンキー（checkback）
+// 1押し目＝N秒戻し＋×1.0に落として再生（聞くモードのみ速度変更。停止中なら再生も開始）
+// 2押し目＝元の速度に復帰してそのまま続行
+// ※検出モードは速度が1.0固定なのでN秒戻しのみ動作。手動で速度キーを押すと確認モードは解除される(setSpd参照)
+function doCheckback(){
+  if(!objURL) return;
+  if(cbPrevSpd>0){ // 復帰（検出モード中でもsetSpdは変数のみ更新＝聞くモードに戻った時に反映される）
+    const s=cbPrevSpd; cbPrevSpd=0;
+    setSpd(s,true);
+    showToast(detectOn ? '確認終了（聞くモードで×'+fmtSpd(s)+'）' : '確認終了 ×'+fmtSpd(s)+'で続行');
+    return;
+  }
+  seekTo(curT()-skipSec);
+  if(!detectOn && playbackRate!==1.0){
+    cbPrevSpd=playbackRate; setSpd(1.0,true);
+  }
+  if(!isPlaying) play();
+  showToast(cbPrevSpd>0 ? '確認中 ×1.0（再押しで×'+fmtSpd(cbPrevSpd)+'に復帰）' : '確認：−'+skipSec+'s');
 }
 
 // ── Markers ───────────────────────────────────
@@ -1433,6 +1465,7 @@ const DEFAULT_KEYMAP={
   skipfwd:['ArrowRight'],
   fineback:[','],
   finefwd:['.'],
+  checkback:['c'], // v104: 確認＝N秒戻し＋×1.0、再押しで元速度に復帰
   prevmark:['['],
   nextmark:[']'],
   prevsil:[';'],
@@ -1495,6 +1528,7 @@ function doAction(fn){
     case 'markdel': delNearestMk(); break;
     case 'skipback': seekTo(curT()-skipSec); break;
     case 'skipfwd': seekTo(curT()+skipSec); break;
+    case 'checkback': doCheckback(); break; // v104
     case 'fineback': seekTo(curT()-0.1); break;
     case 'finefwd': seekTo(curT()+0.1); break;
     case 'prevmark': document.getElementById('prevMrkBtn').click(); break;
@@ -1506,12 +1540,13 @@ function doAction(fn){
     case 'head': seekTo(0); break;
     case 'tail': seekTo(duration); break;
     case 'speedreset': setSpd(1.0); break;
-    case 'speed1': setSpd(0.25); break;
-    case 'speed2': setSpd(0.5); break;
-    case 'speed3': setSpd(0.75); break;
-    case 'speed4': setSpd(1.25); break;
-    case 'speed5': setSpd(1.5); break;
-    case 'speed6': setSpd(2.0); break;
+    // v104: 固定値→SPD_PRESETS参照に修正（設定で変更したプリセットにキーも追従）
+    case 'speed1': setSpd(SPD_PRESETS[0]); break;
+    case 'speed2': setSpd(SPD_PRESETS[1]); break;
+    case 'speed3': setSpd(SPD_PRESETS[2]); break;
+    case 'speed4': setSpd(SPD_PRESETS[3]); break;
+    case 'speed5': setSpd(SPD_PRESETS[4]); break;
+    case 'speed6': setSpd(SPD_PRESETS[5]); break;
     case 'undo': undo(); break;
     case 'redo': redo(); break;
     case 'detect': toggleDetect(); break;
@@ -1520,8 +1555,8 @@ function doAction(fn){
   }
 }
 // ── Keymap editor (stage B) ──
-const FN_ORDER=['playpause','markadd','markdel','skipback','skipfwd','fineback','finefwd','prevmark','nextmark','prevsil','nextsil','prevfile','nextfile','head','tail','timejump','report','speedreset','speed1','speed2','speed3','speed4','speed5','speed6','undo','redo','detect'];
-const FN_LABELS={playpause:'再生/停止',markadd:'マーク追加',markdel:'マーク削除',skipback:'−N秒スキップ',skipfwd:'+N秒スキップ',fineback:'−0.1秒',finefwd:'+0.1秒',prevmark:'前のマーク',nextmark:'次のマーク',prevsil:'前の無音',nextsil:'次の無音',prevfile:'前のファイル',nextfile:'次のファイル',head:'先頭へ',tail:'末尾へ',timejump:'タイムジャンプ',report:'情報ポップアップ',speedreset:'速度リセット(×1.0)',speed1:'速度プリセット1',speed2:'速度プリセット2',speed3:'速度プリセット3',speed4:'速度プリセット4',speed5:'速度プリセット5',speed6:'速度プリセット6',undo:'取り消し',redo:'やり直し',detect:'無音検出 ON/OFF'};
+const FN_ORDER=['playpause','markadd','markdel','skipback','skipfwd','fineback','finefwd','checkback','prevmark','nextmark','prevsil','nextsil','prevfile','nextfile','head','tail','timejump','report','speedreset','speed1','speed2','speed3','speed4','speed5','speed6','undo','redo','detect'];
+const FN_LABELS={playpause:'再生/停止',markadd:'マーク追加',markdel:'マーク削除',skipback:'−N秒スキップ',skipfwd:'+N秒スキップ',fineback:'−0.1秒',finefwd:'+0.1秒',checkback:'確認(−N秒＋×1.0⇄復帰)',prevmark:'前のマーク',nextmark:'次のマーク',prevsil:'前の無音',nextsil:'次の無音',prevfile:'前のファイル',nextfile:'次のファイル',head:'先頭へ',tail:'末尾へ',timejump:'タイムジャンプ',report:'情報ポップアップ',speedreset:'速度リセット(×1.0)',speed1:'速度プリセット1',speed2:'速度プリセット2',speed3:'速度プリセット3',speed4:'速度プリセット4',speed5:'速度プリセット5',speed6:'速度プリセット6',undo:'取り消し',redo:'やり直し',detect:'無音検出 ON/OFF'};
 function tokenLabel(t){
   if(t===' ')return'Space';
   const m={ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',Backspace:'BS',Delete:'Del',Enter:'Enter',Escape:'Esc',Tab:'Tab',Home:'Home',End:'End'};
