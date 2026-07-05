@@ -137,7 +137,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v104</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v105</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -405,6 +405,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
       <div style="font-size:8px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.4;margin:-2px 0 8px">時刻補正：検出した無音区間の開始/終了に一律で足す秒数。他のソフトと比べ全体が早い場合に。全削除してから調整。</div>
       <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">速度補正(ms)</span><button class="sil-adj" onclick="adjComp('spd',-1)">−</button><input type="range" id="spdComp" min="0" max="500" step="10" value="240"><button class="sil-adj" onclick="adjComp('spd',1)">＋</button><span class="sil-val" id="spdCompV">240ms</span></div>
       <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">再開補正(ms)</span><button class="sil-adj" onclick="adjComp('res',-1)">−</button><input type="range" id="resumeComp" min="0" max="500" step="10" value="50"><button class="sil-adj" onclick="adjComp('res',1)">＋</button><span class="sil-val" id="resumeCompV">50ms</span></div>
+      <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">マーク反応補正(ms)</span><button class="sil-adj" onclick="adjComp('mk',-1)">−</button><input type="range" id="markComp" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjComp('mk',1)">＋</button><span class="sil-val" id="markCompV">0ms</span></div>
       <div style="font-size:8px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.4;margin:-2px 0 8px">再開補正：一時停止→再生でわずかに戻る感じがある時、その分だけ先送りします（頭出し/ジャンプ後の再生には適用しません）。</div>
       <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">重なり許容(ms)</span><button class="sil-adj" onclick="adjComp('ovl',-1)">−</button><input type="range" id="overlapTol" min="0" max="500" step="10" value="50"><button class="sil-adj" onclick="adjComp('ovl',1)">＋</button><span class="sil-val" id="overlapTolV">50ms</span></div>
       <div style="font-size:8px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.4;margin:-2px 0 8px">重なり許容：この秒数より大きく重なる区間は追加しません（隣接する別区間は追加）。</div>
@@ -648,12 +649,13 @@ async function load(file){
 // ── Realtime silence detection ────────────────────────────────
 let waCtx=null, waAnalyser=null, waSrc=null, waReady=false;
 let waBuf=null;
-const DEF_SIL={silThr:0.004,silMinSec:0.5,compD2L:320,compL2D:220,timeOff:100,spdComp:240,resumeComp:50,overlapTol:50,releaseMs:0};
+const DEF_SIL={silThr:0.004,silMinSec:0.5,compD2L:320,compL2D:220,timeOff:100,spdComp:240,resumeComp:50,overlapTol:50,releaseMs:0,markComp:0};
 let silThr=0.004, silMinSec=0.5, silAutoMark=false;
 let compD2L=320, compL2D=220, timeOff=100, spdComp=240; // 検出→聞く / 聞く→検出 / 時刻補正 / 速度補正 (ms)
 let releaseMs=0; // 無音終了の猶予(ヒステリシス)。0=オフ
 let overlapTol=50; // 重なり許容(ms)：これより大きく重なる区間は追加しない
 let resumeComp=50; // 再開補正(ms)：一時停止→再生時の巻き戻りを先送りで相殺
+let markComp=0;    // v105: マーク反応補正(ms)：再生中のマーク追加を「設定値×現在速度」だけ手前に打つ（人間の反応遅延を相殺・0=オフ）
 let canResumeComp=false; // 直前が「一時停止」の時だけ再開補正を適用（ジャンプ後は適用しない）
 let rtLoudStart=-1; // 無音中に音が立ち上がった時刻（猶予判定用）
 let rtInSil=false, rtSilStart=0;
@@ -1259,9 +1261,24 @@ function doCheckback(){
 
 // ── Markers ───────────────────────────────────
 function addMk(){
-  if(!objURL)return; const t=curT(); saveH();
+  if(!objURL)return; let t=curT(); saveH();
+  // v105: マーク反応補正＝再生中のみ「設定値×現在速度」だけ手前に打つ（1.5倍速なら反応遅延も1.5倍進むため）。停止中は正確に狙えるので補正しない
+  if(markComp>0 && isPlaying) t=Math.max(0, t - (markComp/1000)*activeRate());
   markers.push({time:t,note:''}); markers.sort((a,b)=>a.time-b.time);
   renderMarkers(); drawWave(t); drawSeek(t); hlMk(t); saveMk(); showToast('🔖 '+fmtMs(t));
+}
+// v105: マーク微調整（案1）＝現在位置から±10秒以内で最も近いマークを0.1秒動かす。
+// 取消→0.1移動→再マークの3操作を1キーに。履歴(undo)対象。
+function moveNearestMk(d){
+  if(!objURL||!markers.length){ showToast('マークなし'); return; }
+  const t=curT(); let best=-1,bestD=10; // 誤操作で遠くのマークを動かさないよう±10秒以内に限定
+  markers.forEach((mk,i)=>{const dd=Math.abs(mk.time-t);if(dd<bestD){bestD=dd;best=i;}});
+  if(best<0){ showToast('近くにマークなし（±10秒）'); return; }
+  saveH();
+  const nt=Math.max(0,Math.min(duration||markers[best].time, markers[best].time+d));
+  markers[best].time=nt; markers.sort((a,b)=>a.time-b.time);
+  renderMarkers(); drawWave(curT()); drawSeek(curT()); hlMk(curT()); saveMk();
+  showToast('マーク移動 '+fmtMs(nt)+'（'+(d>0?'+':'−')+'0.1s）');
 }
 function delMk(i){ saveH(); markers.splice(i,1); renderMarkers(); drawWave(curT()); drawSeek(curT()); saveMk(); }
 function snapState(){ return {m:JSON.parse(JSON.stringify(markers)), s:JSON.parse(JSON.stringify(silReg))}; }
@@ -1461,6 +1478,8 @@ const DEFAULT_KEYMAP={
   playpause:[' '],       // Space（Pは前ファイルへ）
   markadd:['m'],
   markdel:['Backspace','Delete'],
+  marknudgeback:['j'], // v105: 直近マークを−0.1秒移動
+  marknudgefwd:['k'],  // v105: 直近マークを+0.1秒移動
   skipback:['ArrowLeft'],
   skipfwd:['ArrowRight'],
   fineback:[','],
@@ -1526,6 +1545,8 @@ function doAction(fn){
     case 'playpause': isPlaying?stop():play(); break;
     case 'markadd': addMk(); break;
     case 'markdel': delNearestMk(); break;
+    case 'marknudgeback': moveNearestMk(-0.1); break; // v105
+    case 'marknudgefwd': moveNearestMk(0.1); break;   // v105
     case 'skipback': seekTo(curT()-skipSec); break;
     case 'skipfwd': seekTo(curT()+skipSec); break;
     case 'checkback': doCheckback(); break; // v104
@@ -1555,8 +1576,8 @@ function doAction(fn){
   }
 }
 // ── Keymap editor (stage B) ──
-const FN_ORDER=['playpause','markadd','markdel','skipback','skipfwd','fineback','finefwd','checkback','prevmark','nextmark','prevsil','nextsil','prevfile','nextfile','head','tail','timejump','report','speedreset','speed1','speed2','speed3','speed4','speed5','speed6','undo','redo','detect'];
-const FN_LABELS={playpause:'再生/停止',markadd:'マーク追加',markdel:'マーク削除',skipback:'−N秒スキップ',skipfwd:'+N秒スキップ',fineback:'−0.1秒',finefwd:'+0.1秒',checkback:'確認(−N秒＋×1.0⇄復帰)',prevmark:'前のマーク',nextmark:'次のマーク',prevsil:'前の無音',nextsil:'次の無音',prevfile:'前のファイル',nextfile:'次のファイル',head:'先頭へ',tail:'末尾へ',timejump:'タイムジャンプ',report:'情報ポップアップ',speedreset:'速度リセット(×1.0)',speed1:'速度プリセット1',speed2:'速度プリセット2',speed3:'速度プリセット3',speed4:'速度プリセット4',speed5:'速度プリセット5',speed6:'速度プリセット6',undo:'取り消し',redo:'やり直し',detect:'無音検出 ON/OFF'};
+const FN_ORDER=['playpause','markadd','markdel','marknudgeback','marknudgefwd','skipback','skipfwd','fineback','finefwd','checkback','prevmark','nextmark','prevsil','nextsil','prevfile','nextfile','head','tail','timejump','report','speedreset','speed1','speed2','speed3','speed4','speed5','speed6','undo','redo','detect'];
+const FN_LABELS={playpause:'再生/停止',markadd:'マーク追加',markdel:'マーク削除',marknudgeback:'マーク微調整 −0.1',marknudgefwd:'マーク微調整 +0.1',skipback:'−N秒スキップ',skipfwd:'+N秒スキップ',fineback:'−0.1秒',finefwd:'+0.1秒',checkback:'確認(−N秒＋×1.0⇄復帰)',prevmark:'前のマーク',nextmark:'次のマーク',prevsil:'前の無音',nextsil:'次の無音',prevfile:'前のファイル',nextfile:'次のファイル',head:'先頭へ',tail:'末尾へ',timejump:'タイムジャンプ',report:'情報ポップアップ',speedreset:'速度リセット(×1.0)',speed1:'速度プリセット1',speed2:'速度プリセット2',speed3:'速度プリセット3',speed4:'速度プリセット4',speed5:'速度プリセット5',speed6:'速度プリセット6',undo:'取り消し',redo:'やり直し',detect:'無音検出 ON/OFF'};
 function tokenLabel(t){
   if(t===' ')return'Space';
   const m={ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',Backspace:'BS',Delete:'Del',Enter:'Enter',Escape:'Esc',Tab:'Tab',Home:'Home',End:'End'};
@@ -1978,7 +1999,7 @@ document.getElementById('silMin').addEventListener('input',function(){
   document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒';
 });
 // 4つの補正スライダー（ドラッグ）
-[['compD2L',v=>compD2L=v],['compL2D',v=>compL2D=v],['timeOff',v=>timeOff=v],['spdComp',v=>spdComp=v],['releaseMs',v=>releaseMs=v],['overlapTol',v=>overlapTol=v],['resumeComp',v=>resumeComp=v]].forEach(([id,set])=>{
+[['compD2L',v=>compD2L=v],['compL2D',v=>compL2D=v],['timeOff',v=>timeOff=v],['spdComp',v=>spdComp=v],['releaseMs',v=>releaseMs=v],['overlapTol',v=>overlapTol=v],['resumeComp',v=>resumeComp=v],['markComp',v=>markComp=v]].forEach(([id,set])=>{
   const el=document.getElementById(id);
   if(el) el.addEventListener('input',function(){ set(parseInt(this.value)||0); document.getElementById(id+'V').textContent=(parseInt(this.value)||0)+'ms'; saveSilPrefs(); });
 });
@@ -1986,12 +2007,12 @@ document.getElementById('silMin').addEventListener('input',function(){
 silAutoMark=false;
 
 let settingsBackup=null;
-function snapSettings(){ return {silThr,silMinSec,compD2L,compL2D,timeOff,spdComp,resumeComp,overlapTol,releaseMs}; }
-function applySettings(o){ silThr=o.silThr; silMinSec=o.silMinSec; compD2L=o.compD2L; compL2D=o.compL2D; timeOff=o.timeOff; spdComp=o.spdComp; resumeComp=o.resumeComp; overlapTol=o.overlapTol; releaseMs=o.releaseMs; }
+function snapSettings(){ return {silThr,silMinSec,compD2L,compL2D,timeOff,spdComp,resumeComp,overlapTol,releaseMs,markComp}; }
+function applySettings(o){ silThr=o.silThr; silMinSec=o.silMinSec; compD2L=o.compD2L; compL2D=o.compL2D; timeOff=o.timeOff; spdComp=o.spdComp; resumeComp=o.resumeComp; overlapTol=o.overlapTol; releaseMs=o.releaseMs; markComp=o.markComp||0; }
 function syncSettingsUI(){
   const st=document.getElementById('silThr'); if(st){st.value=silThr; document.getElementById('silThrV').textContent=silThr.toFixed(3);}
   const sm=document.getElementById('silMin'); if(sm){sm.value=silMinSec; document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒';}
-  setCompUI('compD2L',compD2L); setCompUI('compL2D',compL2D); setCompUI('timeOff',timeOff); setCompUI('spdComp',spdComp); setCompUI('resumeComp',resumeComp); setCompUI('overlapTol',overlapTol); setCompUI('releaseMs',releaseMs);
+  setCompUI('compD2L',compD2L); setCompUI('compL2D',compL2D); setCompUI('timeOff',timeOff); setCompUI('spdComp',spdComp); setCompUI('resumeComp',resumeComp); setCompUI('overlapTol',overlapTol); setCompUI('releaseMs',releaseMs); setCompUI('markComp',markComp);
 }
 let settingsTab='detect';
 function openSettingsModal(tab){
@@ -2031,11 +2052,11 @@ function closeSettings(ok){
 function resetSettings(){ applySettings(DEF_SIL); syncSettingsUI(); saveSilPrefs(); showToast('既定値に戻しました'); }
 // 補正スライダー（±ボタン）。kind: 'D2L'(検出→聞く) / 'L2D'(聞く→検出) / 'head'(先頭) / 'spd'(速度実験)
 function adjComp(kind,d){
-  const map={D2L:['compD2L',500],L2D:['compL2D',500],head:['timeOff',500],spd:['spdComp',500],rel:['releaseMs',400],ovl:['overlapTol',500],res:['resumeComp',500]};
+  const map={D2L:['compD2L',500],L2D:['compL2D',500],head:['timeOff',500],spd:['spdComp',500],rel:['releaseMs',400],ovl:['overlapTol',500],res:['resumeComp',500],mk:['markComp',500]};
   const [id,mx]=map[kind];
-  let v=({D2L:compD2L,L2D:compL2D,head:timeOff,spd:spdComp,rel:releaseMs,ovl:overlapTol,res:resumeComp})[kind];
+  let v=({D2L:compD2L,L2D:compL2D,head:timeOff,spd:spdComp,rel:releaseMs,ovl:overlapTol,res:resumeComp,mk:markComp})[kind];
   v=Math.max(0,Math.min(mx, v + d*10));
-  if(kind==='D2L')compD2L=v; else if(kind==='L2D')compL2D=v; else if(kind==='head')timeOff=v; else if(kind==='spd')spdComp=v; else if(kind==='rel')releaseMs=v; else if(kind==='ovl')overlapTol=v; else resumeComp=v;
+  if(kind==='D2L')compD2L=v; else if(kind==='L2D')compL2D=v; else if(kind==='head')timeOff=v; else if(kind==='spd')spdComp=v; else if(kind==='rel')releaseMs=v; else if(kind==='ovl')overlapTol=v; else if(kind==='mk')markComp=v; else resumeComp=v;
   const el=document.getElementById(id); if(el) el.value=v;
   document.getElementById(id+'V').textContent=v+'ms';
   saveSilPrefs();
@@ -2300,7 +2321,7 @@ function clearSilData(){
   drawSeek(curT()); saveMk(); showToast('無音データをクリア');
 }
 function saveSilPrefs(){
-  try{ localStorage.setItem('ac_silprefs',JSON.stringify({silThr,silMinSec,compD2L,compL2D,timeOff,spdComp,releaseMs,overlapTol,resumeComp})); }catch(e){}
+  try{ localStorage.setItem('ac_silprefs',JSON.stringify({silThr,silMinSec,compD2L,compL2D,timeOff,spdComp,releaseMs,overlapTol,resumeComp,markComp})); }catch(e){}
 }
 function setCompUI(id,val){ const el=document.getElementById(id); if(el) el.value=val; const v=document.getElementById(id+'V'); if(v) v.textContent=val+'ms'; }
 function loadSilPrefs(){
@@ -2318,7 +2339,8 @@ function loadSilPrefs(){
     if(d.releaseMs>=0 && d.releaseMs!==120) releaseMs=d.releaseMs; // 旧既定120はオフ(0)扱い
     if(d.overlapTol>=0) overlapTol=d.overlapTol;
     if(d.resumeComp>=0) resumeComp=d.resumeComp;
-    setCompUI('compD2L',compD2L); setCompUI('compL2D',compL2D); setCompUI('timeOff',timeOff); setCompUI('spdComp',spdComp); setCompUI('releaseMs',releaseMs); setCompUI('overlapTol',overlapTol); setCompUI('resumeComp',resumeComp);
+    if(d.markComp>=0) markComp=d.markComp; // v105
+    setCompUI('compD2L',compD2L); setCompUI('compL2D',compL2D); setCompUI('timeOff',timeOff); setCompUI('spdComp',spdComp); setCompUI('releaseMs',releaseMs); setCompUI('overlapTol',overlapTol); setCompUI('resumeComp',resumeComp); setCompUI('markComp',markComp);
   }catch(e){}
 }
 
