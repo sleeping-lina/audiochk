@@ -137,7 +137,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v106</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v107</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -643,6 +643,7 @@ async function load(file){
 
   drawWave(0); drawSeek(0);
   showLd(false); showToast(file.name); renderPL();
+  msUpdateMeta(); msUpdateState(); // v107: コントロールセンターの曲名等を更新
   restoreFocusNow(); // 読込直後に8BitDoが効くようfocusTrapへ復帰
 
   // decode waveform in background
@@ -1128,12 +1129,12 @@ function play(){
       // Re-apply rate after play() resolves (iOS resets it)
       audioEl.playbackRate=activeRate(); setPitch(audioEl);
       isPlaying=true; redrawPlayBtn(); loop(); if(detectOn&&waReady) rtLoop();
-      requestWakeLock();
+      requestWakeLock(); msUpdateState(); // v107
     }).catch(e=>showToast('再生失敗:'+e.message));
   } else {
     audioEl.playbackRate=activeRate(); setPitch(audioEl);
     isPlaying=true; redrawPlayBtn(); loop(); if(detectOn&&waReady) rtLoop();
-    requestWakeLock();
+    requestWakeLock(); msUpdateState(); // v107
   }
 }
 function stop(){
@@ -1147,6 +1148,7 @@ function stop(){
   document.getElementById('silStatus').textContent=detectOn?'停止中':'聞くモード';
   document.getElementById('silCurDur').textContent='--';
   drawWave(curT()); drawSeek(curT()); updateTime(curT());
+  msUpdateState(); // v107
 }
 function seekTo(t){
   if(!objURL)return;
@@ -1788,6 +1790,35 @@ if(navigator.getGamepads){
   window.addEventListener('gamepadconnected',e=>{ showToast('🎮 パッド接続'); });
   window.addEventListener('gamepaddisconnected',e=>{ showToast('⚠ 🎮 パッド切断',true); });
   requestAnimationFrame(gpPoll);
+}
+
+// ── v107: Media Session（コントロールセンター/ロック画面からの操作） ──────
+// 登録はseekbackward/seekforwardのみ（前後トラックを登録しないことで±秒ボタンが表示される＝出先チェック向き）。
+// ロック画面のシークバー(seekto/setPositionState)にも対応。全てtry/catchで包み、非対応iOSでも無害。
+function msUpdateMeta(){
+  if(!('mediaSession' in navigator)) return;
+  try{
+    navigator.mediaSession.metadata=new MediaMetadata({
+      title: curFileName||'AUDIOCHK',
+      artist: playlist.length>1 ? ('ファイル '+(plIdx+1)+' / '+playlist.length) : 'AUDIOCHK'
+    });
+  }catch(e){}
+}
+function msUpdateState(){
+  if(!('mediaSession' in navigator)) return;
+  try{ navigator.mediaSession.playbackState=isPlaying?'playing':'paused'; }catch(e){}
+  try{
+    if(duration>0&&isFinite(duration))
+      navigator.mediaSession.setPositionState({duration:duration,playbackRate:activeRate(),position:Math.max(0,Math.min(duration,curT()))});
+  }catch(e){}
+}
+if('mediaSession' in navigator){
+  const msSet=(a,h)=>{ try{ navigator.mediaSession.setActionHandler(a,h); }catch(e){} }; // アクション毎に握りつぶし（未対応actionはthrowするため）
+  msSet('play', ()=>{ play(); });
+  msSet('pause', ()=>{ stop(); });
+  msSet('seekbackward', d=>{ seekTo(curT()-((d&&d.seekOffset)||skipSec)); msUpdateState(); });
+  msSet('seekforward', d=>{ seekTo(curT()+((d&&d.seekOffset)||skipSec)); msUpdateState(); });
+  msSet('seekto', d=>{ if(d&&typeof d.seekTime==='number'){ seekTo(d.seekTime); msUpdateState(); } });
 }
 
 function onKey(e){
