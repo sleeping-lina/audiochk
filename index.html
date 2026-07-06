@@ -137,7 +137,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v105</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v106</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -268,6 +268,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
     <div style="display:flex;gap:8px;margin-top:12px">
       <button onclick="backToHelp()" style="flex:1;background:#1c1c28;border:1px solid var(--tap);border-radius:7px;color:rgba(0,229,255,.72);font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">戻る</button>
       <button onclick="resetKeymap()" style="flex:1;background:#1c1c28;border:1px solid var(--tap);border-radius:7px;color:rgba(0,229,255,.72);font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">既定に戻す</button>
+      <button onclick="resetGpMap()" style="flex:1;background:#1c1c28;border:1px solid var(--tap);border-radius:7px;color:rgba(0,229,255,.72);font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">🎮既定に戻す</button>
       <button onclick="document.getElementById('keymapModal').style.display='none';closeSettings(true)" style="flex:1;background:#1c1c28;border:1px solid var(--tap);border-radius:7px;color:rgba(0,229,255,.72);font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">閉じる</button>
     </div>
   </div>
@@ -283,6 +284,8 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
     <div style="display:flex;gap:8px;margin-top:10px">
       <button onclick="endCapture()" style="flex:1;background:#1c1c28;border:1px solid var(--tap);border-radius:8px;color:rgba(0,229,255,.72);font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">キャンセル</button>
       <button id="captureConfirm" onclick="confirmCapture()" style="display:none;flex:1;background:rgba(0,229,255,.15);border:1px solid #00e5ff;border-radius:8px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">このキーを登録</button>
+      <button id="gpCapShort" onclick="confirmGpCapture(false)" style="display:none;flex:1;background:rgba(0,229,255,.15);border:1px solid #00e5ff;border-radius:8px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">短押しに登録</button>
+      <button id="gpCapLong" onclick="confirmGpCapture(true)" style="display:none;flex:1;background:rgba(255,140,66,.15);border:1px solid #ff8c42;border-radius:8px;color:#ff8c42;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">長押しに登録</button>
     </div>
   </div>
 </div>
@@ -1613,6 +1616,18 @@ function renderKeymap(){
       x.onclick=(ev)=>{ ev.stopPropagation(); removeKey(fn,tok); };
       chip.appendChild(x); row.appendChild(chip);
     });
+    // v106: ゲームパッド割り当てチップ（短押し=シアン、長押し=オレンジ+「長」）
+    for(const tok in gpMap){
+      [['s',false],['l',true]].forEach(([slot,isLong])=>{
+        if(gpMap[tok][slot]!==fn) return;
+        const chip=document.createElement('span');
+        chip.style.cssText="display:inline-flex;align-items:center;gap:3px;background:#1c1c28;border:1px solid "+(isLong?'#ff8c42':'#2a2a3d')+";border-radius:5px;color:"+(isLong?'#ff8c42':'#00e5ff')+";font-family:'Space Mono',monospace;font-size:10px;padding:2px 5px";
+        const tx=document.createElement('span'); tx.textContent='🎮'+gpBtnName(tok)+(isLong?' 長':''); chip.appendChild(tx);
+        const x=document.createElement('span'); x.textContent='×'; x.style.cssText='color:#ff6b6b;cursor:pointer;font-size:11px;padding:0 1px';
+        x.onclick=(ev)=>{ ev.stopPropagation(); removeGp(tok,slot); };
+        chip.appendChild(x); row.appendChild(chip);
+      });
+    }
     const add=document.createElement('button');
     add.textContent='＋'; add.style.cssText="background:rgba(0,229,255,.12);border:1px solid #00e5ff;border-radius:5px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:13px;width:28px;height:26px;cursor:pointer;flex-shrink:0";
     add.onclick=()=>startCapture(fn);
@@ -1641,9 +1656,11 @@ function startCapture(fn){
   const ft=document.getElementById('focusTrap'); if(ft) ft.focus({preventScroll:true});
 }
 function endCapture(){
-  captureFn=null; pendingCapTok=null;
+  captureFn=null; pendingCapTok=null; pendingGpTok=null; // v106
   const ov=document.getElementById('captureOverlay'); if(ov) ov.style.display='none';
   const cf=document.getElementById('captureConfirm'); if(cf) cf.style.display='none';
+  const gs=document.getElementById('gpCapShort'); if(gs) gs.style.display='none'; // v106
+  const gl=document.getElementById('gpCapLong'); if(gl) gl.style.display='none';  // v106
 }
 function confirmCapture(){ if(captureFn&&pendingCapTok!==null){ assignKey(captureFn,pendingCapTok); } endCapture(); }
 function assignKey(fn,tok){
@@ -1660,6 +1677,119 @@ function assignKey(fn,tok){
 function removeKey(fn,tok){ keymap[fn]=(keymap[fn]||[]).filter(x=>x!==tok); saveKeymap(); renderKeymap(); }
 function resetKeymap(){ keymap=defKeymapCopy(); saveKeymap(); renderKeymap(); renderHelpList(); showToast('既定キーに戻しました'); }
 
+// ── v106: ゲームパッド層（8BitDo micro S/Dモード用・キーボードと共存） ──────
+// iOS仕様メモ：ページ読み込み後に画面を1回タップするまでパッドが露出しない。以後はアプリ往復しても生きる（実機確認済み）。
+// ★ボタンは本体プロファイル用で露出せず、アイコン(ホーム)はiOSが横取り(Apple Games)するため取得不可＝使えるのは14入力。
+const GP_BTN_NAMES={B0:'A',B1:'B',B2:'X',B3:'Y',B4:'L',B5:'R',B6:'L2',B7:'R2',B8:'−',B9:'＋',UP:'↑',DOWN:'↓',LEFT:'←',RIGHT:'→'};
+function gpBtnName(tok){ return GP_BTN_NAMES[tok]||tok; }
+// 既定マップ：現行の8BitDo運用＋「Y・↑→確認Cに統合」を反映。s=短押し、l=長押し(既定は全て未設定＝遅延ゼロ)
+const DEFAULT_GPMAP={
+  B0:{s:'playpause'}, B1:{s:'undo'}, B2:{s:'markadd'}, B3:{s:'checkback'},
+  B4:{s:'prevmark'}, B5:{s:'nextmark'}, B6:{s:'prevfile'}, B7:{s:'nextfile'},
+  B8:{s:'marknudgeback'}, B9:{s:'marknudgefwd'},
+  UP:{s:'report'}, DOWN:{s:'detect'}, LEFT:{s:'skipback'}, RIGHT:{s:'skipfwd'}
+};
+function defGpMapCopy(){ const m={}; for(const k in DEFAULT_GPMAP) m[k]=Object.assign({},DEFAULT_GPMAP[k]); return m; }
+function loadGpMap(){
+  try{ const o=JSON.parse(localStorage.getItem('ac_gpmap')||'null');
+    if(o&&typeof o==='object') return o; // 保存済みマップ全体を採用（削除も保持される）
+  }catch(e){}
+  return defGpMapCopy();
+}
+function saveGpMap(){ try{ localStorage.setItem('ac_gpmap',JSON.stringify(gpMap)); }catch(e){} }
+let gpMap=loadGpMap();
+function resetGpMap(){ gpMap=defGpMapCopy(); saveGpMap(); renderKeymap(); renderHelpList(); showToast('🎮 既定に戻しました'); }
+
+// 長押し判定400ms／リピートは移動系のみ（トグル系の連打事故防止。キーボードのOSリピートに相当）
+const GP_LONG_MS=400, GP_REP1=400, GP_REP=120;
+const GP_REPEAT_FNS=['skipback','skipfwd','fineback','finefwd','marknudgeback','marknudgefwd','prevmark','nextmark','prevsil','nextsil','undo','redo'];
+const gpState={}; // token -> {down,t0,firedLong,nextRep}
+let pendingGpTok=null;
+
+// D: 十字=B12-15 / S: 十字=軸A0,A1 → 共通トークン(UP/DOWN/LEFT/RIGHT)に正規化
+function gpTokensFrom(g){
+  const set=new Set();
+  g.buttons.forEach((b,i)=>{
+    const on=b.pressed||b.value>0.5; if(!on)return;
+    if(i===12)set.add('UP'); else if(i===13)set.add('DOWN'); else if(i===14)set.add('LEFT'); else if(i===15)set.add('RIGHT');
+    else set.add('B'+i);
+  });
+  if(g.axes.length>=2){
+    const x=g.axes[0],y=g.axes[1];
+    if(y<-0.5)set.add('UP'); if(y>0.5)set.add('DOWN');
+    if(x<-0.5)set.add('LEFT'); if(x>0.5)set.add('RIGHT');
+  }
+  return set;
+}
+// キーボードonKeyと同じ抑制ルールをパッドにも適用
+function gpFire(fn){
+  if(document.getElementById('reportModal').style.display!=='none'){
+    if(fn==='report') closeReportPopup(); // ポップアップ中はreportのみトグルで閉じる
+    return;
+  }
+  if(anyModalOpen()) return;
+  doAction(fn);
+}
+function gpCaptureHit(tok){ // キー登録画面でパッドが押された：短押し/長押しの選択を出す
+  pendingGpTok=tok; pendingCapTok=null;
+  document.getElementById('captureLabel').textContent='登録ボタン: 🎮'+gpBtnName(tok);
+  document.getElementById('captureDbg').textContent='gamepad token='+tok;
+  document.getElementById('captureConfirm').style.display='none';
+  document.getElementById('gpCapShort').style.display='';
+  document.getElementById('gpCapLong').style.display='';
+}
+function confirmGpCapture(isLong){ if(captureFn&&pendingGpTok!==null){ assignGp(captureFn,pendingGpTok,isLong); } endCapture(); }
+function assignGp(fn,tok,isLong){
+  const slot=isLong?'l':'s';
+  const cur=gpMap[tok]&&gpMap[tok][slot];
+  if(!gpMap[tok]) gpMap[tok]={};
+  gpMap[tok][slot]=fn;
+  saveGpMap(); renderKeymap(); renderHelpList();
+  if(cur&&cur!==fn) showToast('⚠「'+(FN_LABELS[cur]||cur)+'」からこのボタンを移動しました');
+}
+function removeGp(tok,slot){
+  if(!gpMap[tok]) return;
+  delete gpMap[tok][slot];
+  if(!gpMap[tok].s&&!gpMap[tok].l) delete gpMap[tok];
+  saveGpMap(); renderKeymap(); renderHelpList();
+}
+function gpPoll(){
+  const pads=navigator.getGamepads?navigator.getGamepads():[];
+  const down=new Set();
+  for(const g of pads){ if(g){ const t=gpTokensFrom(g); t.forEach(x=>down.add(x)); } }
+  const now=performance.now();
+  down.forEach(tok=>{
+    let st=gpState[tok];
+    if(!st||!st.down){ // 押した瞬間
+      gpState[tok]=st={down:true,t0:now,firedLong:false,nextRep:now+GP_REP1};
+      if(captureFn){ gpCaptureHit(tok); return; }
+      const m=gpMap[tok]; if(!m) return;
+      if(!m.l && m.s) gpFire(m.s); // 長押し未設定＝即発火（遅延ゼロ）
+    } else { // 押しっぱなし
+      if(captureFn) return;
+      const m=gpMap[tok]; if(!m) return;
+      if(m.l){ if(!st.firedLong && now-st.t0>=GP_LONG_MS){ st.firedLong=true; gpFire(m.l); } }
+      else if(m.s && GP_REPEAT_FNS.includes(m.s) && now>=st.nextRep){ st.nextRep=now+GP_REP; gpFire(m.s); }
+    }
+  });
+  for(const tok in gpState){
+    const st=gpState[tok];
+    if(st.down && !down.has(tok)){ // 離した瞬間
+      st.down=false;
+      const m=gpMap[tok];
+      // 長押し設定ありのボタン：400ms未満で離したら短押し発火（判別のため離した時になる＝仕様）
+      if(!captureFn && m && m.l && !st.firedLong && (now-st.t0)<GP_LONG_MS && m.s) gpFire(m.s);
+      st.firedLong=false;
+    }
+  }
+  requestAnimationFrame(gpPoll);
+}
+if(navigator.getGamepads){
+  window.addEventListener('gamepadconnected',e=>{ showToast('🎮 パッド接続'); });
+  window.addEventListener('gamepaddisconnected',e=>{ showToast('⚠ 🎮 パッド切断',true); });
+  requestAnimationFrame(gpPoll);
+}
+
 function onKey(e){
   if(e._acHandled) return; e._acHandled=true; // 同一keydownが document/window/focusTrap の3経路で届く重複を1回に集約
   const tag=e.target.tagName;
@@ -1668,7 +1798,9 @@ function onKey(e){
   // キー登録中：押されたキーを表示（key/code）。通常動作はさせず、確認ボタンで登録。
   if(captureFn){
     e.preventDefault(); e.stopPropagation();
-    pendingCapTok=keyToken(e);
+    pendingCapTok=keyToken(e); pendingGpTok=null; // v106: キー入力があればパッド候補は破棄
+    document.getElementById('gpCapShort').style.display='none';
+    document.getElementById('gpCapLong').style.display='none';
     const kd=JSON.stringify(e.key), cd=e.code||'-';
     document.getElementById('captureLabel').textContent='登録キー: '+tokenLabel(pendingCapTok);
     document.getElementById('captureDbg').textContent='key='+kd+'  code='+cd;
@@ -1866,7 +1998,9 @@ function renderHelpList(){
   const wrap=document.getElementById('helpList'); if(!wrap) return;
   wrap.innerHTML='';
   FN_ORDER.forEach(fn=>{
-    const keys=(keymap[fn]||[]).map(tokenLabel).join(' / ')||'—';
+    let keys=(keymap[fn]||[]).map(tokenLabel).join(' / ');
+    for(const tok in gpMap){ if(gpMap[tok].s===fn) keys+=(keys?' / ':'')+'🎮'+gpBtnName(tok); if(gpMap[tok].l===fn) keys+=(keys?' / ':'')+'🎮'+gpBtnName(tok)+'長'; }
+    keys=keys||'—';
     const row=document.createElement('div');
     row.style.cssText='display:flex;gap:8px;padding:5px 4px;border-bottom:1px solid #2a2a3d';
     const k=document.createElement('span'); k.style.cssText="color:#00e5ff;font-size:11px;min-width:92px"; k.textContent=keys;
