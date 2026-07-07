@@ -137,7 +137,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v108</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v109</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -493,6 +493,7 @@ let lastGoodTime=0, lastRecover=0; // 直近の有効再生位置／最終復旧
 let cbPrevSpd=0; // v104: 確認モード(checkback)復帰用の元速度（0=非確認中）
 let playGen=0;   // v108: play()非同期解決の世代番号（解決前に停止/モード切替が起きたら結果を破棄）
 let mediaUnlocked=false; // v108: 両audio要素のiOSアンロック済みフラグ
+let msArmed=false; // v109: セッション中に一度でも再生したらtrue。コントロールセンター/BT機器からの意図しない再生コマンドを無視するため
 let raf=null;
 let playlist=[], plIdx=-1, skipSec=5;
 let curMkIdx=-1;
@@ -1116,6 +1117,9 @@ function recoverMedia(forcePlay){ // v104: forcePlay=play()から呼ばれた時
 function unlockMedia(){
   if(mediaUnlocked || !objURL) return;
   mediaUnlocked=true;
+  // v109: 検出用のAudioContext/グラフをジェスチャ内で先に作成（この文脈なら最初からrunningで生まれる。
+  // パッド経由のtoggleDetectで作るとsuspendedのまま起こせず「無音で時間だけ進む」現象になる）
+  try{ ensureWAGraph(); if(waCtx&&waCtx.state!=='running') waCtx.resume(); }catch(e){}
   [audioPlay,audioDet].forEach(el=>{
     if(el===audioEl && isPlaying) return; // 実際に再生中の要素には触らない
     try{
@@ -1131,9 +1135,19 @@ function unlockMedia(){
       } else { el.pause(); el.muted=false; }
     }catch(e){}
   });
+  // v109: 安全網＝アンロック処理の350ms後、再生中でないのに鳴っている要素があれば強制停止（「勝手に再生」の保険）
+  setTimeout(()=>{
+    if(isPlaying) return;
+    try{ if(!audioPlay.paused) audioPlay.pause(); }catch(e){}
+    try{ if(!audioDet.paused) audioDet.pause(); }catch(e){}
+  },350);
 }
-document.addEventListener('touchend',unlockMedia,true); // ゲームパッド用の「初回1タップ」がそのままアンロックを兼ねる
-document.addEventListener('click',unlockMedia,true);
+function gestureUnlock(){ // v109: 本物のタップ毎に軽量実行。検出モードの音の出口(AudioContext)はタップ文脈でしか起こせない
+  try{ if(waCtx && waCtx.state!=='running'){ const pr=waCtx.resume(); if(pr&&pr.catch) pr.catch(()=>{}); } }catch(e){}
+  unlockMedia();
+}
+document.addEventListener('touchend',gestureUnlock,true); // ゲームパッド用の「初回1タップ」がアンロックとctx起動を兼ねる
+document.addEventListener('click',gestureUnlock,true);
 
 function play(){
   if(!objURL||isPlaying)return;
@@ -1150,6 +1164,7 @@ function play(){
   canResumeComp=false;
   if(detectOn) ensureWAGraph();      // 聞くモード(OFF)ではグラフを作らず直接再生→倍速なめらか
   if(waCtx&&waCtx.state==='suspended') waCtx.resume();
+  try{ (audioEl===audioPlay?audioDet:audioPlay).pause(); }catch(e){} // v109: 非アクティブ側を必ず停止（どの経路でも二重再生＝エコーを不可能にする）
   // Set rate before AND after play() — iOS sometimes resets it on play()
   audioEl.playbackRate=activeRate(); setPitch(audioEl);
   const el=audioEl, g=++playGen; // v108: 解決時に停止/モード切替が起きていたら結果を破棄（二重再生・状態ズレ防止）
@@ -1161,6 +1176,12 @@ function play(){
       audioEl.playbackRate=activeRate(); setPitch(audioEl);
       isPlaying=true; redrawPlayBtn(); loop(); if(detectOn&&waReady) rtLoop();
       requestWakeLock(); msUpdateMeta(); msUpdateState(); // v107/v108: 再生のたびにCC情報を再クレーム
+      msArmed=true; // v109: 以後コントロールセンターの再生コマンドを受け付ける
+      // v109: 検出モードで音の出口が眠ったままなら、resumeを試みた上で明確に案内（旧: 無音・トーストなしで進行していた）
+      if(detectOn && waCtx && waCtx.state!=='running'){
+        try{ const pr=waCtx.resume(); if(pr&&pr.catch) pr.catch(()=>{}); }catch(e){}
+        setTimeout(()=>{ if(isPlaying && detectOn && waCtx && waCtx.state!=='running') showToast('⚠ 音を出すには画面をどこか1回タップしてください（iOSの制限）',true); },350);
+      }
     }).catch(e=>{
       if(g!==playGen) return; // v108: 破棄済みの要求のエラーは無視
       isPlaying=false; redrawPlayBtn();
@@ -1852,7 +1873,17 @@ function msUpdateState(){
 }
 if('mediaSession' in navigator){
   const msSet=(a,h)=>{ try{ navigator.mediaSession.setActionHandler(a,h); }catch(e){} }; // アクション毎に握りつぶし（未対応actionはthrowするため）
-  msSet('play', ()=>{ stopTime=0; play(); }); // v108: コントロールセンターの停止→即再生が200msデバウンスに食われないように
+  msSet('play', ()=>{ // v108: stopTime=0で200msデバウンス回避 / v109: msArmedガード＋失速監視
+    if(!objURL || !msArmed) return; // v109: セッション内で未再生ならBT機器等からの意図しない再生コマンドを無視
+    stopTime=0; play();
+    // v109: バックグラウンドではiOSが音声セッションを返さず「再生扱いだが無音で位置も進まない」ことがある。
+    // 実位置が進んでいなければ停止状態に戻し、コントロールセンターの表示を実態と一致させる（時間だけ進む見かけを防ぐ）
+    setTimeout(()=>{
+      if(!isPlaying) return;
+      const t0=audioEl.currentTime;
+      setTimeout(()=>{ if(isPlaying && Math.abs(audioEl.currentTime-t0)<0.05){ stop(); msUpdateState(); } },700);
+    },300);
+  });
   msSet('pause', ()=>{ stop(); });
   msSet('seekbackward', d=>{ seekTo(curT()-((d&&d.seekOffset)||skipSec)); msUpdateState(); });
   msSet('seekforward', d=>{ seekTo(curT()+((d&&d.seekOffset)||skipSec)); msUpdateState(); });
