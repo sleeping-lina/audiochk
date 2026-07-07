@@ -137,7 +137,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v107</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v108</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -491,6 +491,8 @@ let silReg=[];
 let silMaxDur=0; // 既知の最長無音(秒)。drawWaveのカリングで「手前に伸びる長い無音」を取りこぼさないため
 let lastGoodTime=0, lastRecover=0; // 直近の有効再生位置／最終復旧時刻（MEDIA_ERR_DECODE自動復旧用）
 let cbPrevSpd=0; // v104: 確認モード(checkback)復帰用の元速度（0=非確認中）
+let playGen=0;   // v108: play()非同期解決の世代番号（解決前に停止/モード切替が起きたら結果を破棄）
+let mediaUnlocked=false; // v108: 両audio要素のiOSアンロック済みフラグ
 let raf=null;
 let playlist=[], plIdx=-1, skipSec=5;
 let curMkIdx=-1;
@@ -586,14 +588,14 @@ const AEXTS=/\.(mp3|m4a|aac|wav|ogg|flac|opus|webm|caf)$/i;
 document.getElementById('fileInput').addEventListener('change',function(){
   const f=this.files[0]; if(!f)return;
   playlist=[{name:f.name,file:f,size:f.size}]; plIdx=0;
-  setSrc(f); load(f); renderPL(); this.value='';
+  setSrc(f); unlockMedia(); load(f); renderPL(); this.value=''; // v108: 選択操作の勢いで両要素をアンロック
 });
 document.getElementById('folderInput').addEventListener('change',function(){
   const files=Array.from(this.files).filter(f=>AEXTS.test(f.name)||f.type.startsWith('audio/')).sort((a,b)=>a.name.localeCompare(b.name,'ja'));
   if(!files.length){ showToast('音声ファイルなし'); return; }
   playlist=files.map(f=>({name:f.name,file:f,size:f.size})); plIdx=0;
   renderPL();
-  setSrc(files[0]); load(files[0]); this.value='';
+  setSrc(files[0]); unlockMedia(); load(files[0]); this.value=''; // v108
 });
 function setSrc(file){
   if(objURL) URL.revokeObjectURL(objURL);
@@ -879,7 +881,7 @@ function updateFileNav(){
   document.getElementById('prevFileBtn').disabled = plIdx<=0;
   document.getElementById('nextFileBtn').disabled = plIdx>=n-1;
 }
-function plTap(i){ const f=playlist[i].file; plIdx=i; setSrc(f); load(f); closePlModal(); }
+function plTap(i){ const f=playlist[i].file; plIdx=i; setSrc(f); unlockMedia(); load(f); closePlModal(); } // v108: unlock追加
 function openPlModal(){
   if(playlist.length<=1) return; // 1ファイル以下は一覧不要
   document.getElementById('plModalCount').textContent='('+playlist.length+')';
@@ -1106,6 +1108,33 @@ function recoverMedia(forcePlay){ // v104: forcePlay=play()から呼ばれた時
   audioEl.addEventListener('loadeddata',onReady,{once:true});
 }
 
+// ── v108: メディアアンロック ──────────────────────────────
+// ゲームパッドのボタンはiOSの「ユーザー操作」にならないため、各audio要素の初回play()が
+// NotAllowedErrorで拒否される（キーボードのkeydownはユーザー操作扱い＝旧運用で表面化しなかった理由）。
+// 対策：本物のタップ/クリックの中で両要素をミュート再生→即停止し、iOSのホワイトリストに載せる。
+// 一度アンロックすればsrcを変えても要素単位で有効なのでページ寿命で1回だけでよい。
+function unlockMedia(){
+  if(mediaUnlocked || !objURL) return;
+  mediaUnlocked=true;
+  [audioPlay,audioDet].forEach(el=>{
+    if(el===audioEl && isPlaying) return; // 実際に再生中の要素には触らない
+    try{
+      const t=el.currentTime;
+      el.muted=true;
+      const p=el.play();
+      if(p){
+        p.then(()=>{
+          if(el===audioEl && isPlaying){ el.muted=false; return; } // アンロック中に本再生が始まった場合はそのまま
+          el.pause(); el.muted=false;
+          try{ el.currentTime=t; }catch(e){}
+        }).catch(()=>{ el.muted=false; });
+      } else { el.pause(); el.muted=false; }
+    }catch(e){}
+  });
+}
+document.addEventListener('touchend',unlockMedia,true); // ゲームパッド用の「初回1タップ」がそのままアンロックを兼ねる
+document.addEventListener('click',unlockMedia,true);
+
 function play(){
   if(!objURL||isPlaying)return;
   if(Date.now()-stopTime<200)return; // debounce: ignore rapid play after stop
@@ -1123,14 +1152,22 @@ function play(){
   if(waCtx&&waCtx.state==='suspended') waCtx.resume();
   // Set rate before AND after play() — iOS sometimes resets it on play()
   audioEl.playbackRate=activeRate(); setPitch(audioEl);
-  const p=audioEl.play();
+  const el=audioEl, g=++playGen; // v108: 解決時に停止/モード切替が起きていたら結果を破棄（二重再生・状態ズレ防止）
+  const p=el.play();
   if(p){
     p.then(()=>{
+      if(g!==playGen || el!==audioEl){ try{el.pause();}catch(e){} return; } // v108: 古い再生要求は破棄
       // Re-apply rate after play() resolves (iOS resets it)
       audioEl.playbackRate=activeRate(); setPitch(audioEl);
       isPlaying=true; redrawPlayBtn(); loop(); if(detectOn&&waReady) rtLoop();
-      requestWakeLock(); msUpdateState(); // v107
-    }).catch(e=>showToast('再生失敗:'+e.message));
+      requestWakeLock(); msUpdateMeta(); msUpdateState(); // v107/v108: 再生のたびにCC情報を再クレーム
+    }).catch(e=>{
+      if(g!==playGen) return; // v108: 破棄済みの要求のエラーは無視
+      isPlaying=false; redrawPlayBtn();
+      // v108: ゲームパッド操作はiOSのユーザー操作扱いにならず、未アンロック要素の初回play()がNotAllowedErrorになる
+      if(e && e.name==='NotAllowedError'){ mediaUnlocked=false; showToast('⚠ iOSの制限で再生できません。画面をどこか1回タップしてから、もう一度再生してください',true); }
+      else showToast('⚠ 再生失敗: '+(e&&e.message||e),true);
+    });
   } else {
     audioEl.playbackRate=activeRate(); setPitch(audioEl);
     isPlaying=true; redrawPlayBtn(); loop(); if(detectOn&&waReady) rtLoop();
@@ -1138,6 +1175,7 @@ function play(){
   }
 }
 function stop(){
+  playGen++; // v108: 解決前のplay()を無効化
   audioPlay.pause(); audioDet.pause(); isPlaying=false; stopTime=Date.now(); redrawPlayBtn();
   drawAllBtns(); // パージで消えた操作ボタンを復帰
   releaseWakeLock();
@@ -1814,7 +1852,7 @@ function msUpdateState(){
 }
 if('mediaSession' in navigator){
   const msSet=(a,h)=>{ try{ navigator.mediaSession.setActionHandler(a,h); }catch(e){} }; // アクション毎に握りつぶし（未対応actionはthrowするため）
-  msSet('play', ()=>{ play(); });
+  msSet('play', ()=>{ stopTime=0; play(); }); // v108: コントロールセンターの停止→即再生が200msデバウンスに食われないように
   msSet('pause', ()=>{ stop(); });
   msSet('seekbackward', d=>{ seekTo(curT()-((d&&d.seekOffset)||skipSec)); msUpdateState(); });
   msSet('seekforward', d=>{ seekTo(curT()+((d&&d.seekOffset)||skipSec)); msUpdateState(); });
