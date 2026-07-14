@@ -118,8 +118,13 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 .mk-empty{text-align:center;padding:18px;color:var(--dm);font-size:11px;line-height:2}
 /* io */
 .io-bar{display:flex;gap:4px;padding:4px 8px;background:var(--sf);border-top:1px solid var(--bd);flex-shrink:0}
+.iconbtn{background:#0d1f2a;border:1px solid rgba(0,229,255,.3);border-radius:6px;width:32px;height:28px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;padding:0}
+.iconbtn:active{opacity:.6}
 .iobtn{flex:1;background:var(--s2);border:1px solid var(--tap);border-radius:5px;color:var(--dm);
-  font-size:10px;font-family:'Space Mono',monospace;padding:4px;cursor:pointer;text-align:center}
+  font-size:10px;font-family:'Space Mono',monospace;padding:4px;cursor:pointer;text-align:center;
+  display:flex;align-items:center;justify-content:center;gap:5px}
+.iobtn svg{flex-shrink:0}
 .iobtn:active{opacity:.6}
 #toast{position:fixed;bottom:48px;left:50%;transform:translateX(-50%) translateY(10px);
   background:var(--s2);border:1px solid var(--ac);color:var(--ac);font-family:'Space Mono',monospace;
@@ -137,12 +142,16 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v111</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v112</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
-    <canvas class="cbtn" id="folderBtn" width="32" height="28" data-w="32" data-h="28"></canvas>
-    <canvas class="cbtn" id="fileBtn" width="32" height="28" data-w="32" data-h="28"></canvas>
+    <button class="iconbtn" id="folderBtn" title="フォルダを開く" aria-label="フォルダを開く">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8 V7 a2 2 0 0 1 2-2 h4.2 L11.5 7 H19 a2 2 0 0 1 2 2 v8 a2 2 0 0 1-2 2 H5 a2 2 0 0 1-2-2 Z"/></svg>
+    </button>
+    <button class="iconbtn" id="fileBtn" title="ファイルを開く" aria-label="ファイルを開く">
+      <svg width="18" height="18" viewBox="0 0 24 24"><g stroke="#00e5ff" stroke-width="1.7" fill="none" stroke-linecap="round"><path d="M10.4 16.9 V5.2 q4.7 .6 6.4 4.3"/></g><ellipse cx="7.7" cy="17" rx="2.9" ry="2.2" fill="#00e5ff"/></svg>
+    </button>
   </div>
   <input type="file" id="fileInput" accept=".mp3,.m4a,.aac,.wav,.ogg,.flac,.opus,.caf,audio/mpeg,audio/mp4,audio/x-m4a,audio/aac,audio/wav,audio/ogg,audio/flac,audio/opus">
   <input type="file" id="folderInput" webkitdirectory multiple>
@@ -173,7 +182,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
     </button>
   </div>
   <button id="reportBtn" onclick="openReportPopup()" title="ファイル名と時間を拡大表示" aria-label="拡大表示" style="background:#0a0a0f;border:1px solid var(--tap);border-radius:6px;padding:4px 7px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-    <svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 6 V2 H6 M14 6 V2 H10 M2 10 V14 H6 M14 10 V14 H10" fill="none" stroke="#00e5ff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 11 v5.2"/><circle cx="12" cy="7.8" r=".5" fill="#00e5ff"/></svg>
   </button>
 </div>
 <div class="seek-wrap" id="seekWrap"><canvas id="seekCanvas"></canvas></div>
@@ -248,8 +257,8 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   <div id="silListBox"></div>
 </div>
 <div class="io-bar">
-  <button class="iobtn" id="exportBtn" style="border-color:rgba(0,229,255,.3);color:rgba(0,229,255,.8)">▼ EXPORT</button>
-  <button class="iobtn" onclick="document.getElementById('importData').click()" style="border-color:rgba(0,229,255,.3);color:rgba(0,229,255,.8)">▲ IMPORT</button>
+  <button class="iobtn" id="exportBtn" style="border-color:rgba(0,229,255,.3);color:rgba(0,229,255,.8)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14 v4 a2 2 0 0 0 2 2 h12 a2 2 0 0 0 2-2 v-4"/><path d="M12 14 V3.5"/><path d="M7.8 7.5 L12 3.3 L16.2 7.5"/></svg>EXPORT</button>
+  <button class="iobtn" onclick="document.getElementById('importData').click()" style="border-color:rgba(0,229,255,.3);color:rgba(0,229,255,.8)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14 v4 a2 2 0 0 0 2 2 h12 a2 2 0 0 0 2-2 v-4"/><path d="M12 3.5 V14"/><path d="M7.8 10 L12 14.2 L16.2 10"/></svg>IMPORT</button>
   <button class="iobtn" id="settingsBtn" onclick="openSettingsModal()" title="設定" aria-label="設定" style="border-color:rgba(0,229,255,.3);color:rgba(0,229,255,.8);display:flex;align-items:center;justify-content:center;gap:5px">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>設定</button>
 </div>
@@ -2007,7 +2016,7 @@ function circle(c,x,y,r,fill,stroke,sw){
 }
 
 function drawBtn(id){
-  const cv=document.getElementById(id); if(!cv)return;
+  const cv=document.getElementById(id); if(!cv||!cv.getContext)return; // v112: SVGボタン化した要素が渡されても安全
   // Use data-w/data-h for logical size — never read cv.width which changes with dpr
   const W=parseInt(cv.dataset.w||cv.getAttribute('data-w')||'44');
   const H=parseInt(cv.dataset.h||cv.getAttribute('data-h')||'44');
@@ -2126,8 +2135,8 @@ function drawBtn(id){
 }
 
 function drawAllBtns(){
-  ['folderBtn','fileBtn',
-   'btnHeadTail0','btnBack01','btnBackN','btnPlay','btnFwdN','btnFwd01','btnHeadTail1'].forEach(drawBtn);
+  // v112: folderBtn/fileBtnはSVGボタン化したため描画対象から除外
+  ['btnHeadTail0','btnBack01','btnBackN','btnPlay','btnFwdN','btnFwd01','btnHeadTail1'].forEach(drawBtn);
 }
 // iOSがメモリ不足でcanvas(GPU)をパージすると全描画が消える対策：
 // 失われたら検知して全面描き直す。次回これが出れば「canvas purge」と確定。
