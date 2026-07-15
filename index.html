@@ -142,7 +142,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v112</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v113</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -150,7 +150,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8 V7 a2 2 0 0 1 2-2 h4.2 L11.5 7 H19 a2 2 0 0 1 2 2 v8 a2 2 0 0 1-2 2 H5 a2 2 0 0 1-2-2 Z"/></svg>
     </button>
     <button class="iconbtn" id="fileBtn" title="ファイルを開く" aria-label="ファイルを開く">
-      <svg width="18" height="18" viewBox="0 0 24 24"><g stroke="#00e5ff" stroke-width="1.7" fill="none" stroke-linecap="round"><path d="M10.4 16.9 V5.2 q4.7 .6 6.4 4.3"/></g><ellipse cx="7.7" cy="17" rx="2.9" ry="2.2" fill="#00e5ff"/></svg>
+      <svg width="18" height="18" viewBox="0 0 24 24"><ellipse cx="7.9" cy="17" rx="3.1" ry="2.3" transform="rotate(-18 7.9 17)" fill="#00e5ff"/><path d="M10.08 16.35 V5.3 q4.7 .6 6.4 4.3" stroke="#00e5ff" stroke-width="1.7" fill="none" stroke-linecap="round"/></svg>
     </button>
   </div>
   <input type="file" id="fileInput" accept=".mp3,.m4a,.aac,.wav,.ogg,.flac,.opus,.caf,audio/mpeg,audio/mp4,audio/x-m4a,audio/aac,audio/wav,audio/ogg,audio/flac,audio/opus">
@@ -407,7 +407,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
       <div id="tab-detect" class="setpanel">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-family:'Space Mono',monospace;font-size:9px;color:#b6b9d6;letter-spacing:1px;white-space:nowrap">検出設定</span><span style="flex:1;height:1px;background:var(--tap)"></span></div>
       <div style="font-size:8.5px;color:var(--dm);font-family:'Space Mono',monospace;line-height:1.4;margin-bottom:8px">検出ON＝1.0倍で波形/無音表示・検出OFF＝聞くモード（任意倍速でなめらか・波形は非表示）</div>
-      <div class="sil-row"><span class="sil-ctl-lbl">感度（閾値）</span><button class="sil-adj" onclick="adjSilThr(-1)">−</button><input type="range" id="silThr" min="0.004" max="0.08" step="0.002" value="0.004"><button class="sil-adj" onclick="adjSilThr(1)">＋</button><span class="sil-val" id="silThrV">0.004</span></div>
+      <div class="sil-row"><span class="sil-ctl-lbl">感度（閾値）</span><button class="sil-adj" onclick="adjSilThr(-1)">−</button><input type="range" id="silThr" min="0.001" max="0.02" step="0.0005" value="0.004"><button class="sil-adj" onclick="adjSilThr(1)">＋</button><span class="sil-val" id="silThrV">0.004</span></div>
       <div class="sil-row"><span class="sil-ctl-lbl">最短無音秒数</span><button class="sil-adj" onclick="adjSilMin(-1)">−</button><input type="range" id="silMin" min="0.1" max="5" step="0.1" value="0.5"><button class="sil-adj" onclick="adjSilMin(1)">＋</button><span class="sil-val" id="silMinV">0.5秒</span></div>
       <div style="display:flex;align-items:center;gap:8px;margin:14px 0 8px"><span style="font-family:'Space Mono',monospace;font-size:9px;color:#b6b9d6;letter-spacing:1px;white-space:nowrap">補正設定</span><span style="flex:1;height:1px;background:var(--tap)"></span></div>
       <div style="font-size:9px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:10px">モード切替・速度切替時の巻き戻り感などを補正します。値は実機で調整してください。</div>
@@ -1194,7 +1194,7 @@ function gestureUnlock(ev){ // v109: 本物のタップ毎に軽量実行。検�
     if(Date.now()-retryPlayArmedAt>15000) return; // v111: 古い武装は破棄（忘れた頃の勝手な再生を防止）
     const t=ev&&ev.target;
     // v111: label(ファイル選択ボタンの実体)・リンク・role=buttonも除外＝「ファイル選択しようとしたら再生」の根絶
-    if(!(t&&t.closest&&t.closest("button,input,select,textarea,label,a,[onclick],[role=button]"))){ stopTime=0; play(); }
+    if(!(t&&t.closest&&t.closest("button,input,select,textarea,label,a,[onclick],[role=button]"))){ stopTime=0; showToast('▶ 再生（タップ再開）'); play(); } // v113: 経路ラベル
   }
 }
 document.addEventListener('touchend',gestureUnlock,true); // ゲームパッド用の「初回1タップ」がアンロックとctx起動を兼ねる
@@ -1822,6 +1822,7 @@ function resetGpMap(){ gpMap=defGpMapCopy(); saveGpMap(); renderKeymap(); render
 const GP_LONG_MS=400, GP_REP1=400, GP_REP=120;
 const GP_REPEAT_FNS=['skipback','skipfwd','fineback','finefwd','marknudgeback','marknudgefwd','prevmark','nextmark','prevsil','nextsil','undo','redo'];
 const gpState={}; // token -> {down,t0,firedLong,nextRep}
+const gpWarm={};  // v113: index -> 全解放フレームを確認済みか（接続直後のゴミ入力対策）
 let pendingGpTok=null;
 
 // D: 十字=B12-15 / S: 十字=軸A0,A1 → 共通トークン(UP/DOWN/LEFT/RIGHT)に正規化
@@ -1876,7 +1877,17 @@ function removeGp(tok,slot){
 function gpPoll(){
   const pads=navigator.getGamepads?navigator.getGamepads():[];
   const down=new Set();
-  for(const g of pads){ if(g){ const t=gpTokensFrom(g); t.forEach(x=>down.add(x)); } }
+  for(const g of pads){
+    if(!g) continue;
+    const t=gpTokensFrom(g);
+    // v113: ウォームアップ＝接続直後の数フレームは「押してもいないボタンが押された」ゴミデータが来ることがある。
+    // そのパッドが一度「全ボタン解放」のフレームを見せるまで入力を採用しない（勝手に再生の容疑経路を遮断）
+    if(!gpWarm[g.index]){
+      if(t.size===0) gpWarm[g.index]=true;
+      continue;
+    }
+    t.forEach(x=>down.add(x));
+  }
   const now=performance.now();
   down.forEach(tok=>{
     let st=gpState[tok];
@@ -1906,7 +1917,7 @@ function gpPoll(){
 }
 if(navigator.getGamepads){
   window.addEventListener('gamepadconnected',e=>{ showToast('🎮 パッド接続'); });
-  window.addEventListener('gamepaddisconnected',e=>{ showToast('⚠ 🎮 パッド切断',true); });
+  window.addEventListener('gamepaddisconnected',e=>{ delete gpWarm[e.gamepad.index]; showToast('⚠ 🎮 パッド切断',true); }); // v113: 再接続時に再ウォームアップ
   requestAnimationFrame(gpPoll);
 }
 
@@ -1934,7 +1945,8 @@ if('mediaSession' in navigator){
   const msSet=(a,h)=>{ try{ navigator.mediaSession.setActionHandler(a,h); }catch(e){} }; // アクション毎に握りつぶし（未対応actionはthrowするため）
   msSet('play', ()=>{ // v108: stopTime=0で200msデバウンス回避 / v109: msArmedガード＋失速監視
     if(!objURL || !msArmed) return; // v109: セッション内で未再生ならBT機器等からの意図しない再生コマンドを無視
-    if(Date.now()-lastLoadAt<1500) return; // v110: ファイル読込直後の幽霊再生コマンドを無視
+    showToast('▶ 再生（コントロールセンター経由）'); // v113: 経路ラベル＝勝手に再生された時の犯人特定用
+    if(Date.now()-lastLoadAt<5000) return; // v110/v113: ファイル読込直後の幽霊再生コマンド遮断を5秒に拡大
     stopTime=0; play();
     // v109: バックグラウンドではiOSが音声セッションを返さず「再生扱いだが無音で位置も進まない」ことがある。
     // 実位置が進んでいなければ停止状態に戻し、コントロールセンターの表示を実態と一致させる（時間だけ進む見かけを防ぐ）
@@ -2153,8 +2165,8 @@ function redrawAllCanvases(){
 });
 
 // wire header canvas file buttons
-document.getElementById('folderBtn').addEventListener('click',()=>document.getElementById('folderInput').click());
-document.getElementById('fileBtn').addEventListener('click',()=>document.getElementById('fileInput').click());
+document.getElementById('folderBtn').addEventListener('click',()=>{ retryPlayOnTap=false; document.getElementById('folderInput').click(); }); // v113: ピッカー操作の巻き添え再生を防止
+document.getElementById('fileBtn').addEventListener('click',()=>{ retryPlayOnTap=false; document.getElementById('fileInput').click(); }); // v113
 function renderHelpList(){
   const wrap=document.getElementById('helpList'); if(!wrap) return;
   wrap.innerHTML='';
@@ -2287,7 +2299,7 @@ window.addEventListener('resize',()=>{drawWave(curT());drawSeek(curT());drawAllB
 // ── Silence detection UI wiring ───────────────
 document.getElementById('silThr').addEventListener('input',function(){
   silThr=parseFloat(this.value);
-  document.getElementById('silThrV').textContent=silThr.toFixed(3);
+  document.getElementById('silThrV').textContent=silThr.toFixed(4);
 });
 document.getElementById('silMin').addEventListener('input',function(){
   silMinSec=parseFloat(this.value);
@@ -2305,7 +2317,7 @@ let settingsBackup=null;
 function snapSettings(){ return {silThr,silMinSec,compD2L,compL2D,timeOff,spdComp,resumeComp,overlapTol,releaseMs,markComp}; }
 function applySettings(o){ silThr=o.silThr; silMinSec=o.silMinSec; compD2L=o.compD2L; compL2D=o.compL2D; timeOff=o.timeOff; spdComp=o.spdComp; resumeComp=o.resumeComp; overlapTol=o.overlapTol; releaseMs=o.releaseMs; markComp=o.markComp||0; }
 function syncSettingsUI(){
-  const st=document.getElementById('silThr'); if(st){st.value=silThr; document.getElementById('silThrV').textContent=silThr.toFixed(3);}
+  const st=document.getElementById('silThr'); if(st){st.value=silThr; document.getElementById('silThrV').textContent=silThr.toFixed(4);}
   const sm=document.getElementById('silMin'); if(sm){sm.value=silMinSec; document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒';}
   setCompUI('compD2L',compD2L); setCompUI('compL2D',compL2D); setCompUI('timeOff',timeOff); setCompUI('spdComp',spdComp); setCompUI('resumeComp',resumeComp); setCompUI('overlapTol',overlapTol); setCompUI('releaseMs',releaseMs); setCompUI('markComp',markComp);
 }
@@ -2544,11 +2556,11 @@ document.getElementById('skipSecM')?.addEventListener('change',function(){
 // ── Sil panel +/- buttons ──────────────────────
 function adjSilThr(d){
   const el=document.getElementById('silThr');
-  const step=parseFloat(el.step)||0.002;
+  const step=parseFloat(el.step)||0.0005;
   silThr=Math.max(parseFloat(el.min),Math.min(parseFloat(el.max),
-    Math.round((silThr+d*step)*1000)/1000));
+    Math.round((silThr+d*step)*10000)/10000)); // v113: 0.0005刻み対応（旧: 1000で丸め＝刻みが潰れていた）
   el.value=silThr;
-  document.getElementById('silThrV').textContent=silThr.toFixed(3);
+  document.getElementById('silThrV').textContent=silThr.toFixed(4);
   saveSilPrefs();
 }
 function adjSilMin(d){
@@ -2564,7 +2576,7 @@ function resetSilPrefs(){
   silThr=0.010; silMinSec=1.0;
   document.getElementById('silThr').value=silThr;
   document.getElementById('silMin').value=silMinSec;
-  document.getElementById('silThrV').textContent=silThr.toFixed(3);
+  document.getElementById('silThrV').textContent=silThr.toFixed(4);
   document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒';
   saveSilPrefs(); showToast('設定をリセット');
 }
@@ -2623,7 +2635,7 @@ function loadSilPrefs(){
   try{
     const d=JSON.parse(localStorage.getItem('ac_silprefs')||'{}');
     if(d.silThr>0){ silThr=d.silThr; document.getElementById('silThr').value=silThr;
-      document.getElementById('silThrV').textContent=silThr.toFixed(3); }
+      document.getElementById('silThrV').textContent=silThr.toFixed(4); }
     if(d.silMinSec>0){ silMinSec=d.silMinSec; document.getElementById('silMin').value=silMinSec;
       document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒'; }
     // 旧 seekComp（単一）は 検出→聞く 補正へ移行
