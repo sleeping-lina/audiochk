@@ -142,7 +142,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v116</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v117</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -506,6 +506,20 @@ let msArmed=false; // v109: セッション中に一度でも再生したらtrue
 let lastLoadAt=0, lastHardRec=0; // v110: 読込直後の幽霊再生ガード／ハード復旧の連発防止
 let playPendingAt=0; // v115: play()要求中（Promise未解決）の目印。ゴーストバスターが正規の再生開始を誤殺しないため
 let endHandled=false, endStallAt=0, tdGen=0; // v116: 終端処理の二重実行防止／終端ストール検知／モード切替の世代番号
+let tempMk=null; // v117: 仮マーク（中断・寄り道用の目印。常に1個、ジャンプすると自動で消える。エクスポート対象外）
+// v117: 仮マークを波形に描く（既存のtoPx座標系をそのまま受け取るだけ＝座標計算には手を入れない）
+function drawTempMk(c,toPx,lineX,H){
+  if(tempMk==null) return;
+  const tx=toPx(tempMk);
+  if(!(tx>=0 && tx<=lineX)) return;
+  c.save();
+  c.strokeStyle='#69ff47'; c.lineWidth=1.5; c.setLineDash([4,3]);
+  c.beginPath(); c.moveTo(tx,0); c.lineTo(tx,H); c.stroke();
+  c.setLineDash([]);
+  c.fillStyle='#69ff47';
+  c.beginPath(); c.moveTo(tx-4,0); c.lineTo(tx+4,0); c.lineTo(tx,7); c.fill();
+  c.restore();
+}
 // v114: 「タップで自動再生再開」機構は撤去（クリック対象の除外リストでは漏れを塞ぎきれず、意図しない再生の温床だったため。タップ→再生ボタンの2段に戻す）
 let loadingFile=false, pendingSeekT=null; // v111: 読込中フラグ（この間curTは0を返す）／読込中に要求されたシークの保留
 let raf=null;
@@ -538,6 +552,7 @@ function onEnded(){
           renderMarkers(); saveMk();
         }
         document.getElementById('silCurDur').textContent='--';
+        saveMk(); // v117: 自動マークOFFでも末尾の無音を永続化（rtLoop側と同じ扱い。旧: silAutoMark時しか保存されず開き直しで消えていた）
         renderSilList();
       }
     }
@@ -592,7 +607,7 @@ function loadPrefs(){
 }
 function lsKey(name,size){ return 'ac_mk4_'+name + (size!=null?('__'+size):''); } // サイズ込み＝別フォルダ同名衝突を回避
 let lsWarned=false; // localStorage保存失敗の通知は1回だけ（連続トースト防止）
-function saveMk(){ try{ localStorage.setItem(lsKey(curFileName,curFileSize),JSON.stringify({markers,silReg,duration,ts:Date.now()})); lsWarned=false; }catch(e){ if(!lsWarned){ lsWarned=true; showToast('保存に失敗（端末の保存容量が上限の可能性）'); } } }
+function saveMk(){ try{ localStorage.setItem(lsKey(curFileName,curFileSize),JSON.stringify({markers,silReg,duration,tempMk,ts:Date.now()})); lsWarned=false; }catch(e){ if(!lsWarned){ lsWarned=true; showToast('保存に失敗（端末の保存容量が上限の可能性）'); } } }
 function loadMk(name,size){ try{
     let raw=localStorage.getItem(lsKey(name,size));
     if(!raw && size!=null) raw=localStorage.getItem(lsKey(name)); // 旧キー(名前のみ)から非破壊で読む＝既存マークの移行。次回saveでサイズ込みキーへ移る
@@ -647,8 +662,8 @@ async function load(file){
   drawWave(0); drawSeek(0);
 
   const cached=loadMk(file.name,file.size);
-  if(cached){ markers=cached.markers||[]; silReg=cached.silReg||[]; duration=cached.duration||0; }
-  else markers=[];
+  if(cached){ markers=cached.markers||[]; silReg=cached.silReg||[]; duration=cached.duration||0; tempMk=(typeof cached.tempMk==='number')?cached.tempMk:null; } // v117: 仮マークも復元
+  else { markers=[]; tempMk=null; }
   // 並びを保証（hlMk/hlSil が「開始時刻でソート済み」を前提にするため。古い/外部importデータ対策）
   markers.sort((a,b)=>a.time-b.time);
   silReg.sort((a,b)=>a.start-b.start);
@@ -863,6 +878,8 @@ function drawLiveWave(){
     c.beginPath(); c.moveTo(mx-3,0); c.lineTo(mx+3,0); c.lineTo(mx,6); c.fill();
   }
 
+  drawTempMk(c,toPx,lineX,H); // v117
+
   // ── Right panel: 現在の無音（加算）→ 終了で確定値を保持。再生ラインより右は真っ黒 ──
   const rightW=W-lineX-4;
   if(rightW>20){
@@ -991,6 +1008,8 @@ function drawWave(ct){
     c.fillStyle=colorMarkLine;
     c.beginPath(); c.moveTo(mx-3,0); c.lineTo(mx+3,0); c.lineTo(mx,6); c.fill();
   }
+
+  drawTempMk(c,toPx,lineX,H); // v117
 
   // Right panel: last silence（再生ラインより右は真っ黒）
   const rightW=W-lineX-4;
@@ -1611,6 +1630,9 @@ const DEFAULT_KEYMAP={
   playpause:[' '],       // Space（Pは前ファイルへ）
   markadd:['m'],
   markdel:['Backspace','Delete'],
+  delnearprev:['x'],  // v117: 現在位置/1つ前を削除（モードでマーク⇄無音区間を自動切替）
+  tempset:['g'],      // v117: 仮マークをセット
+  tempjump:['b'],     // v117: 仮マークへ移動（移動後に自動解除）
   marknudgeback:['j'], // v105: 直近マークを−0.1秒移動
   marknudgefwd:['k'],  // v105: 直近マークを+0.1秒移動
   skipback:['ArrowLeft'],
@@ -1673,11 +1695,51 @@ function delNearestMk(){
   markers.forEach((mk,i)=>{const d=Math.abs(mk.time-t);if(d<bestD){bestD=d;best=i;}});
   if(best>=0) delMk(best);
 }
+// v117: 現在位置のものを削除。なければ「1つ前」を削除（Audipo方式）。
+// 対象はモードで自動切替＝聞くモード:マーク / 検出モード:無音区間。どちらも取り消し(undo)対象。
+function delNearOrPrev(){
+  if(!objURL) return;
+  const t=curT();
+  if(detectOn){
+    // 現在位置を含む無音区間（境界0.1s許容）→ なければ現在位置より前で最も近い区間
+    let hit=silReg.find(sr=> t>=sr.start-0.1 && t<=sr.end+0.1);
+    if(!hit){ for(const sr of silReg){ if(sr.end<=t+0.1 && (!hit||sr.end>hit.end)) hit=sr; } }
+    if(!hit){ showToast('削除できる無音区間がありません'); return; }
+    const lbl=fmtMs(hit.start)+' ('+(hit.dur!=null?hit.dur.toFixed(1):(hit.end-hit.start).toFixed(1))+'s)';
+    delSilReg(hit.start,hit.end);
+    showToast('無音区間を削除 '+lbl);
+  } else {
+    let best=-1,bestD=0.5;
+    markers.forEach((mk,i)=>{const d=Math.abs(mk.time-t); if(d<bestD){bestD=d;best=i;}}); // 現在位置（±0.5s）
+    if(best<0){ markers.forEach((mk,i)=>{ if(mk.time<=t+0.05 && (best<0||mk.time>markers[best].time)) best=i; }); } // 1つ前
+    if(best<0){ showToast('削除できるマークがありません'); return; }
+    const lbl=fmtMs(markers[best].time);
+    delMk(best);
+    showToast('マークを削除 '+lbl);
+  }
+}
+// v117: 仮マーク＝中断/寄り道用の目印。常に1個だけ、ジャンプすると自動で消える。エクスポートには含めない。
+function setTempMk(){
+  if(!objURL) return;
+  tempMk=curT();
+  drawWave(curT()); drawSeek(curT()); saveMk();
+  showToast('⚑ 仮マーク '+fmtMs(tempMk));
+}
+function jumpTempMk(){
+  if(!objURL) return;
+  if(tempMk==null){ showToast('仮マークはありません'); return; }
+  const t=tempMk; tempMk=null; // ジャンプと同時に消す＝消し忘れが起きない
+  seekTo(t); drawWave(curT()); drawSeek(curT()); saveMk();
+  showToast('⚑ 仮マークへ移動して解除 '+fmtMs(t));
+}
 function doAction(fn){
   switch(fn){
     case 'playpause': isPlaying?stop():play(); break;
     case 'markadd': addMk(); break;
     case 'markdel': delNearestMk(); break;
+    case 'delnearprev': delNearOrPrev(); break; // v117
+    case 'tempset': setTempMk(); break;         // v117
+    case 'tempjump': jumpTempMk(); break;       // v117
     case 'marknudgeback': moveNearestMk(-0.1); break; // v105
     case 'marknudgefwd': moveNearestMk(0.1); break;   // v105
     case 'skipback': seekTo(curT()-skipSec); break;
@@ -1709,8 +1771,8 @@ function doAction(fn){
   }
 }
 // ── Keymap editor (stage B) ──
-const FN_ORDER=['playpause','markadd','markdel','marknudgeback','marknudgefwd','skipback','skipfwd','fineback','finefwd','checkback','prevmark','nextmark','prevsil','nextsil','prevfile','nextfile','head','tail','timejump','report','speedreset','speed1','speed2','speed3','speed4','speed5','speed6','undo','redo','detect'];
-const FN_LABELS={playpause:'再生/停止',markadd:'マーク追加',markdel:'マーク削除',marknudgeback:'マーク微調整 −0.1',marknudgefwd:'マーク微調整 +0.1',skipback:'−N秒スキップ',skipfwd:'+N秒スキップ',fineback:'−0.1秒',finefwd:'+0.1秒',checkback:'確認(−N秒＋×1.0⇄復帰)',prevmark:'前のマーク',nextmark:'次のマーク',prevsil:'前の無音',nextsil:'次の無音',prevfile:'前のファイル',nextfile:'次のファイル',head:'先頭へ',tail:'末尾へ',timejump:'タイムジャンプ',report:'情報ポップアップ',speedreset:'速度リセット(×1.0)',speed1:'速度プリセット1',speed2:'速度プリセット2',speed3:'速度プリセット3',speed4:'速度プリセット4',speed5:'速度プリセット5',speed6:'速度プリセット6',undo:'取り消し',redo:'やり直し',detect:'無音検出 ON/OFF'};
+const FN_ORDER=['playpause','markadd','markdel','delnearprev','tempset','tempjump','marknudgeback','marknudgefwd','skipback','skipfwd','fineback','finefwd','checkback','prevmark','nextmark','prevsil','nextsil','prevfile','nextfile','head','tail','timejump','report','speedreset','speed1','speed2','speed3','speed4','speed5','speed6','undo','redo','detect'];
+const FN_LABELS={playpause:'再生/停止',markadd:'マーク追加',markdel:'マーク削除',delnearprev:'現在/1つ前を削除（聞く:マーク 検出:無音）',tempset:'仮マークをセット',tempjump:'仮マークへ移動（自動解除）',marknudgeback:'マーク微調整 −0.1',marknudgefwd:'マーク微調整 +0.1',skipback:'−N秒スキップ',skipfwd:'+N秒スキップ',fineback:'−0.1秒',finefwd:'+0.1秒',checkback:'確認(−N秒＋×1.0⇄復帰)',prevmark:'前のマーク',nextmark:'次のマーク',prevsil:'前の無音',nextsil:'次の無音',prevfile:'前のファイル',nextfile:'次のファイル',head:'先頭へ',tail:'末尾へ',timejump:'タイムジャンプ',report:'情報ポップアップ',speedreset:'速度リセット(×1.0)',speed1:'速度プリセット1',speed2:'速度プリセット2',speed3:'速度プリセット3',speed4:'速度プリセット4',speed5:'速度プリセット5',speed6:'速度プリセット6',undo:'取り消し',redo:'やり直し',detect:'無音検出 ON/OFF'};
 function tokenLabel(t){
   if(t===' ')return'Space';
   const m={ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',Backspace:'BS',Delete:'Del',Enter:'Enter',Escape:'Esc',Tab:'Tab',Home:'Home',End:'End'};
