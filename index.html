@@ -142,7 +142,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v115</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v116</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -505,6 +505,7 @@ let mediaUnlocked=false; // v108: 両audio要素のiOSアンロック済みフ�
 let msArmed=false; // v109: セッション中に一度でも再生したらtrue。コントロールセンター/BT機器からの意図しない再生コマンドを無視するため
 let lastLoadAt=0, lastHardRec=0; // v110: 読込直後の幽霊再生ガード／ハード復旧の連発防止
 let playPendingAt=0; // v115: play()要求中（Promise未解決）の目印。ゴーストバスターが正規の再生開始を誤殺しないため
+let endHandled=false, endStallAt=0, tdGen=0; // v116: 終端処理の二重実行防止／終端ストール検知／モード切替の世代番号
 // v114: 「タップで自動再生再開」機構は撤去（クリック対象の除外リストでは漏れを塞ぎきれず、意図しない再生の温床だったため。タップ→再生ボタンの2段に戻す）
 let loadingFile=false, pendingSeekT=null; // v111: 読込中フラグ（この間curTは0を返す）／読込中に要求されたシークの保留
 let raf=null;
@@ -515,6 +516,7 @@ const LP=44, RH=22;
 let ROWS=10;
 
 function onEnded(){
+  if(endHandled) return; endHandled=true; // v116: eventとウォッチドッグの二重実行を防止
   // Finalize any growing silence when file ends
   if(rtInSil && duration>0){
     const endT=audioEl.duration||duration;
@@ -628,6 +630,7 @@ function setSrc(file){
 async function load(file){
   showLd(true);
   loadingFile=true; pendingSeekT=null; // v111
+  endHandled=false; endStallAt=0; // v116
   curFileName=file.name; curFileSize=file.size;
   plIdx=playlist.findIndex(p=>p.file===file);
   isPlaying=false; redrawPlayBtn(); cancelAnimationFrame(raf);
@@ -1202,6 +1205,10 @@ function play(){
     if(c===3||c===2){ recoverMedia(true); return; }
     if(c===4){ hardRecover(); return; } // v110: 同一URLの再読込では直らないためファイルから作り直す
   }
+  // v116: 末尾でplay()するとHTML5仕様により自動で先頭へシークして再生される（＝意図しない頭出し）。
+  // このアプリでは位置を失う事故になるため明示的に拒否し、頭出しはユーザーの操作に委ねる。
+  if(duration>0 && audioEl.currentTime>=duration-0.05){ showToast('ファイル末尾です（先頭へ戻すには先頭ボタン/Hキー）'); return; }
+  endHandled=false; endStallAt=0; // v116: 再生を始めるので終端状態を解除
   try{ (audioEl===audioPlay?audioDet:audioPlay).pause(); }catch(e){} // 重複再生防止（音が重なる対策）
   drawAllBtns(); // パージで消えた操作ボタンを復帰（8BitDoのAで全ボタンが戻る）
   // 再開補正：聞くモードのみ。iOSの一時停止→再生のわずかな巻き戻りを先送り（ジャンプ後の再生・検出モードには適用しない）。
@@ -1261,7 +1268,8 @@ function stop(){
 }
 function seekTo(t){
   if(!objURL)return;
-  if(loadingFile){ pendingSeekT=t; return; } // v111: 読込完了後に適用（読込中はduration=0でクランプされ0に化けていた）
+  if(loadingFile){ pendingSeekT=t; return; }
+  endHandled=false; endStallAt=0; // v116: シークしたら終端状態を解除 // v111: 読込完了後に適用（読込中はduration=0でクランプされ0に化けていた）
   canResumeComp=false; // ジャンプ後の再生には再開補正を適用しない
   const cl=Math.max(0,Math.min(duration||0,t));
   audioEl.currentTime=cl;
@@ -1276,6 +1284,16 @@ function loop(){
   try{
     const t=curT();
     if(t>0) lastGoodTime=t; // 復旧用に直近の有効位置を記録
+    // v116: 終端ウォッチドッグ。iOSは倍速/WebAudio経由でendedイベントを取りこぼすことがあり、
+    // その場合「末尾無音が確定されない」「isPlayingが真のまま残る→次のplay()が仕様で先頭へ巻き戻る」が同時に起きる。
+    if(duration>0 && !endHandled){
+      const nearEnd = t>=duration-0.3;
+      if(audioEl.ended){ onEnded(); return; }
+      if(nearEnd && audioEl.paused){
+        if(!endStallAt) endStallAt=Date.now();
+        else if(Date.now()-endStallAt>300){ endStallAt=0; onEnded(); return; }
+      } else endStallAt=0;
+    }
     if(detectOn){ if(waReady) drawLiveWave(); else drawWave(t); }
     else { drawWave(t); } // 聞くモードも波形を流す（静的タイムライン＋再生ライン＋マーク＋無音）
     updateTime(t);
@@ -2384,6 +2402,7 @@ function updateListMode(){
   if(sl) sl.style.display = detectOn ? '' : 'none';
 }
 function toggleDetect(){
+  tdGen++; // v116: 過去の再開予約を無効化
   const wasPlaying=isPlaying;
   const t=curT();
   // stop both players & loops first
@@ -2408,9 +2427,12 @@ function toggleDetect(){
   drawSeek(nt); updateTime(nt); hlMk(nt); hlSil(nt);
   redrawPlayBtn();
   showToast(detectOn?'検出モード（1.0倍・波形/無音）':'聞くモード（'+fmtSpd(playbackRate)+'・なめらか）');
-  if(wasPlaying){ // シーク完了を待ってから再生＝切替直後に古い位置の音が鳴る/消える問題を防ぐ
-    let played=false;
-    const go=()=>{ if(played)return; played=true; audioEl.removeEventListener('seeked',go); stopTime=0; canResumeComp=false; play(); };
+  // v116: 末尾では自動再開しない（末尾のplay()は仕様で先頭へ巻き戻るため）＋
+  // 保留中の再開予約は世代番号で無効化（連続でモード切替した時に古い予約が発火するのを防ぐ）
+  const atEnd = duration>0 && nt>=duration-0.05;
+  if(wasPlaying && !atEnd){ // シーク完了を待ってから再生＝切替直後に古い位置の音が鳴る/消える問題を防ぐ
+    let played=false; const myGen=tdGen;
+    const go=()=>{ if(played||myGen!==tdGen)return; played=true; audioEl.removeEventListener('seeked',go); stopTime=0; canResumeComp=false; play(); };
     audioEl.addEventListener('seeked',go,{once:true});
     setTimeout(go,400); // 保険：seekedが来ない/既に完了済みの場合
   }
