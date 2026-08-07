@@ -142,7 +142,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v117</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v118</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -431,6 +431,14 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
           <div style="font-family:'Space Mono',monospace;font-size:9px;color:rgba(0,229,255,.7);margin-bottom:10px;letter-spacing:1px">SPEED PRESETS</div>
           <div id="spdPresets" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"></div>
         </div>
+        <div style="background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:8px;padding:10px;margin-bottom:12px">
+          <div style="font-family:'Space Mono',monospace;font-size:9px;color:rgba(0,229,255,.7);margin-bottom:8px;letter-spacing:1px">仮マーク</div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="tempAutoClearChk" checked onchange="setTempAutoClear(this.checked)" style="width:18px;height:18px;accent-color:#69ff47">
+            <span style="font-size:11px;color:#e8e8f0">移動したら自動で解除する</span>
+          </label>
+          <div style="font-size:9px;color:#9a9ac0;margin-top:6px;line-height:1.7">OFFにすると仮マークが残り、何度でも往復できます（解除は「仮マーク 解除」をキーに割り当て）。</div>
+        </div>
         <div style="background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:8px;padding:10px">
           <div style="font-family:'Space Mono',monospace;font-size:9px;color:rgba(0,229,255,.7);margin-bottom:8px;letter-spacing:1px">SKIP 秒数</div>
           <div style="display:flex;align-items:center;gap:8px">
@@ -459,6 +467,10 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
             <span style="font-family:'Space Mono',monospace;font-size:10px;color:#9a9ac0;flex:1">マーク色(ボタン)</span>
             <input type="color" id="cpMk" value="#ff4081" style="width:48px;height:36px;border:1px solid #2a2a3d;border-radius:6px;cursor:pointer;padding:2px;background:#1c1c28">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            <span style="font-family:'Space Mono',monospace;font-size:10px;color:#9a9ac0;flex:1">仮マーク色</span>
+            <input type="color" id="cpTemp" value="#69ff47" style="width:48px;height:36px;border:1px solid #2a2a3d;border-radius:6px;cursor:pointer;padding:2px;background:#1c1c28">
           </div>
         </div>
       </div><!-- /tab-color -->
@@ -513,10 +525,10 @@ function drawTempMk(c,toPx,lineX,H){
   const tx=toPx(tempMk);
   if(!(tx>=0 && tx<=lineX)) return;
   c.save();
-  c.strokeStyle='#69ff47'; c.lineWidth=1.5; c.setLineDash([4,3]);
+  c.strokeStyle=colorTemp; c.lineWidth=1.5; c.setLineDash([4,3]);
   c.beginPath(); c.moveTo(tx,0); c.lineTo(tx,H); c.stroke();
   c.setLineDash([]);
-  c.fillStyle='#69ff47';
+  c.fillStyle=colorTemp;
   c.beginPath(); c.moveTo(tx-4,0); c.lineTo(tx+4,0); c.lineTo(tx,7); c.fill();
   c.restore();
 }
@@ -579,7 +591,7 @@ function onEnded(){
 // ── LocalStorage ───────────────────────────────
 const LS_PREFS='ac_prefs3';
 function savePrefs(){
-  try{ localStorage.setItem(LS_PREFS,JSON.stringify({scheme:'yakou',skipSec,playbackRate,spdPresets:SPD_PRESETS,colors:{colorAc,colorA2,colorSilBar,colorSilFill,colorMarkLine,colorSilText}})); }catch(e){}
+  try{ localStorage.setItem(LS_PREFS,JSON.stringify({scheme:'yakou',skipSec,playbackRate,spdPresets:SPD_PRESETS,tempAutoClear,colors:{colorAc,colorA2,colorSilBar,colorSilFill,colorMarkLine,colorSilText,colorTemp}})); }catch(e){}
 }
 function loadPrefs(){
   try{
@@ -594,6 +606,8 @@ function loadPrefs(){
       if(cl.colorSilFill) colorSilFill=cl.colorSilFill;
       if(cl.colorMarkLine) colorMarkLine=cl.colorMarkLine;
       if(cl.colorSilText) colorSilText=cl.colorSilText;
+      if(cl.colorTemp) colorTemp=cl.colorTemp; // v118
+      if(typeof p.tempAutoClear==='boolean') tempAutoClear=p.tempAutoClear; // v118
     } else {
       // legacy/empty prefs → adopt 夜光 defaults (ignore old colors), apply CSS vars & persist once
       document.documentElement.style.setProperty('--ac',colorAc);
@@ -1055,6 +1069,11 @@ function drawSeek(ct){
       if(m.time<rs||m.time>=re) continue;
       const mx=LP+((m.time-rs)/spr)*TW;
       c.fillStyle='#ff4081'; c.beginPath(); c.moveTo(mx-4,ly-8); c.lineTo(mx+4,ly-8); c.lineTo(mx,ly-1); c.closePath(); c.fill();
+    }
+    // v118: 仮マークの▼（通常マークより一回り大きく＝見分けやすく）
+    if(tempMk!=null && tempMk>=rs && tempMk<re){
+      const gx=LP+((tempMk-rs)/spr)*TW;
+      c.fillStyle=colorTemp; c.beginPath(); c.moveTo(gx-5,ly-10); c.lineTo(gx+5,ly-10); c.lineTo(gx,ly-1); c.closePath(); c.fill();
     }
     if(ct>=rs&&ct<re){ const px=LP+((ct-rs)/spr)*TW; c.fillStyle='#00e5ff'; c.beginPath(); c.arc(Math.max(LP+4,Math.min(LP+TW-4,px)),ly,4,0,Math.PI*2); c.fill(); }
   }
@@ -1629,10 +1648,11 @@ document.getElementById('importData').addEventListener('change',function(){
 const DEFAULT_KEYMAP={
   playpause:[' '],       // Space（Pは前ファイルへ）
   markadd:['m'],
-  markdel:['Backspace','Delete'],
-  delnearprev:['x'],  // v117: 現在位置/1つ前を削除（モードでマーク⇄無音区間を自動切替）
-  tempset:['g'],      // v117: 仮マークをセット
-  tempjump:['b'],     // v117: 仮マークへ移動（移動後に自動解除）
+  delnearprev:['x','Backspace','Delete'], // v118: 旧「マーク削除」を統合（BS/Delもそのまま使える）
+  temp:['g'],         // v118: 仮マーク＝なければセット／あれば移動（1キー運用）
+  tempset:[],         // v118: セットのみ（仮マークを付け直したい時用・既定キーなし）
+  tempjump:['b'],     // v118: 移動のみ
+  tempclear:[],       // v118: 解除のみ（自動解除OFFで運用する場合に便利・既定キーなし）
   marknudgeback:['j'], // v105: 直近マークを−0.1秒移動
   marknudgefwd:['k'],  // v105: 直近マークを+0.1秒移動
   skipback:['ArrowLeft'],
@@ -1662,8 +1682,16 @@ const DEFAULT_KEYMAP={
   report:['i']
 };
 function defKeymapCopy(){ const m={}; for(const k in DEFAULT_KEYMAP) m[k]=DEFAULT_KEYMAP[k].slice(); return m; }
+function migrateFn(o){ // v118: 保存済みの 'markdel' を統合先 'delnearprev' に読み替える
+  if(o && Array.isArray(o.markdel)){
+    const cur=Array.isArray(o.delnearprev)?o.delnearprev:[];
+    o.delnearprev=cur.concat(o.markdel.filter(t=>!cur.includes(t)));
+    delete o.markdel;
+  }
+  return o;
+}
 function loadKeymap(){
-  try{ const o=JSON.parse(localStorage.getItem('ac_keymap')||'null');
+  try{ const o=migrateFn(JSON.parse(localStorage.getItem('ac_keymap')||'null'));
     if(o&&typeof o==='object'){ const m=defKeymapCopy(); for(const k in m){ if(Array.isArray(o[k])) m[k]=o[k].filter(t=>t!==''&&t!=null); } return m; }
   }catch(e){}
   return defKeymapCopy();
@@ -1728,18 +1756,36 @@ function setTempMk(){
 function jumpTempMk(){
   if(!objURL) return;
   if(tempMk==null){ showToast('仮マークはありません'); return; }
-  const t=tempMk; tempMk=null; // ジャンプと同時に消す＝消し忘れが起きない
+  const t=tempMk;
+  if(tempAutoClear) tempMk=null; // 設定ONなら移動と同時に解除＝消し忘れが起きない
   seekTo(t); drawWave(curT()); drawSeek(curT()); saveMk();
-  showToast('⚑ 仮マークへ移動して解除 '+fmtMs(t));
+  showToast('⚑ 仮マークへ移動'+(tempAutoClear?'して解除 ':' ')+fmtMs(t));
+}
+function clearTempMk(){ // v118
+  if(tempMk==null){ showToast('仮マークはありません'); return; }
+  tempMk=null; drawWave(curT()); drawSeek(curT()); saveMk();
+  showToast('⚑ 仮マークを解除');
+}
+// v118: 1キー運用＝仮マークが無ければセット、有れば移動。
+// 付け直したい時は「移動→セット」の2回押し（または『仮マーク セットのみ』を別キーに割り当て）。
+function tempToggle(){
+  if(!objURL) return;
+  if(tempMk==null) setTempMk(); else jumpTempMk();
+}
+function setTempAutoClear(v){ // v118
+  tempAutoClear=!!v; savePrefs();
+  const el=document.getElementById('tempAutoClearChk'); if(el) el.checked=tempAutoClear;
 }
 function doAction(fn){
   switch(fn){
     case 'playpause': isPlaying?stop():play(); break;
     case 'markadd': addMk(); break;
-    case 'markdel': delNearestMk(); break;
-    case 'delnearprev': delNearOrPrev(); break; // v117
-    case 'tempset': setTempMk(); break;         // v117
-    case 'tempjump': jumpTempMk(); break;       // v117
+    case 'markdel': // v118: 旧アクション名（保存済みの割り当て互換）。統合先へ委譲
+    case 'delnearprev': delNearOrPrev(); break;
+    case 'temp': tempToggle(); break;           // v118
+    case 'tempset': setTempMk(); break;
+    case 'tempjump': jumpTempMk(); break;
+    case 'tempclear': clearTempMk(); break;     // v118
     case 'marknudgeback': moveNearestMk(-0.1); break; // v105
     case 'marknudgefwd': moveNearestMk(0.1); break;   // v105
     case 'skipback': seekTo(curT()-skipSec); break;
@@ -1771,8 +1817,8 @@ function doAction(fn){
   }
 }
 // ── Keymap editor (stage B) ──
-const FN_ORDER=['playpause','markadd','markdel','delnearprev','tempset','tempjump','marknudgeback','marknudgefwd','skipback','skipfwd','fineback','finefwd','checkback','prevmark','nextmark','prevsil','nextsil','prevfile','nextfile','head','tail','timejump','report','speedreset','speed1','speed2','speed3','speed4','speed5','speed6','undo','redo','detect'];
-const FN_LABELS={playpause:'再生/停止',markadd:'マーク追加',markdel:'マーク削除',delnearprev:'現在/1つ前を削除（聞く:マーク 検出:無音）',tempset:'仮マークをセット',tempjump:'仮マークへ移動（自動解除）',marknudgeback:'マーク微調整 −0.1',marknudgefwd:'マーク微調整 +0.1',skipback:'−N秒スキップ',skipfwd:'+N秒スキップ',fineback:'−0.1秒',finefwd:'+0.1秒',checkback:'確認(−N秒＋×1.0⇄復帰)',prevmark:'前のマーク',nextmark:'次のマーク',prevsil:'前の無音',nextsil:'次の無音',prevfile:'前のファイル',nextfile:'次のファイル',head:'先頭へ',tail:'末尾へ',timejump:'タイムジャンプ',report:'情報ポップアップ',speedreset:'速度リセット(×1.0)',speed1:'速度プリセット1',speed2:'速度プリセット2',speed3:'速度プリセット3',speed4:'速度プリセット4',speed5:'速度プリセット5',speed6:'速度プリセット6',undo:'取り消し',redo:'やり直し',detect:'無音検出 ON/OFF'};
+const FN_ORDER=['playpause','markadd','delnearprev','temp','tempset','tempjump','tempclear','marknudgeback','marknudgefwd','skipback','skipfwd','fineback','finefwd','checkback','prevmark','nextmark','prevsil','nextsil','prevfile','nextfile','head','tail','timejump','report','speedreset','speed1','speed2','speed3','speed4','speed5','speed6','undo','redo','detect'];
+const FN_LABELS={playpause:'再生/停止',markadd:'マーク追加',delnearprev:'現在/1つ前を削除（聞く:マーク 検出:無音）',temp:'仮マーク セット⇄移動',tempset:'仮マーク セットのみ',tempjump:'仮マーク 移動のみ',tempclear:'仮マーク 解除',marknudgeback:'マーク微調整 −0.1',marknudgefwd:'マーク微調整 +0.1',skipback:'−N秒スキップ',skipfwd:'+N秒スキップ',fineback:'−0.1秒',finefwd:'+0.1秒',checkback:'確認(−N秒＋×1.0⇄復帰)',prevmark:'前のマーク',nextmark:'次のマーク',prevsil:'前の無音',nextsil:'次の無音',prevfile:'前のファイル',nextfile:'次のファイル',head:'先頭へ',tail:'末尾へ',timejump:'タイムジャンプ',report:'情報ポップアップ',speedreset:'速度リセット(×1.0)',speed1:'速度プリセット1',speed2:'速度プリセット2',speed3:'速度プリセット3',speed4:'速度プリセット4',speed5:'速度プリセット5',speed6:'速度プリセット6',undo:'取り消し',redo:'やり直し',detect:'無音検出 ON/OFF'};
 function tokenLabel(t){
   if(t===' ')return'Space';
   const m={ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',Backspace:'BS',Delete:'Del',Enter:'Enter',Escape:'Esc',Tab:'Tab',Home:'Home',End:'End'};
@@ -1884,7 +1930,10 @@ const DEFAULT_GPMAP={
 function defGpMapCopy(){ const m={}; for(const k in DEFAULT_GPMAP) m[k]=Object.assign({},DEFAULT_GPMAP[k]); return m; }
 function loadGpMap(){
   try{ const o=JSON.parse(localStorage.getItem('ac_gpmap')||'null');
-    if(o&&typeof o==='object') return o; // 保存済みマップ全体を採用（削除も保持される）
+    if(o&&typeof o==='object'){
+      for(const tok in o){ ['s','l'].forEach(sl=>{ if(o[tok][sl]==='markdel') o[tok][sl]='delnearprev'; }); } // v118: 旧アクション名を移行
+      return o; // 保存済みマップ全体を採用（削除も保持される）
+    }
   }catch(e){}
   return defGpMapCopy();
 }
@@ -2394,6 +2443,7 @@ function syncSettingsUI(){
   const st=document.getElementById('silThr'); if(st){st.value=silThr; updateSilThrLabel();}
   const sm=document.getElementById('silMin'); if(sm){sm.value=silMinSec; document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒';}
   setCompUI('compD2L',compD2L); setCompUI('compL2D',compL2D); setCompUI('timeOff',timeOff); setCompUI('spdComp',spdComp); setCompUI('resumeComp',resumeComp); setCompUI('overlapTol',overlapTol); setCompUI('releaseMs',releaseMs); setCompUI('markComp',markComp);
+  const tac=document.getElementById('tempAutoClearChk'); if(tac) tac.checked=tempAutoClear; // v118
 }
 let settingsTab='detect';
 function openSettingsModal(tab){
@@ -2509,6 +2559,8 @@ function toggleDetect(){
 //   ・波形右端の無音秒数 = colorSilNum
 let colorAc='#00e5ff', colorA2='#ff4081', colorSilBar='rgba(82,214,252,1)';
 let colorSilFill='rgba(82,214,252,0.15)', colorMarkLine='#ff4081';
+let colorTemp='#69ff47'; // v118: 仮マーク色（波形の破線＋シークバーの▼）
+let tempAutoClear=true;  // v118: 仮マークへ移動したら自動で解除するか（往復したい時はOFF）
 let colorSilText='#ffffff';                 // 無音の秒数テキスト・直近無音表示（独立・高視認）
 let colorSilNum='#69ff47';                  // 波形右端の無音秒数（緑・停止中インジケータと同色）
 let colorCenter='rgba(255,64,129,0.35)';    // センターライン（控えめなピンク）
@@ -2538,6 +2590,8 @@ function applyColor(id,val){
   } else if(id==='cpMk'){
     colorA2=val; C.a2=val;
     document.documentElement.style.setProperty('--a2',val);
+  } else if(id==='cpTemp'){
+    colorTemp=val; // v118
   }
   drawAllBtns();
   if(!isPlaying) drawWave(audioEl.currentTime);
@@ -2550,9 +2604,10 @@ function buildColorPanel(){
   document.getElementById('cpA2').value=colorMarkLine||'#ff4081';
   document.getElementById('cpSil').value=silToHex();
   document.getElementById('cpMk').value=colorA2;
+  document.getElementById('cpTemp').value=colorTemp; // v118
   if(document.getElementById('cpAc')._wired) return;
   document.getElementById('cpAc')._wired=true;
-  ['cpAc','cpA2','cpSil','cpMk'].forEach(id=>{
+  ['cpAc','cpA2','cpSil','cpMk','cpTemp'].forEach(id=>{
     const el=document.getElementById(id);
     el.addEventListener('input', e=>applyColor(id,e.target.value));
     el.addEventListener('change',e=>applyColor(id,e.target.value));
@@ -2561,13 +2616,14 @@ function buildColorPanel(){
 function resetColors(){
   colorAc='#00e5ff'; colorA2='#ff4081';
   colorSilBar='rgba(82,214,252,1)'; colorSilFill='rgba(82,214,252,0.15)';
-  colorMarkLine='#ff4081'; colorSilText='#ffffff';
+  colorMarkLine='#ff4081'; colorSilText='#ffffff'; colorTemp='#69ff47'; // v118
   C.ac=colorAc; C.a2=colorA2;
   document.documentElement.style.setProperty('--ac','#00e5ff');
   document.documentElement.style.setProperty('--a2','#ff4081');
   document.getElementById('cpAc').value='#00e5ff';
   document.getElementById('cpA2').value='#ff4081';
   document.getElementById('cpSil').value='#52d6fc';
+  const _ct=document.getElementById('cpTemp'); if(_ct) _ct.value='#69ff47'; // v118
   document.getElementById('cpMk').value='#ff4081';
   drawAllBtns(); if(!isPlaying) drawWave(audioEl.currentTime); savePrefs(); showToast('夜光カラーに戻しました');
 }
