@@ -142,7 +142,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v118</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v119</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -518,6 +518,8 @@ let msArmed=false; // v109: セッション中に一度でも再生したらtrue
 let lastLoadAt=0, lastHardRec=0; // v110: 読込直後の幽霊再生ガード／ハード復旧の連発防止
 let playPendingAt=0; // v115: play()要求中（Promise未解決）の目印。ゴーストバスターが正規の再生開始を誤殺しないため
 let endHandled=false, endStallAt=0, tdGen=0; // v116: 終端処理の二重実行防止／終端ストール検知／モード切替の世代番号
+let reportOpenedAt=0; // v119: 情報ポップアップを開いた時刻（開いた直後の巻き添え入力を無視するため）
+let seekIntentT=0, seekIntentAt=0; // v119: 直近のシーク指示（位置の権威。要素への反映待ちの間はこちらを基準にする）
 let tempMk=null; // v117: 仮マーク（中断・寄り道用の目印。常に1個、ジャンプすると自動で消える。エクスポート対象外）
 // v117: 仮マークを波形に描く（既存のtoPx座標系をそのまま受け取るだけ＝座標計算には手を入れない）
 function drawTempMk(c,toPx,lineX,H){
@@ -1104,7 +1106,14 @@ wa.style.pointerEvents='none';
 
 
 // ── Playback ──────────────────────────────────
-function curT(){ return loadingFile ? 0 : (audioEl.currentTime||0); } // v111: ファイル切替直後、要素が前ファイルの位置を返す窓を遮断（次マーク誤検索・ハイライト誤選択の原因だった）
+function curT(){
+  if(loadingFile) return 0;
+  const t=audioEl.currentTime||0;
+  // v119: iOSでは currentTime への代入が即座に反映されないことがあり、直後の相対操作（±N秒/±0.1秒/マーク移動）が
+  // 古い位置を基準に計算されて「押した方向と逆に動く」事故になる。直近のシーク指示値が未反映の間はそちらを正とする。
+  if(seekIntentAt && Date.now()-seekIntentAt<600 && Math.abs(t-seekIntentT)>0.25) return seekIntentT;
+  return t;
+} // v111: ファイル切替直後、要素が前ファイルの位置を返す窓を遮断（次マーク誤検索・ハイライト誤選択の原因だった）
 // ── Screen Wake Lock：再生中の自動消灯/ロックを防ぐ（iOS Safari 16.4+） ──
 let wakeLock=null;
 async function requestWakeLock(){
@@ -1141,6 +1150,17 @@ window.addEventListener('error', e=>{ const m=(e&&e.message)||''; if(m && !/Scri
 // 同じBlobを再読込してエラーを解除し、直前位置へシークして（再生中なら）再開する。暴走防止に3秒クールダウン。
 // v110: ハード復旧＝Fileオブジェクトから新しいblob URLを作り直して両要素を再構築（同一URLの再読込が通らないcode=4用）。
 // 末尾まで再生した後＝メモリ圧が最大の場面で発生しやすい。自動再生はせず、復旧後にユーザーが再生を押す。
+// v119: 音声リセット＝「位置は進むのに音が出ない」等でアプリ再起動が必要だった状況を1キーで復旧する。
+// 停止したうえでファイルから音声を作り直し、元の位置に戻す（マーク・無音データは保持）。
+function audioReset(){
+  if(!objURL){ showToast('ファイルが開かれていません'); return; }
+  const pos=curT();
+  lastGoodTime=pos;
+  try{ stop(); }catch(e){}
+  try{ audioPlay.muted=false; audioDet.muted=false; }catch(e){}
+  lastHardRec=0; // 手動操作なので連発防止のクールダウンは無視する
+  if(!hardRecover()) showToast('⚠ 音声リセットに失敗しました。ファイルを開き直してください',true);
+}
 function hardRecover(){
   const it=playlist[plIdx]; const f=it&&it.file;
   if(!f) return false;
@@ -1206,8 +1226,9 @@ function unlockMedia(){
   // v115: 「play→完了を待ってpause」はiOSの非同期パイプラインと競合し、データ準備が遅いファイルで
   // 「pauseが再生開始前に握り潰され、数秒後に二重再生が始まる」事故の原因だった（実測で確定）。
   // 許可リスト登録はplay()を「呼ぶこと」自体で成立するため、同じジェスチャ内で同期的に即pauseする古典イディオムに変更。
+  if(isPlaying || playPendingAt) return; // v119: 再生中／再生要求の処理中は一切触らない（進行中のplay()をpauseで潰す事故を防止）
   [audioPlay,audioDet].forEach(el=>{
-    if(el===audioEl && isPlaying) return; // 実際に再生中の要素には触らない
+    if(!el.paused) return; // v119: 鳴っている要素には触らない
     try{
       el.muted=true;
       const p=el.play(); if(p&&p.catch) p.catch(()=>{}); // AbortErrorは想定内なので握り潰す
@@ -1247,6 +1268,7 @@ function play(){
   // このアプリでは位置を失う事故になるため明示的に拒否し、頭出しはユーザーの操作に委ねる。
   if(duration>0 && audioEl.currentTime>=duration-0.05){ showToast('ファイル末尾です（先頭へ戻すには先頭ボタン/Hキー）'); return; }
   endHandled=false; endStallAt=0; // v116: 再生を始めるので終端状態を解除
+  try{ audioPlay.muted=false; audioDet.muted=false; }catch(e){} // v119: アンロック処理のミュートが万一残っていても無音にしない
   try{ (audioEl===audioPlay?audioDet:audioPlay).pause(); }catch(e){} // 重複再生防止（音が重なる対策）
   drawAllBtns(); // パージで消えた操作ボタンを復帰（8BitDoのAで全ボタンが戻る）
   // 再開補正：聞くモードのみ。iOSの一時停止→再生のわずかな巻き戻りを先送り（ジャンプ後の再生・検出モードには適用しない）。
@@ -1310,6 +1332,7 @@ function seekTo(t){
   endHandled=false; endStallAt=0; // v116: シークしたら終端状態を解除 // v111: 読込完了後に適用（読込中はduration=0でクランプされ0に化けていた）
   canResumeComp=false; // ジャンプ後の再生には再開補正を適用しない
   const cl=Math.max(0,Math.min(duration||0,t));
+  seekIntentT=cl; seekIntentAt=Date.now(); // v119: 指示値を記録（反映待ちの間の基準になる）
   audioEl.currentTime=cl;
   resetRTSilence();
   // (旧: シーク地点以降のsilRegを削除 → 頭出しで全消失していたため廃止。重複はrtLoopの重なり判定で防止)
@@ -1653,6 +1676,7 @@ const DEFAULT_KEYMAP={
   tempset:[],         // v118: セットのみ（仮マークを付け直したい時用・既定キーなし）
   tempjump:['b'],     // v118: 移動のみ
   tempclear:[],       // v118: 解除のみ（自動解除OFFで運用する場合に便利・既定キーなし）
+  audioreset:[],      // v119: 音声リセット（音が出なくなった時の復旧・既定キーなし）
   marknudgeback:['j'], // v105: 直近マークを−0.1秒移動
   marknudgefwd:['k'],  // v105: 直近マークを+0.1秒移動
   skipback:['ArrowLeft'],
@@ -1786,6 +1810,7 @@ function doAction(fn){
     case 'tempset': setTempMk(); break;
     case 'tempjump': jumpTempMk(); break;
     case 'tempclear': clearTempMk(); break;     // v118
+    case 'audioreset': audioReset(); break;     // v119
     case 'marknudgeback': moveNearestMk(-0.1); break; // v105
     case 'marknudgefwd': moveNearestMk(0.1); break;   // v105
     case 'skipback': seekTo(curT()-skipSec); break;
@@ -1817,8 +1842,8 @@ function doAction(fn){
   }
 }
 // ── Keymap editor (stage B) ──
-const FN_ORDER=['playpause','markadd','delnearprev','temp','tempset','tempjump','tempclear','marknudgeback','marknudgefwd','skipback','skipfwd','fineback','finefwd','checkback','prevmark','nextmark','prevsil','nextsil','prevfile','nextfile','head','tail','timejump','report','speedreset','speed1','speed2','speed3','speed4','speed5','speed6','undo','redo','detect'];
-const FN_LABELS={playpause:'再生/停止',markadd:'マーク追加',delnearprev:'現在/1つ前を削除（聞く:マーク 検出:無音）',temp:'仮マーク セット⇄移動',tempset:'仮マーク セットのみ',tempjump:'仮マーク 移動のみ',tempclear:'仮マーク 解除',marknudgeback:'マーク微調整 −0.1',marknudgefwd:'マーク微調整 +0.1',skipback:'−N秒スキップ',skipfwd:'+N秒スキップ',fineback:'−0.1秒',finefwd:'+0.1秒',checkback:'確認(−N秒＋×1.0⇄復帰)',prevmark:'前のマーク',nextmark:'次のマーク',prevsil:'前の無音',nextsil:'次の無音',prevfile:'前のファイル',nextfile:'次のファイル',head:'先頭へ',tail:'末尾へ',timejump:'タイムジャンプ',report:'情報ポップアップ',speedreset:'速度リセット(×1.0)',speed1:'速度プリセット1',speed2:'速度プリセット2',speed3:'速度プリセット3',speed4:'速度プリセット4',speed5:'速度プリセット5',speed6:'速度プリセット6',undo:'取り消し',redo:'やり直し',detect:'無音検出 ON/OFF'};
+const FN_ORDER=['playpause','markadd','delnearprev','temp','tempset','tempjump','tempclear','marknudgeback','marknudgefwd','audioreset','skipback','skipfwd','fineback','finefwd','checkback','prevmark','nextmark','prevsil','nextsil','prevfile','nextfile','head','tail','timejump','report','speedreset','speed1','speed2','speed3','speed4','speed5','speed6','undo','redo','detect'];
+const FN_LABELS={playpause:'再生/停止',markadd:'マーク追加',delnearprev:'現在/1つ前を削除（聞く:マーク 検出:無音）',temp:'仮マーク セット⇄移動',tempset:'仮マーク セットのみ',tempjump:'仮マーク 移動のみ',tempclear:'仮マーク 解除',audioreset:'音声リセット（音が出ない時）',marknudgeback:'マーク微調整 −0.1',marknudgefwd:'マーク微調整 +0.1',skipback:'−N秒スキップ',skipfwd:'+N秒スキップ',fineback:'−0.1秒',finefwd:'+0.1秒',checkback:'確認(−N秒＋×1.0⇄復帰)',prevmark:'前のマーク',nextmark:'次のマーク',prevsil:'前の無音',nextsil:'次の無音',prevfile:'前のファイル',nextfile:'次のファイル',head:'先頭へ',tail:'末尾へ',timejump:'タイムジャンプ',report:'情報ポップアップ',speedreset:'速度リセット(×1.0)',speed1:'速度プリセット1',speed2:'速度プリセット2',speed3:'速度プリセット3',speed4:'速度プリセット4',speed5:'速度プリセット5',speed6:'速度プリセット6',undo:'取り消し',redo:'やり直し',detect:'無音検出 ON/OFF'};
 function tokenLabel(t){
   if(t===' ')return'Space';
   const m={ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',Backspace:'BS',Delete:'Del',Enter:'Enter',Escape:'Esc',Tab:'Tab',Home:'Home',End:'End'};
@@ -1949,23 +1974,40 @@ const gpWarm={};  // v113: index -> 全解放フレームを確認済みか（�
 let pendingGpTok=null;
 
 // D: 十字=B12-15 / S: 十字=軸A0,A1 → 共通トークン(UP/DOWN/LEFT/RIGHT)に正規化
+// v119: 方向入力の整流。8BitDoは機種/モードにより「→なのに軸は−1.0」等、軸の値が信頼できないことがある（実機で確認済み）。
+//  ①D-padボタン(B12-15)を持つパッドでは軸を読まない＝ボタンと軸の二重入力（幽霊の逆方向）を根絶
+//  ②左右／上下が同時に立つフレームは矛盾とみなして両方捨てる
+//  ③斜め押し対策＝方向はどれか1つだけ有効（全方向を離すまで他方向を無視するラッチ）
+let gpDirLatch=null;
 function gpTokensFrom(g){
   const set=new Set();
+  const hasDpadBtn = g.buttons.length>15;
   g.buttons.forEach((b,i)=>{
     const on=b.pressed||b.value>0.5; if(!on)return;
     if(i===12)set.add('UP'); else if(i===13)set.add('DOWN'); else if(i===14)set.add('LEFT'); else if(i===15)set.add('RIGHT');
     else set.add('B'+i);
   });
-  if(g.axes.length>=2){
-    const x=g.axes[0],y=g.axes[1];
-    if(y<-0.5)set.add('UP'); if(y>0.5)set.add('DOWN');
-    if(x<-0.5)set.add('LEFT'); if(x>0.5)set.add('RIGHT');
+  if(!hasDpadBtn && g.axes.length>=2){ // D-padボタンが無い機種（Sモード等）のみ軸を使う
+    const x=g.axes[0],y=g.axes[1], DZ=0.6;
+    if(Math.abs(y)>Math.abs(x)){ if(y<-DZ)set.add('UP'); else if(y>DZ)set.add('DOWN'); }   // 優勢な軸だけ採用
+    else { if(x<-DZ)set.add('LEFT'); else if(x>DZ)set.add('RIGHT'); }
+  }
+  // 矛盾する同時入力は捨てる
+  if(set.has('LEFT')&&set.has('RIGHT')){ set.delete('LEFT'); set.delete('RIGHT'); }
+  if(set.has('UP')&&set.has('DOWN')){ set.delete('UP'); set.delete('DOWN'); }
+  // 方向ラッチ＝同時に有効な方向は1つだけ（斜め押しで別機能が巻き添え発火するのを防ぐ）
+  const dirs=['UP','DOWN','LEFT','RIGHT'].filter(d=>set.has(d));
+  if(dirs.length===0) gpDirLatch=null;
+  else {
+    if(!gpDirLatch || !set.has(gpDirLatch)) gpDirLatch=dirs[0];
+    dirs.forEach(d=>{ if(d!==gpDirLatch) set.delete(d); });
   }
   return set;
 }
 // キーボードonKeyと同じ抑制ルールをパッドにも適用
 function gpFire(fn){
   if(document.getElementById('reportModal').style.display!=='none'){
+    if(Date.now()-reportOpenedAt<250) return; // v119: 開いた直後の入力は無視（斜め押し等で即閉じるのを防ぐ）
     // v110: ポップアップは「閉じつつ操作もそのまま効く」透過動作（Excel入力後にAですぐ再生再開できる）
     closeReportPopup();
     if(fn!=='report') doAction(fn);
@@ -2104,6 +2146,7 @@ function onKey(e){
   }
   // v110: 情報ポップアップ表示中はどの割り当てキーでも「閉じつつ操作もそのまま効く」透過動作
   if(document.getElementById('reportModal').style.display!=='none'){
+    if(Date.now()-reportOpenedAt<250) return; // v119: 開いた直後の入力は無視
     if(!e.ctrlKey&&!e.metaKey){
       const tok=keyToken(e); let fn=null;
       for(const f of FN_ORDER){ if((keymap[f]||[]).includes(tok)){ fn=f; break; } }
@@ -2355,6 +2398,7 @@ function refreshReport(){
   document.getElementById('rpMarkLbl').textContent = v.label;
 }
 function openReportPopup(){
+  reportOpenedAt=Date.now(); // v119: 開いた直後の別入力で即閉じるのを防ぐ
   document.getElementById('rpName').textContent = curFileName||'(ファイル未選択)';
   refreshReport();
   document.getElementById('reportModal').style.display='flex';
@@ -2531,6 +2575,7 @@ function toggleDetect(){
   // 補正は再生中の切替（プレーヤー間の引き継ぎ遅延を埋める）でのみ適用。停止中は実時間を維持＝表示が動かない
   const comp = detectOn ? compL2D : compD2L;
   const nt = wasPlaying ? Math.max(0,Math.min(duration||t, t + comp/1000)) : t;
+  seekIntentT=nt; seekIntentAt=Date.now(); // v119: モード切替直後の相対操作が旧位置基準にならないように
   try{ audioEl.currentTime=nt; }catch(e){} // 位置引き継ぎ＋先読み補正
   audioEl.playbackRate=activeRate(); setPitch(audioEl);
   setDetectUI(); applyDetectLayout(); updateListMode();
