@@ -142,7 +142,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v119</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v120</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -511,7 +511,7 @@ let markers=[], hist=[], redoSt=[];
 let silReg=[];
 let silMaxDur=0; // 既知の最長無音(秒)。drawWaveのカリングで「手前に伸びる長い無音」を取りこぼさないため
 let lastGoodTime=0, lastRecover=0; // 直近の有効再生位置／最終復旧時刻（MEDIA_ERR_DECODE自動復旧用）
-let cbPrevSpd=0; // v104: 確認モード(checkback)復帰用の元速度（0=非確認中）
+let cbPrevSpd=0, cbLastAt=0; // v104/v120: 確認モード復帰用の元速度（0=非確認中）／直近の確認操作時刻（連打・二重発火よけ）
 let playGen=0;   // v108: play()非同期解決の世代番号（解決前に停止/モード切替が起きたら結果を破棄）
 let mediaUnlocked=false; // v108: 両audio要素のiOSアンロック済みフラグ
 let msArmed=false; // v109: セッション中に一度でも再生したらtrue。コントロールセンター/BT機器からの意図しない再生コマンドを無視するため
@@ -519,7 +519,7 @@ let lastLoadAt=0, lastHardRec=0; // v110: 読込直後の幽霊再生ガード�
 let playPendingAt=0; // v115: play()要求中（Promise未解決）の目印。ゴーストバスターが正規の再生開始を誤殺しないため
 let endHandled=false, endStallAt=0, tdGen=0; // v116: 終端処理の二重実行防止／終端ストール検知／モード切替の世代番号
 let reportOpenedAt=0; // v119: 情報ポップアップを開いた時刻（開いた直後の巻き添え入力を無視するため）
-let seekIntentT=0, seekIntentAt=0; // v119: 直近のシーク指示（位置の権威。要素への反映待ちの間はこちらを基準にする）
+let seekIntentT=0, seekIntentAt=0, seekFromT=0; // v119/v120: 直近のシーク指示（指示値・時刻・シーク前の位置）
 let tempMk=null; // v117: 仮マーク（中断・寄り道用の目印。常に1個、ジャンプすると自動で消える。エクスポート対象外）
 // v117: 仮マークを波形に描く（既存のtoPx座標系をそのまま受け取るだけ＝座標計算には手を入れない）
 function drawTempMk(c,toPx,lineX,H){
@@ -579,6 +579,7 @@ function onEnded(){
   drawSeek(audioEl.currentTime||duration);
 }
 [audioPlay,audioDet].forEach(el=>{
+  el.addEventListener('seeked',()=>{ if(el===audioEl) seekIntentAt=0; }); // v120: シーク完了＝指示値の役目は終わり（以後は実位置を信頼）
   el.addEventListener('ended',onEnded);
   el.addEventListener('error',()=>{ if(el===audioEl){ const code=el.error?el.error.code:0; if(code===3||code===2){ recoverMedia(); } else if(code===4){ if(!hardRecover()) showToast('⚠ 音声エラー code=4（再読込も失敗）',true); } else { showToast('⚠ 音声エラー code='+code,true); } } }); // v110: code4はファイルから作り直し
   // iOSが稀にplaybackRateを勝手に戻す場合の保険：戻された時だけ即補正。
@@ -1109,9 +1110,10 @@ wa.style.pointerEvents='none';
 function curT(){
   if(loadingFile) return 0;
   const t=audioEl.currentTime||0;
-  // v119: iOSでは currentTime への代入が即座に反映されないことがあり、直後の相対操作（±N秒/±0.1秒/マーク移動）が
-  // 古い位置を基準に計算されて「押した方向と逆に動く」事故になる。直近のシーク指示値が未反映の間はそちらを正とする。
-  if(seekIntentAt && Date.now()-seekIntentAt<600 && Math.abs(t-seekIntentT)>0.25) return seekIntentT;
+  // v120: シーク指示が未反映の間だけ指示値を返す。判定は「要素がまだ“シーク前の位置”に留まっているか」で行う。
+  //  （v119は「指示値と現在値が離れているか」で判定していたため、再生が進むだけで未反映と誤判定し、
+  //    シーク後 最大600ms 現在位置が止まって見える＝確認/マーク移動が乱れる原因になっていた）
+  if(seekIntentAt && Date.now()-seekIntentAt<500 && Math.abs(t-seekFromT)<0.25 && Math.abs(t-seekIntentT)>0.25) return seekIntentT;
   return t;
 } // v111: ファイル切替直後、要素が前ファイルの位置を返す窓を遮断（次マーク誤検索・ハイライト誤選択の原因だった）
 // ── Screen Wake Lock：再生中の自動消灯/ロックを防ぐ（iOS Safari 16.4+） ──
@@ -1219,7 +1221,6 @@ function unlockMedia(){
   // v110: iOSはミュート再生を操作文脈でなくても許可するため、ここが操作文脈でないと「解錠成功したふり」になる。
   // userActivationで本物の操作中か確認し、違えばフラグを立てず次の本物のタップに委ねる（ファイル選択のchangeイベントは操作文脈を失っていることがある＝「たまに失敗」の正体）
   if(navigator.userActivation && !navigator.userActivation.isActive) return;
-  mediaUnlocked=true;
   // v109: 検出用のAudioContext/グラフをジェスチャ内で先に作成（この文脈なら最初からrunningで生まれる。
   // パッド経由のtoggleDetectで作るとsuspendedのまま起こせず「無音で時間だけ進む」現象になる）
   try{ ensureWAGraph(); if(waCtx&&waCtx.state!=='running') waCtx.resume(); }catch(e){}
@@ -1227,6 +1228,8 @@ function unlockMedia(){
   // 「pauseが再生開始前に握り潰され、数秒後に二重再生が始まる」事故の原因だった（実測で確定）。
   // 許可リスト登録はplay()を「呼ぶこと」自体で成立するため、同じジェスチャ内で同期的に即pauseする古典イディオムに変更。
   if(isPlaying || playPendingAt) return; // v119: 再生中／再生要求の処理中は一切触らない（進行中のplay()をpauseで潰す事故を防止）
+                                         // v120: この場合はフラグを立てないまま戻る＝次の操作で改めて解錠を試みる
+  mediaUnlocked=true;
   [audioPlay,audioDet].forEach(el=>{
     if(!el.paused) return; // v119: 鳴っている要素には触らない
     try{
@@ -1332,7 +1335,7 @@ function seekTo(t){
   endHandled=false; endStallAt=0; // v116: シークしたら終端状態を解除 // v111: 読込完了後に適用（読込中はduration=0でクランプされ0に化けていた）
   canResumeComp=false; // ジャンプ後の再生には再開補正を適用しない
   const cl=Math.max(0,Math.min(duration||0,t));
-  seekIntentT=cl; seekIntentAt=Date.now(); // v119: 指示値を記録（反映待ちの間の基準になる）
+  seekFromT=audioEl.currentTime||0; seekIntentT=cl; seekIntentAt=Date.now(); // v119/v120: 指示値＋シーク前の位置を記録
   audioEl.currentTime=cl;
   resetRTSilence();
   // (旧: シーク地点以降のsilRegを削除 → 頭出しで全消失していたため廃止。重複はrtLoopの重なり判定で防止)
@@ -1439,6 +1442,10 @@ function setSpd(s,fromCb){ // v104: fromCb=checkback内部からの呼び出し�
 // ※検出モードは速度が1.0固定なのでN秒戻しのみ動作。手動で速度キーを押すと確認モードは解除される(setSpd参照)
 function doCheckback(){
   if(!objURL) return;
+  // v120: 短時間の二重発火を無視（パッドの取りこぼし/押し直しや連打で「確認した直後に解除」されるのを防ぐ）
+  const nowCb=Date.now();
+  if(nowCb-cbLastAt<400){ return; }
+  cbLastAt=nowCb;
   if(cbPrevSpd>0){ // 復帰（検出モード中でもsetSpdは変数のみ更新＝聞くモードに戻った時に反映される）
     const s=cbPrevSpd; cbPrevSpd=0;
     setSpd(s,true);
@@ -2575,7 +2582,7 @@ function toggleDetect(){
   // 補正は再生中の切替（プレーヤー間の引き継ぎ遅延を埋める）でのみ適用。停止中は実時間を維持＝表示が動かない
   const comp = detectOn ? compL2D : compD2L;
   const nt = wasPlaying ? Math.max(0,Math.min(duration||t, t + comp/1000)) : t;
-  seekIntentT=nt; seekIntentAt=Date.now(); // v119: モード切替直後の相対操作が旧位置基準にならないように
+  seekFromT=audioEl.currentTime||0; seekIntentT=nt; seekIntentAt=Date.now(); // v119/v120: モード切替直後の相対操作が旧位置基準にならないように
   try{ audioEl.currentTime=nt; }catch(e){} // 位置引き継ぎ＋先読み補正
   audioEl.playbackRate=activeRate(); setPitch(audioEl);
   setDetectUI(); applyDetectLayout(); updateListMode();
