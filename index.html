@@ -142,7 +142,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v120</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v121</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -477,6 +477,16 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 
       <div id="tab-keys" class="setpanel" style="display:none">
         <div style="font-family:'Space Mono',monospace;font-size:9px;color:#9a9ac0;letter-spacing:1px;margin-bottom:6px">キーボード / コントローラー</div>
+        <div style="background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:8px;padding:10px;margin-bottom:12px">
+          <div style="font-family:'Space Mono',monospace;font-size:9px;color:rgba(0,229,255,.7);margin-bottom:8px;letter-spacing:1px">🎮 長押しと判定する長さ</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button onclick="adjLongMs(-1)" style="width:34px;height:32px;background:#1c1c28;border:1px solid var(--tap);border-radius:6px;color:#e8e8f0;font-size:16px;cursor:pointer">−</button>
+            <input type="range" id="gpLongMsR" min="300" max="1200" step="50" value="600" style="flex:1;min-width:0">
+            <button onclick="adjLongMs(1)" style="width:34px;height:32px;background:#1c1c28;border:1px solid var(--tap);border-radius:6px;color:#e8e8f0;font-size:16px;cursor:pointer">＋</button>
+            <span id="gpLongMsV" style="font-family:'Space Mono',monospace;font-size:10px;color:#9a9ac0;min-width:52px;text-align:right">600ms</span>
+          </div>
+          <div style="font-size:9px;color:#9a9ac0;margin-top:6px;line-height:1.7">短すぎると、普通に押しただけで長押しの機能が誤って動きます。長押しを使わない場合はこの設定は影響しません。</div>
+        </div>
         <div id="helpList" style="font-family:'Space Mono',monospace"></div>
         <div style="font-size:9px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.5;margin-top:8px">速度プリセットの倍率は「再生」タブで変更できます。</div>
         <button onclick="openKeymapModal()" style="margin-top:12px;width:100%;background:rgba(0,229,255,.12);border:1px solid #00e5ff;border-radius:8px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:11px;padding:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"><span style="font-size:16px;line-height:1">⌨</span><span>キー割り当てを変更</span></button>
@@ -511,6 +521,7 @@ let markers=[], hist=[], redoSt=[];
 let silReg=[];
 let silMaxDur=0; // 既知の最長無音(秒)。drawWaveのカリングで「手前に伸びる長い無音」を取りこぼさないため
 let lastGoodTime=0, lastRecover=0; // 直近の有効再生位置／最終復旧時刻（MEDIA_ERR_DECODE自動復旧用）
+let lastInputSrc=''; // v121: 直近の入力元（キー名 or 🎮ボタン名）。確認の開始/終了トーストに表示して原因を追えるようにする
 let cbPrevSpd=0, cbLastAt=0; // v104/v120: 確認モード復帰用の元速度（0=非確認中）／直近の確認操作時刻（連打・二重発火よけ）
 let playGen=0;   // v108: play()非同期解決の世代番号（解決前に停止/モード切替が起きたら結果を破棄）
 let mediaUnlocked=false; // v108: 両audio要素のiOSアンロック済みフラグ
@@ -594,7 +605,7 @@ function onEnded(){
 // ── LocalStorage ───────────────────────────────
 const LS_PREFS='ac_prefs3';
 function savePrefs(){
-  try{ localStorage.setItem(LS_PREFS,JSON.stringify({scheme:'yakou',skipSec,playbackRate,spdPresets:SPD_PRESETS,tempAutoClear,colors:{colorAc,colorA2,colorSilBar,colorSilFill,colorMarkLine,colorSilText,colorTemp}})); }catch(e){}
+  try{ localStorage.setItem(LS_PREFS,JSON.stringify({scheme:'yakou',skipSec,playbackRate,spdPresets:SPD_PRESETS,tempAutoClear,gpLongMs,colors:{colorAc,colorA2,colorSilBar,colorSilFill,colorMarkLine,colorSilText,colorTemp}})); }catch(e){}
 }
 function loadPrefs(){
   try{
@@ -611,6 +622,7 @@ function loadPrefs(){
       if(cl.colorSilText) colorSilText=cl.colorSilText;
       if(cl.colorTemp) colorTemp=cl.colorTemp; // v118
       if(typeof p.tempAutoClear==='boolean') tempAutoClear=p.tempAutoClear; // v118
+      if(p.gpLongMs>0) gpLongMs=p.gpLongMs; // v121
     } else {
       // legacy/empty prefs → adopt 夜光 defaults (ignore old colors), apply CSS vars & persist once
       document.documentElement.style.setProperty('--ac',colorAc);
@@ -1449,7 +1461,7 @@ function doCheckback(){
   if(cbPrevSpd>0){ // 復帰（検出モード中でもsetSpdは変数のみ更新＝聞くモードに戻った時に反映される）
     const s=cbPrevSpd; cbPrevSpd=0;
     setSpd(s,true);
-    showToast(detectOn ? '確認終了（聞くモードで×'+fmtSpd(s)+'）' : '確認終了 ×'+fmtSpd(s)+'で続行');
+    showToast((detectOn ? '確認終了（聞くモードで×'+fmtSpd(s)+'）' : '確認終了 ×'+fmtSpd(s)+'で続行')+(lastInputSrc?'  ['+lastInputSrc+']':'')); // v121: 入力元を併記
     return;
   }
   seekTo(curT()-skipSec);
@@ -1457,7 +1469,7 @@ function doCheckback(){
     cbPrevSpd=playbackRate; setSpd(1.0,true);
   }
   if(!isPlaying) play();
-  showToast(cbPrevSpd>0 ? '確認中 ×1.0（再押しで×'+fmtSpd(cbPrevSpd)+'に復帰）' : '確認：−'+skipSec+'s');
+  showToast((cbPrevSpd>0 ? '確認中 ×1.0（再押しで×'+fmtSpd(cbPrevSpd)+'に復帰）' : '確認：−'+skipSec+'s')+(lastInputSrc?'  ['+lastInputSrc+']':'')); // v121
 }
 
 // ── Markers ───────────────────────────────────
@@ -1971,10 +1983,20 @@ function loadGpMap(){
 }
 function saveGpMap(){ try{ localStorage.setItem('ac_gpmap',JSON.stringify(gpMap)); }catch(e){} }
 let gpMap=loadGpMap();
+// v121: 長押し判定の長さ
+function setLongMs(v){
+  gpLongMs=Math.max(300,Math.min(1200,Math.round(v/50)*50));
+  const r=document.getElementById('gpLongMsR'); if(r) r.value=gpLongMs;
+  const l=document.getElementById('gpLongMsV'); if(l) l.textContent=gpLongMs+'ms';
+  savePrefs();
+}
+function adjLongMs(d){ setLongMs(gpLongMs+d*50); }
 function resetGpMap(){ gpMap=defGpMapCopy(); saveGpMap(); renderKeymap(); renderHelpList(); showToast('🎮 既定に戻しました'); }
 
 // 長押し判定400ms／リピートは移動系のみ（トグル系の連打事故防止。キーボードのOSリピートに相当）
-const GP_LONG_MS=400, GP_REP1=400, GP_REP=120;
+const GP_REP1=400, GP_REP=120;
+// v121: 長押し判定の時間。400msは「押しただけ」で超えやすく、長押しに割り当てた機能が誤発火していた（既定600ms・設定で変更可）
+let gpLongMs=600;
 const GP_REPEAT_FNS=['skipback','skipfwd','fineback','finefwd','marknudgeback','marknudgefwd','prevmark','nextmark','prevsil','nextsil','undo','redo'];
 const gpState={}; // token -> {down,t0,firedLong,nextRep}
 const gpWarm={};  // v113: index -> 全解放フレームを確認済みか（接続直後のゴミ入力対策）
@@ -2067,12 +2089,12 @@ function gpPoll(){
       gpState[tok]=st={down:true,t0:now,firedLong:false,nextRep:now+GP_REP1};
       if(captureFn){ gpCaptureHit(tok); return; }
       const m=gpMap[tok]; if(!m) return;
-      if(!m.l && m.s) gpFire(m.s); // 長押し未設定＝即発火（遅延ゼロ）
+      if(!m.l && m.s){ lastInputSrc='🎮'+gpBtnName(tok); gpFire(m.s); } // 長押し未設定＝即発火（遅延ゼロ）
     } else { // 押しっぱなし
       if(captureFn) return;
       const m=gpMap[tok]; if(!m) return;
-      if(m.l){ if(!st.firedLong && now-st.t0>=GP_LONG_MS){ st.firedLong=true; gpFire(m.l); } }
-      else if(m.s && GP_REPEAT_FNS.includes(m.s) && now>=st.nextRep){ st.nextRep=now+GP_REP; gpFire(m.s); }
+      if(m.l){ if(!st.firedLong && now-st.t0>=gpLongMs){ st.firedLong=true; lastInputSrc='🎮'+gpBtnName(tok)+' 長押し'; gpFire(m.l); } } // v121
+      else if(m.s && GP_REPEAT_FNS.includes(m.s) && now>=st.nextRep){ st.nextRep=now+GP_REP; lastInputSrc='🎮'+gpBtnName(tok); gpFire(m.s); }
     }
   });
   for(const tok in gpState){
@@ -2081,7 +2103,7 @@ function gpPoll(){
       st.down=false;
       const m=gpMap[tok];
       // 長押し設定ありのボタン：400ms未満で離したら短押し発火（判別のため離した時になる＝仕様）
-      if(!captureFn && m && m.l && !st.firedLong && (now-st.t0)<GP_LONG_MS && m.s) gpFire(m.s);
+      if(!captureFn && m && m.l && !st.firedLong && (now-st.t0)<gpLongMs && m.s){ lastInputSrc='🎮'+gpBtnName(tok); gpFire(m.s); } // v121
       st.firedLong=false;
     }
   }
@@ -2172,7 +2194,7 @@ function onKey(e){
   if(e.ctrlKey||e.metaKey) return;
 
   const fn=lookupFn(keyToken(e));
-  if(fn) doAction(fn);
+  if(fn){ lastInputSrc=tokenLabel(keyToken(e)); doAction(fn); } // v121: 入力元を記録
 }
 // Listen on both document and window
 document.addEventListener('keydown', onKey, true);  // capture phase
@@ -2471,6 +2493,7 @@ function showToast(msg,isError){const el=document.getElementById('toast');el.tex
 window.addEventListener('resize',()=>{drawWave(curT());drawSeek(curT());drawAllBtns();});
 
 // ── Silence detection UI wiring ───────────────
+document.getElementById('gpLongMsR')?.addEventListener('input',function(){ setLongMs(parseInt(this.value)||600); }); // v121
 document.getElementById('silThr').addEventListener('input',function(){
   silThr=parseFloat(this.value);
   updateSilThrLabel();
@@ -2495,6 +2518,7 @@ function syncSettingsUI(){
   const sm=document.getElementById('silMin'); if(sm){sm.value=silMinSec; document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒';}
   setCompUI('compD2L',compD2L); setCompUI('compL2D',compL2D); setCompUI('timeOff',timeOff); setCompUI('spdComp',spdComp); setCompUI('resumeComp',resumeComp); setCompUI('overlapTol',overlapTol); setCompUI('releaseMs',releaseMs); setCompUI('markComp',markComp);
   const tac=document.getElementById('tempAutoClearChk'); if(tac) tac.checked=tempAutoClear; // v118
+  const glr=document.getElementById('gpLongMsR'); if(glr){ glr.value=gpLongMs; document.getElementById('gpLongMsV').textContent=gpLongMs+'ms'; } // v121
 }
 let settingsTab='detect';
 function openSettingsModal(tab){
