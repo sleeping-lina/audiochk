@@ -142,7 +142,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v121</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v122</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -557,6 +557,7 @@ let ROWS=10;
 function onEnded(){
   if(endHandled) return; endHandled=true; // v116: eventとウォッチドッグの二重実行を防止
   // Finalize any growing silence when file ends
+  if(rtInSil && rtSilTrunc){ rtInSil=false; rtSilTrunc=false; } // v122: 始まりを見ていない末尾無音は記録しない
   if(rtInSil && duration>0){
     const endT=audioEl.duration||duration;
     const dur=endT-rtSilStart;
@@ -658,6 +659,7 @@ document.getElementById('folderInput').addEventListener('change',function(){
   setSrc(files[0]); unlockMedia(); load(files[0]); this.value=''; // v108
 });
 function setSrc(file){
+  detDirty=true; // v122
   if(objURL) URL.revokeObjectURL(objURL);
   objURL=URL.createObjectURL(file);
   // v111: 節約モードは巨大ファイルのみ。小さいファイルは両側フル読込＝非アクティブ側が
@@ -732,11 +734,36 @@ let markComp=0;    // v105: マーク反応補正(ms)：再生中のマーク追
 let canResumeComp=false; // 直前が「一時停止」の時だけ再開補正を適用（ジャンプ後は適用しない）
 let rtLoudStart=-1; // 無音中に音が立ち上がった時刻（猶予判定用）
 let rtInSil=false, rtSilStart=0;
+// v122: 検出の安全装置
+//  rtGuardUntil … この時刻まで解析しない（シーク/切替直後に残っている古い音を無音判定に使わない）
+//  rtLastT      … 直前の解析時刻（再生位置の飛びを検知してリセット）
+//  rtFirstTick  … ガード明け最初の解析か（最初から無音＝無音の始まりを見ていない）
+//  rtSilTrunc   … 今の無音区間は始まりを観測できていない（長さが不正確になるので記録しない）
+//  detDirty     … 検出用プレーヤーの位置が前回再生時から変わった（古い音が残っている可能性）
+let rtGuardUntil=0, rtLastT=null, rtFirstTick=true, rtSilTrunc=false, detDirty=true;
+let waGain=null, detGateTimer=null; // v122: 検出モードの出力ゲート（古い音を聞かせないための一時ミュート）
 // Timestamped ring buffer: each entry = {rms, t}
 const RT_MAX=600;  // max entries stored
 let rtBuf=[];      // [{rms, t}] — push to end, trim from front
 const RT_SEC=8;    // seconds of history visible on screen
 
+// v122: 検出モードの出力ゲート。シーク/切替直後に経路へ残っている古い位置の音を聞かせないよう一時ミュートし、
+// 実際に新しい位置から再生が進んだのを確認してから開く。どんな場合も最長1.5秒で必ず開く（無音のまま固まらない）。
+function detGateOpen(){
+  if(detGateTimer){ clearInterval(detGateTimer); detGateTimer=null; }
+  try{ if(waGain && waCtx){ waGain.gain.cancelScheduledValues(waCtx.currentTime); waGain.gain.setTargetAtTime(1, waCtx.currentTime, 0.015); } }catch(e){ try{ waGain.gain.value=1; }catch(_){} }
+}
+function detGateClose(){
+  if(!waGain) return;
+  try{ waGain.gain.cancelScheduledValues(waCtx.currentTime); waGain.gain.value=0; }catch(e){}
+  if(detGateTimer) clearInterval(detGateTimer);
+  const t0=Date.now(), p0=audioDet.currentTime;
+  detGateTimer=setInterval(()=>{
+    const el=Date.now()-t0;
+    const moved=audioDet.currentTime-p0;
+    if((el>=250 && moved>=0.15) || el>=1500 || !isPlaying&&el>=300) detGateOpen();
+  },40);
+}
 function ensureWAGraph(){
   if(waReady) return;
   waCtx=new(window.AudioContext||window.webkitAudioContext)();
@@ -745,10 +772,13 @@ function ensureWAGraph(){
   waAnalyser.fftSize=4096; // larger = better RMS averaging for silence detection
   waBuf=new Float32Array(waAnalyser.fftSize); // matches new fftSize
   waSrc.connect(waAnalyser);
-  waAnalyser.connect(waCtx.destination);
+  // v122: 出力ゲート。解析(analyser)は常に音を受け取るが、スピーカーへはゲート経由で出す
+  waGain=waCtx.createGain(); waGain.gain.value=1;
+  waAnalyser.connect(waGain);
+  waGain.connect(waCtx.destination);
   waReady=true;
 }
-function resetRTSilence(){ rtInSil=false; rtBuf=[]; rtLoudStart=-1; }
+function resetRTSilence(){ rtInSil=false; rtBuf=[]; rtLoudStart=-1; rtLastT=null; rtFirstTick=true; rtSilTrunc=false; } // v122: 安全装置の状態もリセット
 
 let rtTimerId=null;
 let stopTime=0; // timestamp of last stop() call
@@ -761,6 +791,14 @@ function rtLoop(){
   const rms=Math.sqrt(sum/waBuf.length);
   const t=audioEl.currentTime;
 
+  // v122: 再生位置の飛び（逆行 or 1秒超の前進）＝シーク反映遅れ等。状態をリセットして仕切り直す
+  if(rtLastT!=null && (t<rtLastT-0.05 || t>rtLastT+1.0)){
+    resetRTSilence(); rtGuardUntil=Date.now()+350;
+  }
+  rtLastT=t;
+  // v122: ガード中は解析しない（シーク/切替直後に解析器へ残っている古い音を、今の時刻の音として扱わない）
+  if(Date.now()<rtGuardUntil){ if(isPlaying) rtTimerId=setTimeout(rtLoop, 50); return; }
+
   // push timestamped sample
   rtBuf.push({rms,t});
   if(rtBuf.length>RT_MAX) rtBuf.shift();
@@ -769,7 +807,10 @@ function rtLoop(){
     rtLoudStart=-1; // 閾値割れ＝音は途切れた。保留中の立ち上がりを取り消し（スパイク無視）
     if(!rtInSil){ rtInSil=true;
       // 先頭の無音は開始を0に（ファイル先頭=0始まり）。時刻オフセットは別途pushで適用。
-      rtSilStart=t<0.4?0:Math.max(0,t-(waAnalyser.fftSize/waCtx.sampleRate)); }
+      rtSilStart=t<0.4?0:Math.max(0,t-(waAnalyser.fftSize/waCtx.sampleRate));
+      // v122: 解析開始の時点ですでに無音＝この無音の「始まり」は見ていない（途中から計測）。
+      // 長さが実際より短く記録され、しかも重なり判定で正しい値の再記録を妨げるため、記録しない（ファイル先頭は除く）
+      rtSilTrunc = rtFirstTick && rtSilStart!==0; }
     document.getElementById('silCurDur').textContent=(t-rtSilStart).toFixed(1)+'s';
     document.getElementById('silStatus').textContent='無音中…';
   } else {
@@ -785,7 +826,8 @@ function rtLoop(){
       rtLoudStart=-1;
       document.getElementById('silCurDur').textContent='--';
       document.getElementById('silStatus').textContent='音あり';
-      if(dur>=silMinSec){
+      if(rtSilTrunc){ rtSilTrunc=false; showToast('無音の始まりが計測範囲外のため記録しませんでした（少し前から再生してください）'); } // v122
+      else if(dur>=silMinSec){
         // 時刻オフセット補正（解析音と再生位置のズレを補正）。先頭(0始まり)は0のまま。
         const off=timeOff/1000;
         const recStart = rtSilStart===0 ? 0 : rtSilStart+off;
@@ -814,6 +856,7 @@ function rtLoop(){
       document.getElementById('silCurDur').textContent='--';
     }
   }
+  rtFirstTick=false; // v122: 以後の無音は「始まり」を観測できる
   if(isPlaying) rtTimerId=setTimeout(rtLoop, 50);
 }
 
@@ -1292,6 +1335,13 @@ function play(){
   }
   canResumeComp=false;
   if(detectOn) ensureWAGraph();      // 聞くモード(OFF)ではグラフを作らず直接再生→倍速なめらか
+  // v122: 検出プレーヤーの位置が前回再生時から変わっている場合、解析器/出力経路に古い位置の音が残っている。
+  // 出力を一時ミュートし（古い音を聞かせない）、解析も少し待つ（古い音で無音判定しない）。
+  if(detectOn){
+    rtGuardUntil = Date.now() + (detDirty ? 350 : 120);
+    if(detDirty) detGateClose();
+    detDirty=false;
+  }
   if(waCtx&&waCtx.state==='suspended') waCtx.resume();
   try{ (audioEl===audioPlay?audioDet:audioPlay).pause(); }catch(e){} // v109: 非アクティブ側を必ず停止（どの経路でも二重再生＝エコーを不可能にする）
   // Set rate before AND after play() — iOS sometimes resets it on play()
@@ -1329,6 +1379,7 @@ function play(){
 }
 function stop(){
   playGen++; // v108: 解決前のplay()を無効化
+  detGateOpen(); // v122: ミュートを残さない
   audioPlay.pause(); audioDet.pause(); isPlaying=false; stopTime=Date.now(); redrawPlayBtn();
   drawAllBtns(); // パージで消えた操作ボタンを復帰
   releaseWakeLock();
@@ -1348,6 +1399,8 @@ function seekTo(t){
   canResumeComp=false; // ジャンプ後の再生には再開補正を適用しない
   const cl=Math.max(0,Math.min(duration||0,t));
   seekFromT=audioEl.currentTime||0; seekIntentT=cl; seekIntentAt=Date.now(); // v119/v120: 指示値＋シーク前の位置を記録
+  // v122: 検出モードでシーク＝解析器/出力に古い位置の音が残る。再生中ならその場でガード、停止中なら次の再生時に適用
+  if(detectOn){ if(isPlaying){ rtGuardUntil=Date.now()+350; detGateClose(); } else detDirty=true; }
   audioEl.currentTime=cl;
   resetRTSilence();
   // (旧: シーク地点以降のsilRegを削除 → 頭出しで全消失していたため廃止。重複はrtLoopの重なり判定で防止)
@@ -2601,7 +2654,12 @@ function toggleDetect(){
   detectOn=!detectOn;
   try{ localStorage.setItem('ac_detect', detectOn?'1':'0'); }catch(e){}
   audioEl = detectOn ? audioDet : audioPlay; // swap active element
-  audioEl.preload='auto'; (audioEl===audioPlay?audioDet:audioPlay).preload='metadata'; // アクティブだけ先読み
+  // v122: 先読みの節約は巨大ファイル(200MB超)のみ（setSrcと同じ規則）。小さいファイルで非アクティブ側の先読みを止めると、
+  // 次の切替時のシークが遅れて「古い位置の音が一瞬鳴る」原因になっていた
+  audioEl.preload='auto';
+  if((curFileSize||0)>200*1024*1024) (audioEl===audioPlay?audioDet:audioPlay).preload='metadata';
+  if(detectOn) detDirty=true; // v122: 検出プレーヤーは前回の位置の音を抱えている
+  detGateOpen();
   // 方向別補正：検出→聞く=compD2L / 聞く→検出=compL2D
   // 補正は再生中の切替（プレーヤー間の引き継ぎ遅延を埋める）でのみ適用。停止中は実時間を維持＝表示が動かない
   const comp = detectOn ? compL2D : compD2L;
@@ -2618,11 +2676,20 @@ function toggleDetect(){
   // v116: 末尾では自動再開しない（末尾のplay()は仕様で先頭へ巻き戻るため）＋
   // 保留中の再開予約は世代番号で無効化（連続でモード切替した時に古い予約が発火するのを防ぐ）
   const atEnd = duration>0 && nt>=duration-0.05;
-  if(wasPlaying && !atEnd){ // シーク完了を待ってから再生＝切替直後に古い位置の音が鳴る/消える問題を防ぐ
-    let played=false; const myGen=tdGen;
-    const go=()=>{ if(played||myGen!==tdGen)return; played=true; audioEl.removeEventListener('seeked',go); stopTime=0; canResumeComp=false; play(); };
-    audioEl.addEventListener('seeked',go,{once:true});
-    setTimeout(go,400); // 保険：seekedが来ない/既に完了済みの場合
+  if(wasPlaying && !atEnd){
+    // v122: 「シーク完了イベント」ではなく「実際の位置が目標に着いたこと」を確認してから再生する。
+    // （旧: 400msで待ちきれないと古い位置のまま再生を始めていた＝だいぶ前の音が一瞬鳴る原因）
+    // 最長3秒待ち、着かなければ位置を指定し直してから再生する
+    let played=false; const myGen=tdGen, el=audioEl, t0=Date.now();
+    const go=()=>{ if(played||myGen!==tdGen) return; played=true; clearInterval(chk); el.removeEventListener('seeked',onSk); stopTime=0; canResumeComp=false; play(); };
+    const arrived=()=> Math.abs((el.currentTime||0)-nt)<0.3 && el.readyState>=2;
+    const onSk=()=>{ if(arrived()) go(); };
+    el.addEventListener('seeked',onSk);
+    const chk=setInterval(()=>{
+      if(myGen!==tdGen){ clearInterval(chk); el.removeEventListener('seeked',onSk); return; }
+      if(arrived()) go();
+      else if(Date.now()-t0>3000){ try{ el.currentTime=nt; }catch(e){} go(); }
+    },60);
   }
 }
 
