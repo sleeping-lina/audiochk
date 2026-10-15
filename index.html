@@ -127,6 +127,8 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
   display:flex;align-items:center;justify-content:center;gap:5px}
 .iobtn svg{flex-shrink:0}
 .iobtn:active{opacity:.6}
+/* v124: iOS 27でホーム画面アプリの上部がぼやける問題の回避。最上部に「ほぼ透明だが透明ではない」固定要素を置くとぼかしが消える（参考: zenn.dev/last2014）。固定配置なので画面の高さは減らない */
+#iosBlurFix{position:fixed;top:0;left:0;width:100%;height:var(--blurFixH,11px);background-color:#ffffff01;opacity:.1;pointer-events:none;z-index:10000}
 #toast{position:fixed;bottom:48px;left:50%;transform:translateX(-50%) translateY(10px);
   background:var(--s2);border:1px solid var(--ac);color:var(--ac);font-family:'Space Mono',monospace;
   font-size:10px;padding:5px 14px;border-radius:14px;opacity:0;transition:all .25s;pointer-events:none;white-space:normal;max-width:90%;width:max-content;text-align:center;line-height:1.45;z-index:600} /* v123: 長い文は折り返す */
@@ -140,10 +142,11 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 </style>
 </head>
 <body tabindex="0">
+<div id="iosBlurFix" tabindex="-1" aria-hidden="true"></div><!-- v124: iOS 27のヘッダーぼやけ回避（場所を取らない極薄の固定レイヤー） -->
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v123</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v124</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -356,7 +359,9 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
     <div style="font-family:'Space Mono',monospace;font-size:11px;color:#00e5ff;letter-spacing:1px;margin-bottom:6px">EXPORT</div>
     <div style="font-size:10px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:14px">どの範囲を書き出しますか？<br>フォルダ全体＝いま開いているフォルダ内の全ファイル</div>
     <button onclick="doExport('cur')" style="width:100%;background:rgba(0,229,255,.12);border:1px solid #00e5ff;border-radius:8px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:12px;padding:11px;cursor:pointer;margin-bottom:8px">現在のファイルのみ</button>
-    <button onclick="doExport('all')" style="width:100%;background:#1c1c28;border:1px solid var(--tap);border-radius:8px;color:#e8e8f0;font-family:'Space Mono',monospace;font-size:12px;padding:11px;cursor:pointer;margin-bottom:8px">フォルダ全体（<span id="expCount">0</span>件）</button>
+    <button id="expAllBtn" onclick="doExport('all')" style="width:100%;background:#1c1c28;border:1px solid var(--tap);border-radius:8px;color:#e8e8f0;font-family:'Space Mono',monospace;font-size:12px;padding:11px;cursor:pointer;margin-bottom:8px">フォルダ全体（<span id="expCount">0</span>件）</button>
+    <button onclick="doExport('backup')" style="width:100%;background:#1c1c28;border:1px solid var(--tap);border-radius:8px;color:#e8e8f0;font-family:'Space Mono',monospace;font-size:12px;padding:11px;cursor:pointer;margin-bottom:4px">全データのバックアップ</button>
+    <div style="font-size:9px;color:#9a9ac0;line-height:1.6;margin-bottom:10px">設定・キー/パッドの割り当て・全ファイルのマークと無音をまとめて保存します。ホーム画面のアイコンを削除・追加し直す前に必ず書き出してください（削除すると保存データも消えます）。</div>
     <button onclick="closeExpModal()" style="width:100%;background:transparent;border:1px solid var(--tap);border-radius:8px;color:rgba(0,229,255,.72);font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">キャンセル</button>
   </div>
 </div>
@@ -425,6 +430,9 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
       <div style="border-top:1px solid #2a2a3d;margin:10px 0 8px"></div>
       <div style="font-size:9px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:8px">猶予：音が一瞬入っても、この時間続けて音がある時だけ無音終了とみなします（0=オフ）。</div>
       <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">猶予(ms)</span><button class="sil-adj" onclick="adjComp('rel',-1)">−</button><input type="range" id="releaseMs" min="0" max="400" step="10" value="0"><button class="sil-adj" onclick="adjComp('rel',1)">＋</button><span class="sil-val" id="releaseMsV">0ms</span></div>
+      <div style="border-top:1px solid #2a2a3d;margin:10px 0 8px"></div>
+      <div style="font-size:9px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:8px">助走：検出モードで位置を変えて再生する時、少し手前から無音で再生して、前に再生していた位置の音を流しきってから音を出します。切替直後に別の箇所の音が鳴る場合は大きく、開始の待ちが気になる場合は小さくしてください（0=オフ）。</div>
+      <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">助走(秒)</span><input type="range" id="preRollR" min="0" max="3" step="0.1" value="1.5"><span class="sil-val" id="preRollV">1.5s</span></div>
       </div><!-- /tab-detect -->
 
       <div id="tab-play" class="setpanel" style="display:none">
@@ -449,12 +457,12 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
           <div style="font-size:9px;color:#9a9ac0;margin-top:6px;line-height:1.7">画面下の通知が表示される時間です。赤いエラー通知はこれより3秒長く表示されます。</div>
         </div>
         <div style="background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:8px;padding:10px;margin-bottom:12px">
-          <div style="font-family:'Space Mono',monospace;font-size:9px;color:rgba(0,229,255,.7);margin-bottom:8px;letter-spacing:1px">画面上部の余白</div>
+          <div style="font-family:'Space Mono',monospace;font-size:9px;color:rgba(0,229,255,.7);margin-bottom:8px;letter-spacing:1px">ヘッダーのぼやけ回避（iOS 27）</div>
           <div style="display:flex;align-items:center;gap:8px">
-            <input type="range" id="topPadR" min="0" max="40" step="2" value="0" style="flex:1;min-width:0">
-            <span id="topPadV" style="font-family:'Space Mono',monospace;font-size:10px;color:#9a9ac0;min-width:44px;text-align:right">0px</span>
+            <input type="range" id="topPadR" min="0" max="30" step="1" value="11" style="flex:1;min-width:0">
+            <span id="topPadV" style="font-family:'Space Mono',monospace;font-size:10px;color:#9a9ac0;min-width:44px;text-align:right">11px</span>
           </div>
-          <div style="font-size:9px;color:#9a9ac0;margin-top:6px;line-height:1.7">ヘッダーがぼやける場合に、ぼかしの範囲より下へずらします。</div>
+          <div style="font-size:9px;color:#9a9ac0;margin-top:6px;line-height:1.7">画面最上部に見えない層を置いてぼかしを消します（画面は狭くなりません）。ぼやけが残る場合は数値を上げてください。0でオフ。</div>
         </div>
         <div style="background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:8px;padding:10px">
           <div style="font-family:'Space Mono',monospace;font-size:9px;color:rgba(0,229,255,.7);margin-bottom:8px;letter-spacing:1px">SKIP 秒数</div>
@@ -623,7 +631,7 @@ function onEnded(){
 // ── LocalStorage ───────────────────────────────
 const LS_PREFS='ac_prefs3';
 function savePrefs(){
-  try{ localStorage.setItem(LS_PREFS,JSON.stringify({scheme:'yakou',skipSec,playbackRate,spdPresets:SPD_PRESETS,tempAutoClear,gpLongMs,toastSec,topPad,colors:{colorAc,colorA2,colorSilBar,colorSilFill,colorMarkLine,colorSilText,colorTemp}})); }catch(e){}
+  try{ localStorage.setItem(LS_PREFS,JSON.stringify({scheme:'yakou',skipSec,playbackRate,spdPresets:SPD_PRESETS,tempAutoClear,gpLongMs,toastSec,blurFixH:topPad,preRoll,colors:{colorAc,colorA2,colorSilBar,colorSilFill,colorMarkLine,colorSilText,colorTemp}})); }catch(e){}
 }
 function loadPrefs(){
   try{
@@ -642,7 +650,8 @@ function loadPrefs(){
       if(typeof p.tempAutoClear==='boolean') tempAutoClear=p.tempAutoClear; // v118
       if(p.gpLongMs>0) gpLongMs=p.gpLongMs; // v121
       if(p.toastSec>0) toastSec=p.toastSec; // v123
-      if(p.topPad>=0) topPad=p.topPad; // v123
+      if(p.blurFixH>=0) topPad=p.blurFixH; // v124（旧topPad=余白値は引き継がない）
+      if(p.preRoll>=0) preRoll=p.preRoll; // v124
     } else {
       // legacy/empty prefs → adopt 夜光 defaults (ignore old colors), apply CSS vars & persist once
       document.documentElement.style.setProperty('--ac',colorAc);
@@ -779,13 +788,15 @@ function detGateOpen(){
   if(detGateTimer){ clearInterval(detGateTimer); detGateTimer=null; }
   detGateSet(1);
 }
-function detGateClose(){
+function detGateClose(untilT){ // v124: untilT＝この再生位置に達したら開く（助走用）。省略時は従来どおり進み具合で開く
   if(!waGain) return;
   detGateSet(0);
   if(detGateTimer) clearInterval(detGateTimer);
   const t0=Date.now(); let p0=null;
   detGateTimer=setInterval(()=>{
     const el=Date.now()-t0;
+    if(el>=8000){ detGateOpen(); return; }       // 絶対の安全弁（無音のまま固まらない）
+    if(untilT!=null){ if(!audioDet.seeking && isPlaying && audioDet.currentTime>=untilT-0.02) detGateOpen(); return; }
     if(!isPlaying && el>=300){ detGateOpen(); return; }
     if(audioDet.seeking) return;                 // シーク中は判定しない（位置の値が当てにならない）
     if(p0==null){ p0=audioDet.currentTime; return; }
@@ -825,6 +836,11 @@ function rtLoop(){
     resetRTSilence(); rtGuardUntil=Date.now()+350;
   }
   rtLastT=t;
+  // v124: 助走中は解析しない。到達した瞬間から計測を始める（始まりの判定もここから）
+  if(rtGuardMediaT!=null){
+    if(t<rtGuardMediaT){ if(isPlaying) rtTimerId=setTimeout(rtLoop, 50); return; }
+    rtGuardMediaT=null; resetRTSilence(); rtLastT=t;
+  }
   // v123: シーク処理中は位置も音も当てにならない → 解析を止め、完了後も少し待つ
   if(audioEl.seeking){ resetRTSilence(); rtGuardUntil=Date.now()+350; }
   // v122: ガード中は解析しない（シーク/切替直後に解析器へ残っている古い音を、今の時刻の音として扱わない）
@@ -1196,6 +1212,8 @@ wa.style.pointerEvents='none';
 function curT(){
   if(loadingFile) return 0;
   const t=audioEl.currentTime||0;
+  // v124: 助走中は目標位置を現在位置として扱う（表示が手前に戻って見えない／±N秒は目標位置基準）
+  if(prerollTarget!=null && detectOn){ if(t<prerollTarget-0.02) return prerollTarget; prerollTarget=null; }
   // v120: シーク指示が未反映の間だけ指示値を返す。判定は「要素がまだ“シーク前の位置”に留まっているか」で行う。
   //  （v119は「指示値と現在値が離れているか」で判定していたため、再生が進むだけで未反映と誤判定し、
   //    シーク後 最大600ms 現在位置が止まって見える＝確認/マーク移動が乱れる原因になっていた）
@@ -1377,9 +1395,26 @@ function play(){
   // v122: 検出プレーヤーの位置が前回再生時から変わっている場合、解析器/出力経路に古い位置の音が残っている。
   // 出力を一時ミュートし（古い音を聞かせない）、解析も少し待つ（古い音で無音判定しない）。
   if(detectOn){
-    rtGuardUntil = Date.now() + (detDirty ? 350 : 120);
-    if(detDirty) detGateClose();
-    detDirty=false;
+    if(detDirty && preRoll>=0.3 && audioEl.currentTime>=0.3 && prerollTarget==null){
+      // v124: 助走。検出プレーヤーには前回再生していた位置の音が残っていて、残る時間は0.35秒より長いことがある（v122/v123の前提が誤り）。
+      // 目標の preRoll 秒手前へ戻して無音のまま再生し、古い音を流しきってから目標位置で音を出す。
+      // 解析は目標の0.3秒手前から始める（古い音で無音判定しない）
+      const target=audioEl.currentTime, pre=Math.min(preRoll,target);
+      prerollTarget=target; rtGuardMediaT=target-Math.min(0.3,pre); detDirty=false;
+      resetRTSilence();
+      detGateClose(target);
+      try{ audioEl.currentTime=target-pre; }catch(e){}
+      if(audioEl.seeking){
+        const el=audioEl, g=playGen; let fired=false;
+        const go=()=>{ if(fired) return; fired=true; el.removeEventListener('seeked',go); if(g===playGen && !isPlaying && prerollTarget!=null){ stopTime=0; play(); } };
+        el.addEventListener('seeked',go); setTimeout(go,2000);
+        return;
+      }
+    } else {
+      rtGuardUntil = Date.now() + (detDirty ? 350 : 120);
+      if(detDirty) detGateClose();
+      detDirty=false;
+    }
   }
   if(waCtx&&waCtx.state==='suspended') waCtx.resume();
   try{ (audioEl===audioPlay?audioDet:audioPlay).pause(); }catch(e){} // v109: 非アクティブ側を必ず停止（どの経路でも二重再生＝エコーを不可能にする）
@@ -1419,6 +1454,7 @@ function play(){
 function stop(){
   playGen++; // v108: 解決前のplay()を無効化
   detGateOpen(); // v122: ミュートを残さない
+  if(prerollTarget!=null){ const tg=prerollTarget; prerollTarget=null; rtGuardMediaT=null; try{ audioEl.pause(); audioEl.currentTime=tg; }catch(e){} detDirty=true; } // v124: 助走中に止めた→目標位置に戻す
   audioPlay.pause(); audioDet.pause(); isPlaying=false; stopTime=Date.now(); redrawPlayBtn();
   drawAllBtns(); // パージで消えた操作ボタンを復帰
   releaseWakeLock();
@@ -1434,6 +1470,7 @@ function stop(){
 function seekTo(t){
   if(!objURL)return;
   if(loadingFile){ pendingSeekT=t; return; }
+  prerollTarget=null; rtGuardMediaT=null; // v124: シークしたら助走は取り消し
   endHandled=false; endStallAt=0; // v116: シークしたら終端状態を解除 // v111: 読込完了後に適用（読込中はduration=0でクランプされ0に化けていた）
   canResumeComp=false; // ジャンプ後の再生には再開補正を適用しない
   const cl=Math.max(0,Math.min(duration||0,t));
@@ -1721,9 +1758,19 @@ function doClearFolder(){
 // ── Export / Import ───────────────────────────
 document.getElementById('exportBtn').addEventListener('click',openExportModal);
 function openExportModal(){
-  if(playlist.length<=1){ exportCurrent(); return; } // フォルダ未読込なら即・現在のみ
+  // v124: 全データのバックアップを選べるよう、ファイル1つの時もモーダルを出す（フォルダ全体ボタンだけ隠す）
   document.getElementById('expCount').textContent=playlist.length;
+  const ab=document.getElementById('expAllBtn'); if(ab) ab.style.display = playlist.length>1 ? '' : 'none';
   document.getElementById('exportModal').style.display='flex';
+}
+// v124: 全データのバックアップ＝このアプリの保存データ（設定・キー/パッド割り当て・全ファイルのマークと無音）を1ファイルに書き出す。
+// ホーム画面のアイコンを削除すると保存データも消えるため、追加し直す前に必ず書き出しておく
+function exportBackup(){
+  const data={};
+  try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k && k.indexOf('ac_')===0) data[k]=localStorage.getItem(k); } }catch(e){}
+  const n=Object.keys(data).filter(k=>k.indexOf('ac_mk4_')===0).length;
+  dlJSON({type:'audiochk-backup',ver:'v124',date:new Date().toISOString(),data}, 'audiochk_backup_'+todayStr()+'.json');
+  showToast('バックアップを書き出しました（マーク '+n+'ファイル分＋設定）');
 }
 function closeExpModal(){
   document.getElementById('exportModal').style.display='none';
@@ -1733,6 +1780,7 @@ function doExport(which){
   closeExpModal();
   if(which==='cur') exportCurrent();
   else if(which==='all') exportAll();
+  else if(which==='backup') exportBackup(); // v124
 }
 function mkExportObj(fname,mkrs,silR,dur,size){ return{file:fname,size:size,duration:dur,markers:mkrs,silences:silR.map(s=>({start:+s.start.toFixed(3),end:+s.end.toFixed(3),dur:+s.dur.toFixed(3)}))}; }
 function todayStr(){ const d=new Date(); return ''+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); }
@@ -1744,6 +1792,16 @@ document.getElementById('importData').addEventListener('change',function(){
   const r=new FileReader();
   r.onload=ev=>{try{
     const d=JSON.parse(ev.target.result);
+    if(d && d.type==='audiochk-backup' && d.data && typeof d.data==='object'){
+      // v124: 全データのバックアップから復元（同じ項目は上書き。バックアップに無い既存データは残す）
+      const keys=Object.keys(d.data).filter(k=>k.indexOf('ac_')===0);
+      const n=keys.filter(k=>k.indexOf('ac_mk4_')===0).length;
+      if(!confirm('バックアップ（'+(d.date||'').slice(0,10)+'）から復元します。\n設定とキー割り当ては上書きされ、マークは'+n+'ファイル分が復元されます。\n復元後に画面を再読み込みします（ファイルは開き直してください）。')) return;
+      let ok=0; keys.forEach(k=>{ try{ localStorage.setItem(k, d.data[k]); ok++; }catch(err){} });
+      showToast('復元しました（'+ok+'項目）。再読み込みします…');
+      setTimeout(()=>location.reload(),1500);
+      return;
+    }
     if(Array.isArray(d)){
       // 全ファイル形式：各エントリを自分のキーに復元
       let n=0;
@@ -2581,14 +2639,17 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 let lT=null;
 function showLd(on){const b=document.getElementById('lbar');b.style.width=on?'65%':'100%';clearTimeout(lT);if(!on)lT=setTimeout(()=>{b.style.width='0%';},350);}
 let tT=null;
-let topPad=0; // v123: 画面上部の余白(px)。iOSのガラス効果でヘッダーがぼやける場合の逃げ
-function applyTopPad(){ document.body.style.paddingTop=topPad+'px'; try{ drawWave(curT()); drawSeek(curT()); }catch(e){} }
+let preRoll=1.5; // v124: 検出モードの「助走」秒数（位置を変えて再生する時、目標の少し手前から無音で再生して古い音を流しきる）
+let prerollTarget=null, rtGuardMediaT=null; // v124: 助走中の目標位置／この再生位置に達するまで解析しない
+let topPad=11; // v124: ぼやけ回避レイヤーの高さ(px)。v123の「上部余白」から置き換え（余白は画面を狭くするため）
+function applyTopPad(){ document.body.style.paddingTop='0px'; document.documentElement.style.setProperty('--blurFixH', topPad+'px'); const f=document.getElementById('iosBlurFix'); if(f) f.style.display= topPad>0?'block':'none'; }
 let toastSec=4; // v123: 通知の表示時間（秒）。設定→再生で変更可。エラーはこれ＋3秒
 function showToast(msg,isError){const el=document.getElementById('toast');el.textContent=msg;el.classList.toggle('err',!!isError);el.classList.add('show');clearTimeout(tT);const ms=toastSec*1000+(isError?3000:0);tT=setTimeout(()=>el.classList.remove('show'),ms);}
 window.addEventListener('resize',()=>{drawWave(curT());drawSeek(curT());drawAllBtns();});
 
 // ── Silence detection UI wiring ───────────────
 document.getElementById('gpLongMsR')?.addEventListener('input',function(){ setLongMs(parseInt(this.value)||600); }); // v121
+document.getElementById('preRollR')?.addEventListener('input',function(){ preRoll=parseFloat(this.value)||0; document.getElementById('preRollV').textContent=preRoll.toFixed(1)+'s'; savePrefs(); }); // v124
 document.getElementById('topPadR')?.addEventListener('input',function(){ topPad=parseInt(this.value)||0; document.getElementById('topPadV').textContent=topPad+'px'; applyTopPad(); savePrefs(); }); // v123
 document.getElementById('toastSecR')?.addEventListener('input',function(){ toastSec=parseFloat(this.value)||4; document.getElementById('toastSecV').textContent=toastSec.toFixed(1)+'秒'; savePrefs(); }); // v123
 document.getElementById('silThr').addEventListener('input',function(){
@@ -2615,6 +2676,7 @@ function syncSettingsUI(){
   const sm=document.getElementById('silMin'); if(sm){sm.value=silMinSec; document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒';}
   setCompUI('compD2L',compD2L); setCompUI('compL2D',compL2D); setCompUI('timeOff',timeOff); setCompUI('spdComp',spdComp); setCompUI('resumeComp',resumeComp); setCompUI('overlapTol',overlapTol); setCompUI('releaseMs',releaseMs); setCompUI('markComp',markComp);
   const tac=document.getElementById('tempAutoClearChk'); if(tac) tac.checked=tempAutoClear; // v118
+  const prr=document.getElementById('preRollR'); if(prr){ prr.value=preRoll; document.getElementById('preRollV').textContent=preRoll.toFixed(1)+'s'; } // v124
   const tpr=document.getElementById('topPadR'); if(tpr){ tpr.value=topPad; document.getElementById('topPadV').textContent=topPad+'px'; } // v123
   const tsr=document.getElementById('toastSecR'); if(tsr){ tsr.value=toastSec; document.getElementById('toastSecV').textContent=toastSec.toFixed(1)+'秒'; } // v123
   const glr=document.getElementById('gpLongMsR'); if(glr){ glr.value=gpLongMs; document.getElementById('gpLongMsV').textContent=gpLongMs+'ms'; } // v121
@@ -2691,6 +2753,7 @@ function toggleDetect(){
   tdGen++; // v116: 過去の再開予約を無効化
   const wasPlaying=isPlaying;
   const t=curT();
+  prerollTarget=null; rtGuardMediaT=null; // v124
   // stop both players & loops first
   audioPlay.pause(); audioDet.pause(); isPlaying=false;
   if(rtTimerId){ clearTimeout(rtTimerId); rtTimerId=null; }
