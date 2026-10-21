@@ -146,7 +146,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v124</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v125</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -360,8 +360,9 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
     <div style="font-size:10px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:14px">どの範囲を書き出しますか？<br>フォルダ全体＝いま開いているフォルダ内の全ファイル</div>
     <button onclick="doExport('cur')" style="width:100%;background:rgba(0,229,255,.12);border:1px solid #00e5ff;border-radius:8px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:12px;padding:11px;cursor:pointer;margin-bottom:8px">現在のファイルのみ</button>
     <button id="expAllBtn" onclick="doExport('all')" style="width:100%;background:#1c1c28;border:1px solid var(--tap);border-radius:8px;color:#e8e8f0;font-family:'Space Mono',monospace;font-size:12px;padding:11px;cursor:pointer;margin-bottom:8px">フォルダ全体（<span id="expCount">0</span>件）</button>
-    <button onclick="doExport('backup')" style="width:100%;background:#1c1c28;border:1px solid var(--tap);border-radius:8px;color:#e8e8f0;font-family:'Space Mono',monospace;font-size:12px;padding:11px;cursor:pointer;margin-bottom:4px">全データのバックアップ</button>
-    <div style="font-size:9px;color:#9a9ac0;line-height:1.6;margin-bottom:10px">設定・キー/パッドの割り当て・全ファイルのマークと無音をまとめて保存します。ホーム画面のアイコンを削除・追加し直す前に必ず書き出してください（削除すると保存データも消えます）。</div>
+    <button onclick="doExport('backup')" style="width:100%;background:#1c1c28;border:1px solid var(--tap);border-radius:8px;color:#e8e8f0;font-family:'Space Mono',monospace;font-size:12px;padding:11px;cursor:pointer;margin-bottom:8px">全データのバックアップ</button>
+    <button onclick="doExport('settings')" style="width:100%;background:#1c1c28;border:1px solid var(--tap);border-radius:8px;color:#e8e8f0;font-family:'Space Mono',monospace;font-size:12px;padding:11px;cursor:pointer;margin-bottom:4px">設定のみ</button>
+    <div style="font-size:9px;color:#9a9ac0;line-height:1.6;margin-bottom:10px">全データ＝設定・キー/パッドの割り当て・全ファイルのマークと無音。設定のみ＝マークを含まず、別の端末やアプリに設定だけ移したい時用。ホーム画面のアイコンを削除・追加し直す前に必ず書き出してください（削除すると保存データも消えます）。</div>
     <button onclick="closeExpModal()" style="width:100%;background:transparent;border:1px solid var(--tap);border-radius:8px;color:rgba(0,229,255,.72);font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">キャンセル</button>
   </div>
 </div>
@@ -571,6 +572,7 @@ function drawTempMk(c,toPx,lineX,H){
   c.restore();
 }
 // v114: 「タップで自動再生再開」機構は撤去（クリック対象の除外リストでは漏れを塞ぎきれず、意図しない再生の温床だったため。タップ→再生ボタンの2段に戻す）
+let pendingPlay=false; // v125: 読込中に押された再生（読込完了後に実行）
 let loadingFile=false, pendingSeekT=null; // v111: 読込中フラグ（この間curTは0を返す）／読込中に要求されたシークの保留
 let raf=null;
 let playlist=[], plIdx=-1, skipSec=5;
@@ -703,7 +705,7 @@ function setSrc(file){
 // ── Load ──────────────────────────────────────
 async function load(file){
   showLd(true);
-  loadingFile=true; pendingSeekT=null; // v111
+  loadingFile=true; pendingSeekT=null; pendingPlay=false; // v111/v125
   endHandled=false; endStallAt=0; // v116
   curFileName=file.name; curFileSize=file.size;
   plIdx=playlist.findIndex(p=>p.file===file);
@@ -736,8 +738,12 @@ async function load(file){
     setTimeout(done,5000);
   });
   if(duration>0) document.getElementById('timeTotal').textContent='/ '+fmtMs(duration);
+  // v125: 新しいファイルは必ず先頭から。iOSは読込直後に前のファイルの再生位置（末尾付近）を返し続けることがあり、
+  // 「先頭なのにファイル末尾です」と誤判定する原因になっていた
+  [audioPlay,audioDet].forEach(el=>{ try{ if((el.currentTime||0)>0.05) el.currentTime=0; }catch(e){} });
   loadingFile=false; // v111
   if(pendingSeekT!=null){ const v=pendingSeekT; pendingSeekT=null; seekTo(v); } // v111: 読込中に押されたマークジャンプ等をここで実行
+  if(pendingPlay){ pendingPlay=false; setTimeout(()=>{ stopTime=0; play(); },0); } // v125: 読込中に押された再生をここで実行
 
   drawWave(0); drawSeek(0);
   showLd(false); showToast(file.name); renderPL();
@@ -1363,6 +1369,7 @@ setInterval(()=>{
 
 function play(){
   if(!objURL||isPlaying)return;
+  if(loadingFile){ pendingPlay=true; return; } // v125: 読込中の再生は完了後に実行（読込中は位置も長さも当てにならない）
   if(Date.now()-stopTime<200)return; // debounce: ignore rapid play after stop
   // v104: 非アクティブ中にcode3/2で死んだ要素の検知（errorイベントはel===audioElの時しか処理されず、
   // モード切替で死んだ要素がアクティブになっても再発火しないため、ここで拾って自動復旧→復旧後に再生）
@@ -1373,7 +1380,14 @@ function play(){
   }
   // v116: 末尾でplay()するとHTML5仕様により自動で先頭へシークして再生される（＝意図しない頭出し）。
   // このアプリでは位置を失う事故になるため明示的に拒否し、頭出しはユーザーの操作に委ねる。
-  if(duration>0 && audioEl.currentTime>=duration-0.05){ showToast('ファイル末尾です（先頭へ戻すには先頭ボタン/Hキー）'); return; }
+  // v125: 長さは要素自身の値を優先（保存済みの値は前回のものの場合がある）。読込直後3秒以内に末尾と出たら前のファイルの位置が残っているだけなので先頭へ戻して再生
+  {
+    const ed=(isFinite(audioEl.duration)&&audioEl.duration>0)?audioEl.duration:duration;
+    if(ed>0 && audioEl.currentTime>=ed-0.05){
+      if(Date.now()-lastLoadAt<3000){ try{ audioEl.currentTime=0; }catch(e){} }
+      else { showToast('ファイル末尾です（先頭へ戻すには先頭ボタン/Hキー）'); return; }
+    }
+  }
   // v123: シーク処理中に再生を始めると、シーク前の位置の音が一瞬鳴る（＋検出がズレる）。完了を待ってから再生する
   if(audioEl.seeking){
     const el=audioEl, g=playGen; let fired=false;
@@ -1453,6 +1467,7 @@ function play(){
 }
 function stop(){
   playGen++; // v108: 解決前のplay()を無効化
+  pendingPlay=false; // v125
   detGateOpen(); // v122: ミュートを残さない
   if(prerollTarget!=null){ const tg=prerollTarget; prerollTarget=null; rtGuardMediaT=null; try{ audioEl.pause(); audioEl.currentTime=tg; }catch(e){} detDirty=true; } // v124: 助走中に止めた→目標位置に戻す
   audioPlay.pause(); audioDet.pause(); isPlaying=false; stopTime=Date.now(); redrawPlayBtn();
@@ -1765,12 +1780,17 @@ function openExportModal(){
 }
 // v124: 全データのバックアップ＝このアプリの保存データ（設定・キー/パッド割り当て・全ファイルのマークと無音）を1ファイルに書き出す。
 // ホーム画面のアイコンを削除すると保存データも消えるため、追加し直す前に必ず書き出しておく
-function exportBackup(){
+function exportBackup(scope){ // v125: scope='settings' なら設定のみ（マーク・無音・モード状態は含めない）
+  const onlySet = scope==='settings';
   const data={};
-  try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k && k.indexOf('ac_')===0) data[k]=localStorage.getItem(k); } }catch(e){}
+  try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i);
+    if(!k || k.indexOf('ac_')!==0) continue;
+    if(onlySet && (k.indexOf('ac_mk4_')===0 || k==='ac_detect')) continue;
+    data[k]=localStorage.getItem(k); } }catch(e){}
   const n=Object.keys(data).filter(k=>k.indexOf('ac_mk4_')===0).length;
-  dlJSON({type:'audiochk-backup',ver:'v124',date:new Date().toISOString(),data}, 'audiochk_backup_'+todayStr()+'.json');
-  showToast('バックアップを書き出しました（マーク '+n+'ファイル分＋設定）');
+  dlJSON({type:'audiochk-backup',scope:onlySet?'settings':'all',ver:'v125',date:new Date().toISOString(),data},
+         (onlySet?'audiochk_settings_':'audiochk_backup_')+todayStr()+'.json');
+  showToast(onlySet?'設定を書き出しました':'バックアップを書き出しました（マーク '+n+'ファイル分＋設定）');
 }
 function closeExpModal(){
   document.getElementById('exportModal').style.display='none';
@@ -1781,6 +1801,7 @@ function doExport(which){
   if(which==='cur') exportCurrent();
   else if(which==='all') exportAll();
   else if(which==='backup') exportBackup(); // v124
+  else if(which==='settings') exportBackup('settings'); // v125
 }
 function mkExportObj(fname,mkrs,silR,dur,size){ return{file:fname,size:size,duration:dur,markers:mkrs,silences:silR.map(s=>({start:+s.start.toFixed(3),end:+s.end.toFixed(3),dur:+s.dur.toFixed(3)}))}; }
 function todayStr(){ const d=new Date(); return ''+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); }
@@ -1796,7 +1817,10 @@ document.getElementById('importData').addEventListener('change',function(){
       // v124: 全データのバックアップから復元（同じ項目は上書き。バックアップに無い既存データは残す）
       const keys=Object.keys(d.data).filter(k=>k.indexOf('ac_')===0);
       const n=keys.filter(k=>k.indexOf('ac_mk4_')===0).length;
-      if(!confirm('バックアップ（'+(d.date||'').slice(0,10)+'）から復元します。\n設定とキー割り当ては上書きされ、マークは'+n+'ファイル分が復元されます。\n復元後に画面を再読み込みします（ファイルは開き直してください）。')) return;
+      const msg = d.scope==='settings'
+        ? '設定ファイル（'+(d.date||'').slice(0,10)+'）を読み込みます。\n設定とキー/パッドの割り当てが上書きされます（マークは変わりません）。\n読み込み後に画面を再読み込みします（ファイルは開き直してください）。'
+        : 'バックアップ（'+(d.date||'').slice(0,10)+'）から復元します。\n設定とキー割り当ては上書きされ、マークは'+n+'ファイル分が復元されます。\n復元後に画面を再読み込みします（ファイルは開き直してください）。';
+      if(!confirm(msg)) return;
       let ok=0; keys.forEach(k=>{ try{ localStorage.setItem(k, d.data[k]); ok++; }catch(err){} });
       showToast('復元しました（'+ok+'項目）。再読み込みします…');
       setTimeout(()=>location.reload(),1500);
@@ -1804,17 +1828,23 @@ document.getElementById('importData').addEventListener('change',function(){
     }
     if(Array.isArray(d)){
       // 全ファイル形式：各エントリを自分のキーに復元
-      let n=0;
+      let n=0, inFolder=0, sizeDiff=0;
+      const nf=x=>String(x||'').normalize('NFC'); // v125: 濁点などの文字の表し方の違い（NFC/NFD）を吸収
       d.forEach(e=>{
         if(!e||!e.file||!Array.isArray(e.markers))return;
         const sil=(Array.isArray(e.silences)?e.silences:[]).map(s=>({start:s.start,end:s.end,dur:s.dur}));
-        try{ localStorage.setItem(lsKey(e.file,e.size),JSON.stringify({markers:e.markers,silReg:sil,duration:e.duration||0,ts:Date.now()})); n++; }catch(err){}
-        if(e.file===curFileName){ saveH(); markers=e.markers; silReg=sil; markers.sort((a,b)=>a.time-b.time); silReg.sort((a,b)=>a.start-b.start); }
+        // v125: いま開いているフォルダに同じ名前のファイルがあれば、サイズが違ってもそのファイルに適用する
+        // （ダウンロードし直してサイズが変わったファイルの救済。読み込みは自分で選んだ操作なので取り違えの心配が小さい）
+        const hit=playlist.find(p=>nf(p.name)===nf(e.file));
+        const name=hit?hit.name:e.file, size=hit?hit.size:e.size;
+        if(hit){ inFolder++; if(hit.size!==e.size) sizeDiff++; }
+        try{ localStorage.setItem(lsKey(name,size),JSON.stringify({markers:e.markers,silReg:sil,duration:e.duration||0,ts:Date.now()})); n++; }catch(err){}
+        if(name===curFileName){ saveH(); markers=e.markers; silReg=sil; markers.sort((a,b)=>a.time-b.time); silReg.sort((a,b)=>a.start-b.start); }
       });
       renderMarkers(); renderSilList();
       if(detectOn&&!isPlaying) drawWave(curT());
       drawSeek(curT());
-      showToast(n+'ファイル分を復元');
+      showToast(n+'ファイル分を復元（開いているフォルダ内 '+inFolder+'件'+(sizeDiff?'・うちサイズ違い '+sizeDiff+'件':'')+'）'); // v125
     } else {
       // 単一ファイル形式：現在のファイルへ
       if(!Array.isArray(d.markers))throw 0;
