@@ -146,7 +146,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v125</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v126</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -431,9 +431,6 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
       <div style="border-top:1px solid #2a2a3d;margin:10px 0 8px"></div>
       <div style="font-size:9px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:8px">猶予：音が一瞬入っても、この時間続けて音がある時だけ無音終了とみなします（0=オフ）。</div>
       <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">猶予(ms)</span><button class="sil-adj" onclick="adjComp('rel',-1)">−</button><input type="range" id="releaseMs" min="0" max="400" step="10" value="0"><button class="sil-adj" onclick="adjComp('rel',1)">＋</button><span class="sil-val" id="releaseMsV">0ms</span></div>
-      <div style="border-top:1px solid #2a2a3d;margin:10px 0 8px"></div>
-      <div style="font-size:9px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:8px">助走：検出モードで位置を変えて再生する時、少し手前から無音で再生して、前に再生していた位置の音を流しきってから音を出します。切替直後に別の箇所の音が鳴る場合は大きく、開始の待ちが気になる場合は小さくしてください（0=オフ）。</div>
-      <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">助走(秒)</span><input type="range" id="preRollR" min="0" max="3" step="0.1" value="1.5"><span class="sil-val" id="preRollV">1.5s</span></div>
       </div><!-- /tab-detect -->
 
       <div id="tab-play" class="setpanel" style="display:none">
@@ -653,7 +650,6 @@ function loadPrefs(){
       if(p.gpLongMs>0) gpLongMs=p.gpLongMs; // v121
       if(p.toastSec>0) toastSec=p.toastSec; // v123
       if(p.blurFixH>=0) topPad=p.blurFixH; // v124（旧topPad=余白値は引き継がない）
-      if(p.preRoll>=0) preRoll=p.preRoll; // v124
     } else {
       // legacy/empty prefs → adopt 夜光 defaults (ignore old colors), apply CSS vars & persist once
       document.documentElement.style.setProperty('--ac',colorAc);
@@ -706,6 +702,7 @@ function setSrc(file){
 async function load(file){
   showLd(true);
   loadingFile=true; pendingSeekT=null; pendingPlay=false; // v111/v125
+  playGen++; detReloading=false; detFresh=false; prerollTarget=null; // v126: 保留中の再生・検出準備を無効化
   endHandled=false; endStallAt=0; // v116
   curFileName=file.name; curFileSize=file.size;
   plIdx=playlist.findIndex(p=>p.file===file);
@@ -1321,6 +1318,22 @@ function recoverMedia(forcePlay){ // v104: forcePlay=play()から呼ばれた時
   audioEl.addEventListener('loadeddata',onReady,{once:true});
 }
 
+// v126: 検出経路の作り直し。検出用プレーヤーに同じ音声を読み込み直し、目標位置へシークしてデータが揃ったら再生する
+function detFreshStart(target){
+  detReloading=true; detLoadTarget=target; detSeekIssued=false; prerollTarget=target;
+  const g=playGen, el=audioDet, t0=Date.now(); let told=false;
+  try{ el.pause(); el.src=objURL; el.load(); setPitch(el); }catch(e){}
+  const tick=setInterval(()=>{
+    if(g!==playGen || !detectOn){ clearInterval(tick); detReloading=false; return; } // 停止・切替・ファイル変更で中止
+    if(!told && Date.now()-t0>400){ told=true; showToast('検出の準備中…'); }
+    if(Date.now()-t0>8000){ clearInterval(tick); detReloading=false; prerollTarget=null; showToast('⚠ 検出の準備に失敗しました。もう一度再生してください',true); return; }
+    if(el.readyState<1) return;
+    if(!detSeekIssued){ try{ el.currentTime=detLoadTarget; }catch(e){} detSeekIssued=true; return; }
+    if(el.seeking || el.readyState<3 || Math.abs((el.currentTime||0)-detLoadTarget)>0.3) return;
+    clearInterval(tick); detReloading=false; detFresh=true;
+    stopTime=0; play();
+  },40);
+}
 // ── v108: メディアアンロック ──────────────────────────────
 // ゲームパッドのボタンはiOSの「ユーザー操作」にならないため、各audio要素の初回play()が
 // NotAllowedErrorで拒否される（キーボードのkeydownはユーザー操作扱い＝旧運用で表面化しなかった理由）。
@@ -1409,26 +1422,17 @@ function play(){
   // v122: 検出プレーヤーの位置が前回再生時から変わっている場合、解析器/出力経路に古い位置の音が残っている。
   // 出力を一時ミュートし（古い音を聞かせない）、解析も少し待つ（古い音で無音判定しない）。
   if(detectOn){
-    if(detDirty && preRoll>=0.3 && audioEl.currentTime>=0.3 && prerollTarget==null){
-      // v124: 助走。検出プレーヤーには前回再生していた位置の音が残っていて、残る時間は0.35秒より長いことがある（v122/v123の前提が誤り）。
-      // 目標の preRoll 秒手前へ戻して無音のまま再生し、古い音を流しきってから目標位置で音を出す。
-      // 解析は目標の0.3秒手前から始める（古い音で無音判定しない）
-      const target=audioEl.currentTime, pre=Math.min(preRoll,target);
-      prerollTarget=target; rtGuardMediaT=target-Math.min(0.3,pre); detDirty=false;
-      resetRTSilence();
-      detGateClose(target);
-      try{ audioEl.currentTime=target-pre; }catch(e){}
-      if(audioEl.seeking){
-        const el=audioEl, g=playGen; let fired=false;
-        const go=()=>{ if(fired) return; fired=true; el.removeEventListener('seeked',go); if(g===playGen && !isPlaying && prerollTarget!=null){ stopTime=0; play(); } };
-        el.addEventListener('seeked',go); setTimeout(go,2000);
-        return;
-      }
-    } else {
-      rtGuardUntil = Date.now() + (detDirty ? 350 : 120);
-      if(detDirty) detGateClose();
-      detDirty=false;
+    // v126: 検出モードの再生開始は毎回、検出用プレーヤーの音声を読み込み直す（＝再起動と同じく経路を新品にする）。
+    // 一時停止・シーク・切替を重ねると、解析器に届く音と再生位置のタイミングがずれていき、再起動まで戻らなかった（無音位置ズレの原因）
+    if(!detFresh){
+      if(detReloading) return;
+      detFreshStart(prerollTarget!=null ? prerollTarget : curT());
+      return;
     }
+    detFresh=false; prerollTarget=null; detDirty=false; // 消費（次の再生開始でもう一度作り直す）
+    resetRTSilence();
+    rtGuardUntil=Date.now()+250; // 念のための短い待ち
+    detGateClose();              // 念のための短いミュート（再生が進んだら開く）
   }
   if(waCtx&&waCtx.state==='suspended') waCtx.resume();
   try{ (audioEl===audioPlay?audioDet:audioPlay).pause(); }catch(e){} // v109: 非アクティブ側を必ず停止（どの経路でも二重再生＝エコーを不可能にする）
@@ -1468,6 +1472,7 @@ function play(){
 function stop(){
   playGen++; // v108: 解決前のplay()を無効化
   pendingPlay=false; // v125
+  detReloading=false; // v126: 検出の準備を中止
   detGateOpen(); // v122: ミュートを残さない
   if(prerollTarget!=null){ const tg=prerollTarget; prerollTarget=null; rtGuardMediaT=null; try{ audioEl.pause(); audioEl.currentTime=tg; }catch(e){} detDirty=true; } // v124: 助走中に止めた→目標位置に戻す
   audioPlay.pause(); audioDet.pause(); isPlaying=false; stopTime=Date.now(); redrawPlayBtn();
@@ -1485,6 +1490,20 @@ function stop(){
 function seekTo(t){
   if(!objURL)return;
   if(loadingFile){ pendingSeekT=t; return; }
+  if(detReloading){ // v126: 準備中のシークは目標位置の差し替えのみ（準備が終わり次第そこから再生）
+    const c2=Math.max(0,Math.min(duration||0,t));
+    detLoadTarget=c2; detSeekIssued=false; prerollTarget=c2;
+    drawWave(c2); updateTime(c2); drawSeek(c2); hlMk(c2); hlSil(c2);
+    return;
+  }
+  if(detectOn && isPlaying){ // v126: 検出再生中のシーク＝いったん止めて、経路を作り直してから新しい位置で再開
+    const c3=Math.max(0,Math.min(duration||0,t));
+    stop(); try{ audioEl.currentTime=c3; }catch(e){}
+    seekFromT=c3; seekIntentT=c3; seekIntentAt=Date.now();
+    drawWave(c3); updateTime(c3); drawSeek(c3); hlMk(c3); hlSil(c3);
+    stopTime=0; play();
+    return;
+  }
   prerollTarget=null; rtGuardMediaT=null; // v124: シークしたら助走は取り消し
   endHandled=false; endStallAt=0; // v116: シークしたら終端状態を解除 // v111: 読込完了後に適用（読込中はduration=0でクランプされ0に化けていた）
   canResumeComp=false; // ジャンプ後の再生には再開補正を適用しない
@@ -2669,7 +2688,8 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 let lT=null;
 function showLd(on){const b=document.getElementById('lbar');b.style.width=on?'65%':'100%';clearTimeout(lT);if(!on)lT=setTimeout(()=>{b.style.width='0%';},350);}
 let tT=null;
-let preRoll=1.5; // v124: 検出モードの「助走」秒数（位置を変えて再生する時、目標の少し手前から無音で再生して古い音を流しきる）
+let detFresh=false, detReloading=false, detLoadTarget=0, detSeekIssued=false; // v126: 検出経路の作り直し（新品の経路で再生するための状態）
+let preRoll=0; // v126: 助走は廃止（経路の作り直しに置き換え）。v124: 検出モードの「助走」秒数（位置を変えて再生する時、目標の少し手前から無音で再生して古い音を流しきる）
 let prerollTarget=null, rtGuardMediaT=null; // v124: 助走中の目標位置／この再生位置に達するまで解析しない
 let topPad=11; // v124: ぼやけ回避レイヤーの高さ(px)。v123の「上部余白」から置き換え（余白は画面を狭くするため）
 function applyTopPad(){ document.body.style.paddingTop='0px'; document.documentElement.style.setProperty('--blurFixH', topPad+'px'); const f=document.getElementById('iosBlurFix'); if(f) f.style.display= topPad>0?'block':'none'; }
@@ -2679,7 +2699,6 @@ window.addEventListener('resize',()=>{drawWave(curT());drawSeek(curT());drawAllB
 
 // ── Silence detection UI wiring ───────────────
 document.getElementById('gpLongMsR')?.addEventListener('input',function(){ setLongMs(parseInt(this.value)||600); }); // v121
-document.getElementById('preRollR')?.addEventListener('input',function(){ preRoll=parseFloat(this.value)||0; document.getElementById('preRollV').textContent=preRoll.toFixed(1)+'s'; savePrefs(); }); // v124
 document.getElementById('topPadR')?.addEventListener('input',function(){ topPad=parseInt(this.value)||0; document.getElementById('topPadV').textContent=topPad+'px'; applyTopPad(); savePrefs(); }); // v123
 document.getElementById('toastSecR')?.addEventListener('input',function(){ toastSec=parseFloat(this.value)||4; document.getElementById('toastSecV').textContent=toastSec.toFixed(1)+'秒'; savePrefs(); }); // v123
 document.getElementById('silThr').addEventListener('input',function(){
@@ -2706,7 +2725,6 @@ function syncSettingsUI(){
   const sm=document.getElementById('silMin'); if(sm){sm.value=silMinSec; document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒';}
   setCompUI('compD2L',compD2L); setCompUI('compL2D',compL2D); setCompUI('timeOff',timeOff); setCompUI('spdComp',spdComp); setCompUI('resumeComp',resumeComp); setCompUI('overlapTol',overlapTol); setCompUI('releaseMs',releaseMs); setCompUI('markComp',markComp);
   const tac=document.getElementById('tempAutoClearChk'); if(tac) tac.checked=tempAutoClear; // v118
-  const prr=document.getElementById('preRollR'); if(prr){ prr.value=preRoll; document.getElementById('preRollV').textContent=preRoll.toFixed(1)+'s'; } // v124
   const tpr=document.getElementById('topPadR'); if(tpr){ tpr.value=topPad; document.getElementById('topPadV').textContent=topPad+'px'; } // v123
   const tsr=document.getElementById('toastSecR'); if(tsr){ tsr.value=toastSec; document.getElementById('toastSecV').textContent=toastSec.toFixed(1)+'秒'; } // v123
   const glr=document.getElementById('gpLongMsR'); if(glr){ glr.value=gpLongMs; document.getElementById('gpLongMsV').textContent=gpLongMs+'ms'; } // v121
@@ -2781,6 +2799,7 @@ function updateListMode(){
 }
 function toggleDetect(){
   tdGen++; // v116: 過去の再開予約を無効化
+  playGen++; detReloading=false; detFresh=false; // v126: 準備中の検出再生を中止
   const wasPlaying=isPlaying;
   const t=curT();
   prerollTarget=null; rtGuardMediaT=null; // v124
@@ -2815,7 +2834,9 @@ function toggleDetect(){
   // v116: 末尾では自動再開しない（末尾のplay()は仕様で先頭へ巻き戻るため）＋
   // 保留中の再開予約は世代番号で無効化（連続でモード切替した時に古い予約が発火するのを防ぐ）
   const atEnd = duration>0 && nt>=duration-0.05;
-  if(wasPlaying && !atEnd){
+  if(wasPlaying && !atEnd && detectOn){ // v126: 検出へ切替＝経路を作り直してから目標位置で再生（シーク待ちも作り直しの中で行う）
+    prerollTarget=nt; stopTime=0; canResumeComp=false; play();
+  } else if(wasPlaying && !atEnd){
     // v122: 「シーク完了イベント」ではなく「実際の位置が目標に着いたこと」を確認してから再生する。
     // （旧: 400msで待ちきれないと古い位置のまま再生を始めていた＝だいぶ前の音が一瞬鳴る原因）
     // 最長3秒待ち、着かなければ位置を指定し直してから再生する
