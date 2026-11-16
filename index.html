@@ -146,7 +146,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v126</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v127</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -569,6 +569,11 @@ function drawTempMk(c,toPx,lineX,H){
   c.restore();
 }
 // v114: 「タップで自動再生再開」機構は撤去（クリック対象の除外リストでは漏れを塞ぎきれず、意図しない再生の温床だったため。タップ→再生ボタンの2段に戻す）
+// v127: 末尾判定と読込直後の位置を「アプリ自身の状態」で管理する（プレーヤーの返す値に頼らない）
+//  fileAtEnd … 最後まで再生した／末尾へ移動した、のどちらかで真。末尾での再生（＝仕様上の自動頭出し）を止めるために使う
+//  freshLoad … 読み込み後まだ一度も再生していない。この間iOSはプレーヤーが前のファイルの位置を返し続け、シークも効かないことがある
+//  loadWantT … freshLoad の間の「正」の位置（読込直後は0、シークすればその位置）
+let fileAtEnd=false, freshLoad=false, loadWantT=0, freshFixTried=false;
 let pendingPlay=false; // v125: 読込中に押された再生（読込完了後に実行）
 let loadingFile=false, pendingSeekT=null; // v111: 読込中フラグ（この間curTは0を返す）／読込中に要求されたシークの保留
 let raf=null;
@@ -580,6 +585,7 @@ let ROWS=10;
 
 function onEnded(){
   if(endHandled) return; endHandled=true; // v116: eventとウォッチドッグの二重実行を防止
+  fileAtEnd=true; freshLoad=false; // v127: 最後まで再生した
   // Finalize any growing silence when file ends
   if(rtInSil && rtSilTrunc){ rtInSil=false; rtSilTrunc=false; } // v122: 始まりを見ていない末尾無音は記録しない
   if(rtInSil && duration>0){
@@ -613,9 +619,15 @@ function onEnded(){
   document.getElementById('silStatus').textContent=detectOn?'終了':'聞くモード';
   if(detectOn){ if(waReady) drawLiveWave(); else drawWave(audioEl.currentTime); }
   drawSeek(audioEl.currentTime||duration);
+  try{ updateTime((isFinite(audioEl.duration)&&audioEl.duration>0)?audioEl.duration:duration); }catch(e){} // v127: 最後まで再生したら時刻表示も末尾の値に
 }
 [audioPlay,audioDet].forEach(el=>{
   el.addEventListener('seeked',()=>{ if(el===audioEl) seekIntentAt=0; }); // v120: シーク完了＝指示値の役目は終わり（以後は実位置を信頼）
+  el.addEventListener('durationchange',()=>{ // v127: 読込後に長さが確定・修正された場合も全体の長さを追従させる
+    if(el!==audioEl || loadingFile) return;
+    const d=el.duration;
+    if(isFinite(d) && d>0 && Math.abs(d-duration)>0.01){ duration=d; try{ document.getElementById('timeTotal').textContent='/ '+fmtMs(duration); if(!isPlaying) drawSeek(curT()); }catch(e){} }
+  });
   el.addEventListener('ended',onEnded);
   el.addEventListener('error',()=>{ if(el===audioEl){ const code=el.error?el.error.code:0; if(code===3||code===2){ recoverMedia(); } else if(code===4){ if(!hardRecover()) showToast('⚠ 音声エラー code=4（再読込も失敗）',true); } else { showToast('⚠ 音声エラー code='+code,true); } } }); // v110: code4はファイルから作り直し
   // iOSが稀にplaybackRateを勝手に戻す場合の保険：戻された時だけ即補正。
@@ -704,6 +716,7 @@ async function load(file){
   loadingFile=true; pendingSeekT=null; pendingPlay=false; // v111/v125
   playGen++; detReloading=false; detFresh=false; prerollTarget=null; // v126: 保留中の再生・検出準備を無効化
   endHandled=false; endStallAt=0; // v116
+  fileAtEnd=false; freshLoad=false; loadWantT=0; freshFixTried=false; tdGen++; // v127（tdGen++＝モード切替の再開待ちが残っていたら無効化）
   curFileName=file.name; curFileSize=file.size;
   plIdx=playlist.findIndex(p=>p.file===file);
   isPlaying=false; redrawPlayBtn(); cancelAnimationFrame(raf);
@@ -739,6 +752,7 @@ async function load(file){
   // 「先頭なのにファイル末尾です」と誤判定する原因になっていた
   [audioPlay,audioDet].forEach(el=>{ try{ if((el.currentTime||0)>0.05) el.currentTime=0; }catch(e){} });
   loadingFile=false; // v111
+  freshLoad=true; loadWantT=0; // v127: 最初の再生が始まるまで、位置はアプリ側の値(loadWantT)を正とする
   if(pendingSeekT!=null){ const v=pendingSeekT; pendingSeekT=null; seekTo(v); } // v111: 読込中に押されたマークジャンプ等をここで実行
   if(pendingPlay){ pendingPlay=false; setTimeout(()=>{ stopTime=0; play(); },0); } // v125: 読込中に押された再生をここで実行
 
@@ -1214,6 +1228,7 @@ wa.style.pointerEvents='none';
 // ── Playback ──────────────────────────────────
 function curT(){
   if(loadingFile) return 0;
+  if(freshLoad && !isPlaying) return loadWantT; // v127: 読込後・初回再生前はアプリ側の位置を返す（プレーヤーの値は当てにならないことがある）
   const t=audioEl.currentTime||0;
   // v124: 助走中は目標位置を現在位置として扱う（表示が手前に戻って見えない／±N秒は目標位置基準）
   if(prerollTarget!=null && detectOn){ if(t<prerollTarget-0.02) return prerollTarget; prerollTarget=null; }
@@ -1281,6 +1296,7 @@ function hardRecover(){
   try{ setSrc(f); }catch(e){ return false; }
   const onR=()=>{
     try{ audioEl.currentTime=Math.min(duration||pos,pos); }catch(e){}
+    if(freshLoad) loadWantT=Math.min(duration||pos,pos); // v127
     try{ drawWave(pos); drawSeek(pos); updateTime(pos); }catch(e){}
     msUpdateState();
     showToast('復旧しました。再生を押してください');
@@ -1394,11 +1410,15 @@ function play(){
   // v116: 末尾でplay()するとHTML5仕様により自動で先頭へシークして再生される（＝意図しない頭出し）。
   // このアプリでは位置を失う事故になるため明示的に拒否し、頭出しはユーザーの操作に委ねる。
   // v125: 長さは要素自身の値を優先（保存済みの値は前回のものの場合がある）。読込直後3秒以内に末尾と出たら前のファイルの位置が残っているだけなので先頭へ戻して再生
-  {
-    const ed=(isFinite(audioEl.duration)&&audioEl.duration>0)?audioEl.duration:duration;
-    if(ed>0 && audioEl.currentTime>=ed-0.05){
-      if(Date.now()-lastLoadAt<3000){ try{ audioEl.currentTime=0; }catch(e){} }
-      else { showToast('ファイル末尾です（先頭へ戻すには先頭ボタン/Hキー）'); return; }
+  // v127: 末尾かどうかはアプリの状態(fileAtEnd)で判断する。旧方式はプレーヤーの返す位置で判断していたため、
+  // iOSが読込直後に前のファイルの位置（末尾）を返し続けると「先頭なのに末尾」と判定され、シークも効かず抜け出せなかった
+  if(fileAtEnd){ showToast('ファイル末尾です（先頭へ戻すには先頭ボタン/Hキー）'); return; }
+  if(freshLoad && !freshFixTried){
+    freshFixTried=true; // 補正の試行は1回だけ（効かない端末で待ちが繰り返されないように）
+    const ct0=audioEl.currentTime||0;
+    if(Math.abs(ct0-loadWantT)>0.3){
+      showToast('読込直後の位置ずれを補正しました [p='+ct0.toFixed(1)+' d='+(+audioEl.duration||0).toFixed(1)+' r='+audioEl.readyState+']'); // 原因確認用の内部情報つき
+      try{ audioEl.currentTime=loadWantT; }catch(e){}
     }
   }
   // v123: シーク処理中に再生を始めると、シーク前の位置の音が一瞬鳴る（＋検出がズレる）。完了を待ってから再生する
@@ -1448,6 +1468,12 @@ function play(){
       // Re-apply rate after play() resolves (iOS resets it)
       audioEl.playbackRate=activeRate(); setPitch(audioEl);
       isPlaying=true; redrawPlayBtn(); loop(); if(detectOn&&waReady) rtLoop();
+      fileAtEnd=false;
+      if(freshLoad){ // v127: 初回再生が始まった。再生が始まればシークが効くので、位置がまだずれていればここで合わせる
+        freshLoad=false;
+        const want=loadWantT, chk=()=>{ if(g===playGen && isPlaying && audioEl===el && Math.abs((el.currentTime||0)-want)>1.0){ try{ el.currentTime=want; }catch(e){} } };
+        if(!detectOn){ chk(); setTimeout(chk,250); }
+      }
       requestWakeLock(); msUpdateMeta(); msUpdateState(); // v107/v108: 再生のたびにCC情報を再クレーム
       msArmed=true; // v109: 以後コントロールセンターの再生コマンドを受け付ける
       // v109: 検出モードで音の出口が眠ったままなら、resumeを試みた上で明確に案内（旧: 無音・トーストなしで進行していた）
@@ -1466,10 +1492,12 @@ function play(){
   } else {
     audioEl.playbackRate=activeRate(); setPitch(audioEl);
     isPlaying=true; redrawPlayBtn(); loop(); if(detectOn&&waReady) rtLoop();
+    fileAtEnd=false; freshLoad=false; // v127
     requestWakeLock(); msUpdateState(); // v107
   }
 }
 function stop(){
+  const wasP127=isPlaying, elT127=audioEl.currentTime||0; // v127: 再生中の値は信頼できる
   playGen++; // v108: 解決前のplay()を無効化
   pendingPlay=false; // v125
   detReloading=false; // v126: 検出の準備を中止
@@ -1484,6 +1512,7 @@ function stop(){
   resetRTSilence();
   document.getElementById('silStatus').textContent=detectOn?'停止中':'聞くモード';
   document.getElementById('silCurDur').textContent='--';
+  if(wasP127){ const ed=(isFinite(audioEl.duration)&&audioEl.duration>0)?audioEl.duration:duration; fileAtEnd = ed>1 && elT127>=ed-0.05; } // v127
   drawWave(curT()); drawSeek(curT()); updateTime(curT());
   msUpdateState(); // v107
 }
@@ -1492,6 +1521,7 @@ function seekTo(t){
   if(loadingFile){ pendingSeekT=t; return; }
   if(detReloading){ // v126: 準備中のシークは目標位置の差し替えのみ（準備が終わり次第そこから再生）
     const c2=Math.max(0,Math.min(duration||0,t));
+    fileAtEnd = duration>1 && c2>=duration-0.05; if(freshLoad) loadWantT=c2; // v127
     detLoadTarget=c2; detSeekIssued=false; prerollTarget=c2;
     drawWave(c2); updateTime(c2); drawSeek(c2); hlMk(c2); hlSil(c2);
     return;
@@ -1499,6 +1529,7 @@ function seekTo(t){
   if(detectOn && isPlaying){ // v126: 検出再生中のシーク＝いったん止めて、経路を作り直してから新しい位置で再開
     const c3=Math.max(0,Math.min(duration||0,t));
     stop(); try{ audioEl.currentTime=c3; }catch(e){}
+    fileAtEnd = duration>1 && c3>=duration-0.05; // v127（stop()が付けた値を、シーク先で上書き）
     seekFromT=c3; seekIntentT=c3; seekIntentAt=Date.now();
     drawWave(c3); updateTime(c3); drawSeek(c3); hlMk(c3); hlSil(c3);
     stopTime=0; play();
@@ -1508,6 +1539,7 @@ function seekTo(t){
   endHandled=false; endStallAt=0; // v116: シークしたら終端状態を解除 // v111: 読込完了後に適用（読込中はduration=0でクランプされ0に化けていた）
   canResumeComp=false; // ジャンプ後の再生には再開補正を適用しない
   const cl=Math.max(0,Math.min(duration||0,t));
+  fileAtEnd = duration>1 && cl>=duration-0.05; if(freshLoad) loadWantT=cl; // v127: 末尾へ移動したか／初回再生前の「正」の位置
   seekFromT=audioEl.currentTime||0; seekIntentT=cl; seekIntentAt=Date.now(); // v119/v120: 指示値＋シーク前の位置を記録
   // v122: 検出モードでシーク＝解析器/出力に古い位置の音が残る。再生中ならその場でガード、停止中なら次の再生時に適用
   if(detectOn){ if(isPlaying){ rtGuardUntil=Date.now()+350; detGateClose(); } else detDirty=true; }
@@ -1779,7 +1811,7 @@ function doClearFolder(){
       const d=loadMk(item.name,item.size);
       if(d&&d.markers&&d.markers.length){
         n++;
-        try{ localStorage.setItem(lsKey(item.name,item.size),JSON.stringify({markers:[],silReg:d.silReg||[],duration:d.duration||0,ts:Date.now()})); }catch(e){}
+        try{ localStorage.setItem(lsKey(item.name,item.size),JSON.stringify({markers:[],silReg:d.silReg||[],duration:d.duration||0,tempMk:(typeof d.tempMk==='number'?d.tempMk:null),ts:Date.now()})); }catch(e){} // v127: 仮マークは保持
       }
     }
   });
@@ -1857,7 +1889,8 @@ document.getElementById('importData').addEventListener('change',function(){
         const hit=playlist.find(p=>nf(p.name)===nf(e.file));
         const name=hit?hit.name:e.file, size=hit?hit.size:e.size;
         if(hit){ inFolder++; if(hit.size!==e.size) sizeDiff++; }
-        try{ localStorage.setItem(lsKey(name,size),JSON.stringify({markers:e.markers,silReg:sil,duration:e.duration||0,ts:Date.now()})); n++; }catch(err){}
+        const old127=loadMk(name,size); // v127: 読み込みで上書きしても、そのファイルの仮マークは残す
+        try{ localStorage.setItem(lsKey(name,size),JSON.stringify({markers:e.markers,silReg:sil,duration:e.duration||(old127&&old127.duration)||0,tempMk:(old127&&typeof old127.tempMk==='number'?old127.tempMk:null),ts:Date.now()})); n++; }catch(err){}
         if(name===curFileName){ saveH(); markers=e.markers; silReg=sil; markers.sort((a,b)=>a.time-b.time); silReg.sort((a,b)=>a.start-b.start); }
       });
       renderMarkers(); renderSilList();
@@ -2338,8 +2371,8 @@ if('mediaSession' in navigator){
   const msSet=(a,h)=>{ try{ navigator.mediaSession.setActionHandler(a,h); }catch(e){} }; // アクション毎に握りつぶし（未対応actionはthrowするため）
   msSet('play', ()=>{ // v108: stopTime=0で200msデバウンス回避 / v109: msArmedガード＋失速監視
     if(!objURL || !msArmed) return; // v109: セッション内で未再生ならBT機器等からの意図しない再生コマンドを無視
-    showToast('▶ 再生（コントロールセンター経由）'); // v113: 経路ラベル＝勝手に再生された時の犯人特定用
     if(Date.now()-lastLoadAt<5000) return; // v110/v113: ファイル読込直後の幽霊再生コマンド遮断を5秒に拡大
+    showToast('▶ 再生（コントロールセンター経由）'); // v113: 経路ラベル（v127: 無視した場合は表示しない）
     stopTime=0; play();
     // v109: バックグラウンドではiOSが音声セッションを返さず「再生扱いだが無音で位置も進まない」ことがある。
     // 実位置が進んでいなければ停止状態に戻し、コントロールセンターの表示を実態と一致させる（時間だけ進む見かけを防ぐ）
@@ -2733,8 +2766,8 @@ let settingsTab='detect';
 function openSettingsModal(tab){
   // 全ドメインのバックアップを取得（キャンセルで一括復元）
   settingsBackup=snapSettings();
-  colorBackup={colorAc,colorA2,colorSilBar,colorSilFill,colorMarkLine,colorSilText};
-  ctrlBackup={presets:SPD_PRESETS.slice(),skipSec};
+  colorBackup={colorAc,colorA2,colorSilBar,colorSilFill,colorMarkLine,colorSilText,colorTemp}; // v127: 仮マーク色も対象に
+  ctrlBackup={presets:SPD_PRESETS.slice(),skipSec,toastSec,topPad,gpLongMs,tempAutoClear}; // v127: 通知時間・ぼやけ回避・長押し・仮マーク設定もキャンセルで戻す
   syncSettingsUI();
   buildColorPanel();
   renderSpdPresets(); document.getElementById('skipSecM').value=skipSec;
@@ -2834,6 +2867,7 @@ function toggleDetect(){
   // v116: 末尾では自動再開しない（末尾のplay()は仕様で先頭へ巻き戻るため）＋
   // 保留中の再開予約は世代番号で無効化（連続でモード切替した時に古い予約が発火するのを防ぐ）
   const atEnd = duration>0 && nt>=duration-0.05;
+  if(freshLoad) loadWantT=nt; // v127
   if(wasPlaying && !atEnd && detectOn){ // v126: 検出へ切替＝経路を作り直してから目標位置で再生（シーク待ちも作り直しの中で行う）
     prerollTarget=nt; stopTime=0; canResumeComp=false; play();
   } else if(wasPlaying && !atEnd){
@@ -2876,6 +2910,7 @@ function restoreColors(){
   colorAc=colorBackup.colorAc; colorA2=colorBackup.colorA2;
   colorSilBar=colorBackup.colorSilBar; colorSilFill=colorBackup.colorSilFill;
   colorMarkLine=colorBackup.colorMarkLine; colorSilText=colorBackup.colorSilText;
+  if(colorBackup.colorTemp) colorTemp=colorBackup.colorTemp; // v127
   C.ac=colorAc; C.a2=colorA2;
   document.documentElement.style.setProperty('--ac',colorAc);
   document.documentElement.style.setProperty('--a2',colorA2);
@@ -2939,6 +2974,11 @@ function restoreCtrl(){
   if(!ctrlBackup) return;
   ctrlBackup.presets.forEach((s,i)=>SPD_PRESETS[i]=s);
   setSk(ctrlBackup.skipSec);
+  // v127: 再生タブ／キー操作タブにある他の設定も、開いた時の値に戻す
+  if(ctrlBackup.toastSec>0) toastSec=ctrlBackup.toastSec;
+  if(ctrlBackup.topPad>=0){ topPad=ctrlBackup.topPad; applyTopPad(); }
+  if(ctrlBackup.gpLongMs>0) gpLongMs=ctrlBackup.gpLongMs;
+  if(typeof ctrlBackup.tempAutoClear==='boolean') tempAutoClear=ctrlBackup.tempAutoClear;
   applyPresetsToButtons();
   document.querySelectorAll('.spb').forEach(b=>b.classList.toggle('on',parseFloat(b.dataset.speed)===playbackRate));
   savePrefs();
@@ -2946,6 +2986,7 @@ function restoreCtrl(){
 function resetCtrl(){
   [0.25,0.5,0.75,1.25,1.5,2.0].forEach((s,i)=>SPD_PRESETS[i]=s);
   setSk(5);
+  toastSec=4; topPad=11; applyTopPad(); tempAutoClear=true; syncSettingsUI(); // v127: 再生タブの他の項目もリセット対象に
   applyPresetsToButtons();
   document.querySelectorAll('.spb').forEach(b=>b.classList.toggle('on',parseFloat(b.dataset.speed)===playbackRate));
   renderSpdPresets();
@@ -3053,7 +3094,7 @@ function doSilClearFolder(){
       const d=loadMk(item.name,item.size);
       if(d&&d.silReg&&d.silReg.length){
         n++;
-        try{ localStorage.setItem(lsKey(item.name,item.size),JSON.stringify({markers:d.markers||[],silReg:[],duration:d.duration||0,ts:Date.now()})); }catch(e){}
+        try{ localStorage.setItem(lsKey(item.name,item.size),JSON.stringify({markers:d.markers||[],silReg:[],duration:d.duration||0,tempMk:(typeof d.tempMk==='number'?d.tempMk:null),ts:Date.now()})); }catch(e){} // v127: 仮マークは保持
       }
     }
   });
