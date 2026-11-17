@@ -146,7 +146,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v127</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v128</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -574,6 +574,38 @@ function drawTempMk(c,toPx,lineX,H){
 //  freshLoad … 読み込み後まだ一度も再生していない。この間iOSはプレーヤーが前のファイルの位置を返し続け、シークも効かないことがある
 //  loadWantT … freshLoad の間の「正」の位置（読込直後は0、シークすればその位置）
 let fileAtEnd=false, freshLoad=false, loadWantT=0, freshFixTried=false;
+// v128: 「再生するとすぐ終端になる／長さが極端に短い」壊れた読み込みを検知して、自動で読み込み直す（＝手動の「ファイルを開き直す」と同じ処置）
+let loadGen=0, healTries=0, playStartWall=0, playStartPos=0;
+const SILENT_SRC='data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSADAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA=='; // 解錠専用の無音（実ファイルの読み込み中の要素には触らないため）
+function durBad(d){ return (curFileSize||0)>200000 && isFinite(d) && d>0 && d*2000000<curFileSize; } // ファイルサイズに対して短すぎる長さ（16Mbps超に相当）＝あり得ない
+function selfHeal(pos,autoplay,why){
+  const it=playlist[plIdx], f=it&&it.file;
+  if(!f || healTries>=2) return false;
+  healTries++;
+  const info='['+why+' p='+(+audioEl.currentTime||0).toFixed(1)+' d='+(+audioEl.duration||0).toFixed(1)+' D='+(+duration||0).toFixed(1)+' r='+audioEl.readyState+']';
+  playGen++; detReloading=false; detFresh=false; prerollTarget=null; playPendingAt=0;
+  try{ audioPlay.pause(); audioDet.pause(); }catch(e){}
+  isPlaying=false; redrawPlayBtn();
+  if(raf){ cancelAnimationFrame(raf); raf=null; }
+  if(rtTimerId){ clearTimeout(rtTimerId); rtTimerId=null; }
+  try{ resetRTSilence(); }catch(e){}
+  try{ setSrc(f); }catch(e){ return false; }
+  const el=audioEl, g=playGen, lg=loadGen; let fin=false;
+  const done=()=>{
+    if(fin) return; fin=true;
+    if(lg!==loadGen) return; // 別のファイルが開かれた
+    const d=el.duration; if(isFinite(d) && d>0 && !durBad(d)){ duration=d; try{ document.getElementById('timeTotal').textContent='/ '+fmtMs(duration); }catch(e){} }
+    const p=Math.max(0,Math.min(duration||pos,pos));
+    try{ el.currentTime=p; }catch(e){}
+    fileAtEnd=false; endHandled=false; endStallAt=0; freshLoad=true; loadWantT=p; freshFixTried=false;
+    try{ drawWave(p); drawSeek(p); updateTime(p); }catch(e){}
+    showToast('音声を自動で読み込み直しました '+info);
+    if(autoplay && g===playGen){ stopTime=0; play(); }
+  };
+  el.addEventListener('loadedmetadata',done,{once:true});
+  setTimeout(done,4000);
+  return true;
+}
 let pendingPlay=false; // v125: 読込中に押された再生（読込完了後に実行）
 let loadingFile=false, pendingSeekT=null; // v111: 読込中フラグ（この間curTは0を返す）／読込中に要求されたシークの保留
 let raf=null;
@@ -584,7 +616,13 @@ const LP=44, RH=22;
 let ROWS=10;
 
 function onEnded(){
-  if(endHandled) return; endHandled=true; // v116: eventとウォッチドッグの二重実行を防止
+  if(endHandled) return;
+  // v128: 再生開始から1.5秒以内に、まだ6秒以上残っているのに終端になった＝壊れた読み込み。末尾扱いにせず読み込み直して続きから再生
+  if(playStartWall && Date.now()-playStartWall<1500 && duration-playStartPos>6){
+    const ps=playStartPos; playStartWall=0;
+    if(selfHeal(ps,true,'early-end')) return;
+  }
+  endHandled=true; // v116: eventとウォッチドッグの二重実行を防止
   fileAtEnd=true; freshLoad=false; // v127: 最後まで再生した
   // Finalize any growing silence when file ends
   if(rtInSil && rtSilTrunc){ rtInSil=false; rtSilTrunc=false; } // v122: 始まりを見ていない末尾無音は記録しない
@@ -624,11 +662,11 @@ function onEnded(){
 [audioPlay,audioDet].forEach(el=>{
   el.addEventListener('seeked',()=>{ if(el===audioEl) seekIntentAt=0; }); // v120: シーク完了＝指示値の役目は終わり（以後は実位置を信頼）
   el.addEventListener('durationchange',()=>{ // v127: 読込後に長さが確定・修正された場合も全体の長さを追従させる
-    if(el!==audioEl || loadingFile) return;
-    const d=el.duration;
+    if(el!==audioEl || loadingFile || !objURL) return;
+    const d=el.duration; if(durBad(d)) return; // v128: あり得ない短さは採用しない
     if(isFinite(d) && d>0 && Math.abs(d-duration)>0.01){ duration=d; try{ document.getElementById('timeTotal').textContent='/ '+fmtMs(duration); if(!isPlaying) drawSeek(curT()); }catch(e){} }
   });
-  el.addEventListener('ended',onEnded);
+  el.addEventListener('ended',()=>{ if(el!==audioEl || !isPlaying || !objURL) return; onEnded(); }); // v128: 再生していない要素の終端イベント（解錠処理・読込中など）で末尾扱いにしない
   el.addEventListener('error',()=>{ if(el===audioEl){ const code=el.error?el.error.code:0; if(code===3||code===2){ recoverMedia(); } else if(code===4){ if(!hardRecover()) showToast('⚠ 音声エラー code=4（再読込も失敗）',true); } else { showToast('⚠ 音声エラー code='+code,true); } } }); // v110: code4はファイルから作り直し
   // iOSが稀にplaybackRateを勝手に戻す場合の保険：戻された時だけ即補正。
   // （旧: play後100/500msのタイマー再適用＝切替もたつきの主因。廃止）
@@ -687,14 +725,14 @@ const AEXTS=/\.(mp3|m4a|aac|wav|ogg|flac|opus|webm|caf)$/i;
 document.getElementById('fileInput').addEventListener('change',function(){
   const f=this.files[0]; if(!f)return;
   playlist=[{name:f.name,file:f,size:f.size}]; plIdx=0;
-  setSrc(f); unlockMedia(); load(f); renderPL(); this.value=''; // v108: 選択操作の勢いで両要素をアンロック
+  setSrc(f); load(f); renderPL(); this.value=''; // v128: 解錠はファイル選択ボタンのタップ時に無音データで済ませる（読込中の要素に触らない）
 });
 document.getElementById('folderInput').addEventListener('change',function(){
   const files=Array.from(this.files).filter(f=>AEXTS.test(f.name)||f.type.startsWith('audio/')).sort((a,b)=>a.name.localeCompare(b.name,'ja'));
   if(!files.length){ showToast('音声ファイルなし'); return; }
   playlist=files.map(f=>({name:f.name,file:f,size:f.size})); plIdx=0;
   renderPL();
-  setSrc(files[0]); unlockMedia(); load(files[0]); this.value=''; // v108
+  setSrc(files[0]); load(files[0]); this.value=''; // v128
 });
 function setSrc(file){
   detDirty=true; // v122
@@ -716,7 +754,8 @@ async function load(file){
   loadingFile=true; pendingSeekT=null; pendingPlay=false; // v111/v125
   playGen++; detReloading=false; detFresh=false; prerollTarget=null; // v126: 保留中の再生・検出準備を無効化
   endHandled=false; endStallAt=0; // v116
-  fileAtEnd=false; freshLoad=false; loadWantT=0; freshFixTried=false; tdGen++; // v127（tdGen++＝モード切替の再開待ちが残っていたら無効化）
+  fileAtEnd=false; freshLoad=false; loadWantT=0; freshFixTried=false; tdGen++;
+  const lg=++loadGen; healTries=0; playStartWall=0; // v128 // v127（tdGen++＝モード切替の再開待ちが残っていたら無効化）
   curFileName=file.name; curFileSize=file.size;
   plIdx=playlist.findIndex(p=>p.file===file);
   isPlaying=false; redrawPlayBtn(); cancelAnimationFrame(raf);
@@ -740,13 +779,23 @@ async function load(file){
   silReg.sort((a,b)=>a.start-b.start);
   renderMarkers(); renderSilList();
 
-  await new Promise(res=>{
-    const done=()=>{ if(isFinite(audioEl.duration)&&audioEl.duration>0) duration=audioEl.duration; res(); };
-    if(audioEl.readyState>=1&&isFinite(audioEl.duration)&&audioEl.duration>0){done();return;}
-    audioEl.addEventListener('loadedmetadata',done,{once:true});
-    audioEl.addEventListener('error',done,{once:true});
+  const waitMeta=()=>new Promise(res=>{
+    const el=audioEl; let fin=false; const done=()=>{ if(fin) return; fin=true; res(); };
+    if(el.readyState>=1&&isFinite(el.duration)&&el.duration>0){done();return;}
+    el.addEventListener('loadedmetadata',done,{once:true});
+    el.addEventListener('error',done,{once:true});
     setTimeout(done,5000);
   });
+  // v128: 長さがファイルサイズに対してあり得ないほど短い＝壊れた読み込み（再生すると即終端になる）。最大2回まで読み込み直す
+  let badNote='';
+  for(let i=0;i<3;i++){
+    await waitMeta();
+    if(lg!==loadGen) return; // 読込中に別のファイルが開かれた
+    const d=audioEl.duration;
+    if(!durBad(d)){ if(isFinite(d)&&d>0) duration=d; break; }
+    badNote=badNote||('d='+d.toFixed(2));
+    if(i<2){ try{ setSrc(file); }catch(e){ break; } }
+  }
   if(duration>0) document.getElementById('timeTotal').textContent='/ '+fmtMs(duration);
   // v125: 新しいファイルは必ず先頭から。iOSは読込直後に前のファイルの再生位置（末尾付近）を返し続けることがあり、
   // 「先頭なのにファイル末尾です」と誤判定する原因になっていた
@@ -757,7 +806,7 @@ async function load(file){
   if(pendingPlay){ pendingPlay=false; setTimeout(()=>{ stopTime=0; play(); },0); } // v125: 読込中に押された再生をここで実行
 
   drawWave(0); drawSeek(0);
-  showLd(false); showToast(file.name); renderPL();
+  showLd(false); showToast(badNote ? '読み込みを自動でやり直しました ['+badNote+'→'+(+duration||0).toFixed(1)+']' : file.name); renderPL();
   lastLoadAt=Date.now(); // v110: 読込直後の意図しない再生コマンド遮断用
   msUpdateMeta(); msUpdateState(); // v107: コントロールセンターの曲名等を更新
   restoreFocusNow(); // 読込直後に8BitDoが効くようfocusTrapへ復帰
@@ -1057,7 +1106,7 @@ function updateFileNav(){
   document.getElementById('prevFileBtn').disabled = plIdx<=0;
   document.getElementById('nextFileBtn').disabled = plIdx>=n-1;
 }
-function plTap(i){ const f=playlist[i].file; plIdx=i; setSrc(f); unlockMedia(); load(f); closePlModal(); } // v108: unlock追加
+function plTap(i){ const f=playlist[i].file; plIdx=i; unlockMedia(); setSrc(f); load(f); closePlModal(); } // v128: 解錠は読み込みの前に
 function openPlModal(){
   if(playlist.length<=1) return; // 1ファイル以下は一覧不要
   document.getElementById('plModalCount').textContent='('+playlist.length+')';
@@ -1356,7 +1405,7 @@ function detFreshStart(target){
 // 対策：本物のタップ/クリックの中で両要素をミュート再生→即停止し、iOSのホワイトリストに載せる。
 // 一度アンロックすればsrcを変えても要素単位で有効なのでページ寿命で1回だけでよい。
 function unlockMedia(){
-  if(mediaUnlocked || !objURL) return;
+  if(mediaUnlocked) return;
   // v110: iOSはミュート再生を操作文脈でなくても許可するため、ここが操作文脈でないと「解錠成功したふり」になる。
   // userActivationで本物の操作中か確認し、違えばフラグを立てず次の本物のタップに委ねる（ファイル選択のchangeイベントは操作文脈を失っていることがある＝「たまに失敗」の正体）
   if(navigator.userActivation && !navigator.userActivation.isActive) return;
@@ -1368,10 +1417,14 @@ function unlockMedia(){
   // 許可リスト登録はplay()を「呼ぶこと」自体で成立するため、同じジェスチャ内で同期的に即pauseする古典イディオムに変更。
   if(isPlaying || playPendingAt) return; // v119: 再生中／再生要求の処理中は一切触らない（進行中のplay()をpauseで潰す事故を防止）
                                          // v120: この場合はフラグを立てないまま戻る＝次の操作で改めて解錠を試みる
+  // v128: 実ファイルを読み込んでいる最中の要素にplay()/pause()をかけると、iOSで「再生すると即終端になる」壊れた状態になる疑いが強い
+  // （アプリ起動後の最初の読み込み＝解錠が走る回でだけ「ファイル末尾です」が出ていた）。読込中は見送り、次のタップで行う
+  if(loadingFile || (objURL && audioEl.readyState<1)) return;
   mediaUnlocked=true;
   [audioPlay,audioDet].forEach(el=>{
     if(!el.paused) return; // v119: 鳴っている要素には触らない
     try{
+      if(!objURL) el.src=SILENT_SRC; // ファイルを開く前（＝フォルダ/ファイル選択ボタンのタップ時）は無音データで解錠する
       el.muted=true;
       const p=el.play(); if(p&&p.catch) p.catch(()=>{}); // AbortErrorは想定内なので握り潰す
       el.pause();        // ← Promiseを待たず同期で即停止（再生が始まる余地を与えない）
@@ -1388,7 +1441,7 @@ document.addEventListener('click',gestureUnlock,true);
 // v115: 常駐ゴーストバスター＝「アプリは停止中のはずなのに鳴っている要素」をどの経路由来でも1秒以内に自動停止し、可視化する。
 // 正規のplay()要求中（Promise未解決の間）は誤殺しないようplayPendingAtでガード（保険で8秒を上限）。
 setInterval(()=>{
-  if(isPlaying) return;
+  if(isPlaying || !objURL) return;
   if(playPendingAt && Date.now()-playPendingAt<8000) return;
   let killed=false;
   try{ if(!audioPlay.paused){ audioPlay.pause(); killed=true; } }catch(e){}
@@ -1413,6 +1466,10 @@ function play(){
   // v127: 末尾かどうかはアプリの状態(fileAtEnd)で判断する。旧方式はプレーヤーの返す位置で判断していたため、
   // iOSが読込直後に前のファイルの位置（末尾）を返し続けると「先頭なのに末尾」と判定され、シークも効かず抜け出せなかった
   if(fileAtEnd){ showToast('ファイル末尾です（先頭へ戻すには先頭ボタン/Hキー）'); return; }
+  // v128: 要素が「終端にいる」「長さがあり得ない」と言っているのにアプリ側は末尾ではない＝壊れた読み込み → 読み込み直して再生
+  if(!audioEl.seeking && (durBad(audioEl.duration) || (audioEl.ended && !detectOn))){
+    if(selfHeal(curT(),true, durBad(audioEl.duration)?'bad-dur':'ended')) return;
+  }
   if(freshLoad && !freshFixTried){
     freshFixTried=true; // 補正の試行は1回だけ（効かない端末で待ちが繰り返されないように）
     const ct0=audioEl.currentTime||0;
@@ -1467,6 +1524,7 @@ function play(){
       if(g!==playGen || el!==audioEl){ try{el.pause();}catch(e){} return; } // v108: 古い再生要求は破棄
       // Re-apply rate after play() resolves (iOS resets it)
       audioEl.playbackRate=activeRate(); setPitch(audioEl);
+      playStartWall=Date.now(); playStartPos=freshLoad?loadWantT:(el.currentTime||0); // v128
       isPlaying=true; redrawPlayBtn(); loop(); if(detectOn&&waReady) rtLoop();
       fileAtEnd=false;
       if(freshLoad){ // v127: 初回再生が始まった。再生が始まればシークが効くので、位置がまだずれていればここで合わせる
