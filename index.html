@@ -30,12 +30,17 @@ header{display:flex;align-items:center;gap:5px;padding:5px 8px;
 /* waveform */
 .wave-wrap{position:relative;background:var(--sf);border-bottom:1px solid var(--bd);
   flex-shrink:0;touch-action:none;user-select:none;-webkit-user-select:none}
-#waveCanvas{display:block;width:100%;height:72px}
+#waveCanvas{display:block;width:100%;height:var(--waveH,60px)}
 /* info */
 .info{display:flex;align-items:center;gap:4px;padding:2px 8px;background:var(--s2);
   border-bottom:1px solid var(--bd);font-family:'Space Mono',monospace;font-size:10px;flex-shrink:0}
-#timeDisp{color:var(--ac);font-size:11px}
-#timeTotal{color:#dfe2f0}
+#timeDisp{color:var(--ac);font-size:var(--timeFs,20px);font-weight:700;line-height:1.15;letter-spacing:.3px;white-space:nowrap}
+#timeTotal{color:#dfe2f0;white-space:nowrap}
+.tcol{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0;margin-left:3px}
+.info.sm .tcol{flex-direction:row;align-items:center;gap:6px}
+#modeTag{font-size:10px;font-weight:700;line-height:1.3;padding:0 6px;border-radius:4px;white-space:nowrap;background:rgba(0,229,255,.12);color:var(--ac);border:1px solid rgba(0,229,255,.45)}
+body.det #modeTag{background:var(--or);color:#0a0a0f;border-color:var(--or)}
+body.det .info{background:rgba(255,140,66,.13);box-shadow:inset 4px 0 0 var(--or)}
 #silInfo{color:var(--a3);font-size:10px}
 /* seek */
 .seek-wrap{flex-shrink:0;background:var(--sf);border-bottom:1px solid var(--bd);
@@ -139,6 +144,22 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 .settabs{display:flex;gap:4px;margin-bottom:10px;flex-shrink:0}
 .settab{flex:1;background:#1c1c28;border:1px solid var(--tap);border-radius:6px;color:#9a9ac0;font-family:'Space Mono',monospace;font-size:10px;padding:7px 2px;cursor:pointer;letter-spacing:.3px}
 .settab.on{background:rgba(0,229,255,.12);border-color:#00e5ff;color:#00e5ff}
+/* v129: 設定画面の見やすさ（文字を大きく・コントラストを上げる） */
+#settingsModal .settab{font-family:inherit;font-size:12px;font-weight:400;padding:10px 2px;color:#c6c9de;background:#1b1c28;border-color:#363850;border-radius:8px;letter-spacing:0}
+#settingsModal .settab.on{background:#00e5ff;border-color:#00e5ff;color:#04252c;font-weight:700}
+#settingsModal .sil-row{gap:7px;margin-bottom:11px;flex-wrap:wrap}
+#settingsModal .sil-ctl-lbl{font-family:inherit;font-size:11.5px;font-weight:400;color:#e8e8f0;flex-basis:100%;margin-bottom:-2px}
+#settingsModal .sil-val{font-size:12px;min-width:56px}
+#settingsModal .sil-adj{width:30px;height:30px;font-size:16px;border-radius:6px;background:#262838;border-color:#454866}
+#settingsModal .sil-row input[type=range]{height:5px;background:#3a3d58}
+#settingsModal .sil-row input[type=range]::-webkit-slider-thumb{width:22px;height:22px;background:#00e5ff;border:2px solid #04252c}
+#settingsModal input[type=range]{accent-color:#00e5ff}
+#settingsModal details.adv{margin-top:14px;border:1px solid #363850;border-radius:10px;background:#1b1c28;padding:0 12px}
+#settingsModal details.adv[open]{padding-bottom:12px}
+#settingsModal details.adv>summary{cursor:pointer;padding:12px 0;font-size:12.5px;font-weight:700;color:#74e8f7;outline:none}
+#settingsModal details.adv>summary span{font-weight:400;font-size:10.5px;color:#9a9ac0;margin-left:8px}
+#settingsModal #helpList span{font-size:12px !important;font-weight:400}
+#settingsModal #tab-keys>button{font-size:13px !important;font-family:inherit !important;font-weight:700;padding:12px !important}
 </style>
 </head>
 <body tabindex="0">
@@ -146,7 +167,7 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div id="lbar"></div>
 <header>
   <div style="display:flex;align-items:baseline;gap:3px;flex-shrink:0">
-    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v128</span>
+    <span class="logo">AUDIOCHK</span><span class="ver" id="verLbl">v129</span>
   </div>
   <span class="fname" id="fileName">ファイルまたはフォルダを開いてください</span>
   <div style="display:flex;gap:3px;flex-shrink:0">
@@ -171,10 +192,9 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 <div class="wave-wrap" id="waveArea">
   <canvas id="waveCanvas"></canvas>
 </div>
-<div class="info">
+<div class="info" id="infoRow">
   <span id="timeDisp" onclick="openTimeInput()" style="cursor:pointer;border-bottom:1px solid rgba(0,229,255,.3)">00:00:00.0</span>
-  <span id="timeTotal">/ --:--:--</span>
-  <span style="color:var(--bd);margin:0 2px">|</span>
+  <div class="tcol"><span id="timeTotal">/ --:--:--</span><span id="modeTag">聞く ×1.0</span></div>
   <span style="flex:1"></span>
   <div id="fileNav" style="display:none;align-items:center;gap:1px;flex-shrink:0;margin-right:2px">
     <button id="prevFileBtn" class="fnav" title="前のファイル" aria-label="前のファイル">
@@ -399,71 +419,48 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
 </div>
 
 <div id="settingsModal" onclick="closeSettings(false)" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:520;align-items:flex-start;justify-content:center;overflow-y:auto;-webkit-overflow-scrolling:touch">
-  <div onclick="event.stopPropagation()" style="background:#13131a;border:1px solid var(--tap);border-radius:12px;margin:20px auto;max-width:380px;width:calc(100% - 32px);padding:16px;max-height:calc(100vh - 40px);display:flex;flex-direction:column;overflow:hidden">
+  <div onclick="event.stopPropagation()" style="background:#12131b;border:1px solid #3a3d58;border-radius:14px;margin:14px auto;max-width:400px;width:calc(100% - 20px);padding:14px;max-height:calc(100vh - 28px);display:flex;flex-direction:column;overflow:hidden">
     <div style="display:flex;align-items:center;margin-bottom:10px;flex-shrink:0">
-      <span style="font-family:'Space Mono',monospace;font-size:11px;color:#00e5ff;letter-spacing:1px">設定</span>
+      <span style="font-size:15px;font-weight:700;color:#e8e8f0;letter-spacing:1px">設定</span>
       <button onclick="closeSettings(false)" style="margin-left:auto;background:transparent;border:none;color:#9a9ac0;font-size:18px;cursor:pointer">×</button>
     </div>
     <div class="settabs">
-      <button class="settab on" data-tab="play" onclick="setSettingsTab('play')">再生</button>
+      <button class="settab on" data-tab="play" onclick="setSettingsTab('play')">再生・表示</button>
       <button class="settab" data-tab="detect" onclick="setSettingsTab('detect')">検出・補正</button>
       <button class="settab" data-tab="color" onclick="setSettingsTab('color')">カラー</button>
       <button class="settab" data-tab="keys" onclick="setSettingsTab('keys')">キー操作</button>
     </div>
     <div style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0">
       <div id="tab-detect" class="setpanel">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-family:'Space Mono',monospace;font-size:9px;color:#b6b9d6;letter-spacing:1px;white-space:nowrap">検出設定</span><span style="flex:1;height:1px;background:var(--tap)"></span></div>
-      <div style="font-size:8.5px;color:var(--dm);font-family:'Space Mono',monospace;line-height:1.4;margin-bottom:8px">検出ON＝1.0倍で波形/無音表示・検出OFF＝聞くモード（任意倍速でなめらか・波形は非表示）</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:12.5px;font-weight:700;color:#74e8f7;white-space:nowrap">検出設定</span><span style="flex:1;height:1px;background:var(--tap)"></span></div>
+      <div style="font-size:11px;font-weight:400;color:#c6c9de;line-height:1.55;margin-bottom:8px">検出ON＝1.0倍固定で無音区間を記録／検出OFF＝聞くモード（好きな速度で再生）</div>
       <div class="sil-row"><span class="sil-ctl-lbl">感度（閾値）</span><button class="sil-adj" onclick="adjSilThr(-1)">−</button><input type="range" id="silThr" min="0.00002" max="0.02" step="0.00001" value="0.004"><button class="sil-adj" onclick="adjSilThr(1)">＋</button><span class="sil-val" id="silThrV">0.004</span></div>
       <div class="sil-row"><span class="sil-ctl-lbl">最短無音秒数</span><button class="sil-adj" onclick="adjSilMin(-1)">−</button><input type="range" id="silMin" min="0.1" max="5" step="0.1" value="0.5"><button class="sil-adj" onclick="adjSilMin(1)">＋</button><span class="sil-val" id="silMinV">0.5秒</span></div>
-      <div style="display:flex;align-items:center;gap:8px;margin:14px 0 8px"><span style="font-family:'Space Mono',monospace;font-size:9px;color:#b6b9d6;letter-spacing:1px;white-space:nowrap">補正設定</span><span style="flex:1;height:1px;background:var(--tap)"></span></div>
-      <div style="font-size:9px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:10px">モード切替・速度切替時の巻き戻り感などを補正します。値は実機で調整してください。</div>
+      <details class="adv"><summary>詳細（補正設定）<span>通常は変更不要</span></summary>
+      <div style="font-size:11px;font-weight:400;color:#c6c9de;line-height:1.55;margin-bottom:10px">モード切替・速度切替時の巻き戻り感などを補正します。値は実機で調整してください。</div>
       <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">検出→聞く(ms)</span><button class="sil-adj" onclick="adjComp('D2L',-1)">−</button><input type="range" id="compD2L" min="0" max="500" step="10" value="320"><button class="sil-adj" onclick="adjComp('D2L',1)">＋</button><span class="sil-val" id="compD2LV">320ms</span></div>
       <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">聞く→検出(ms)</span><button class="sil-adj" onclick="adjComp('L2D',-1)">−</button><input type="range" id="compL2D" min="0" max="500" step="10" value="220"><button class="sil-adj" onclick="adjComp('L2D',1)">＋</button><span class="sil-val" id="compL2DV">220ms</span></div>
       <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">時刻補正(ms)</span><button class="sil-adj" onclick="adjComp('head',-1)">−</button><input type="range" id="timeOff" min="0" max="500" step="10" value="100"><button class="sil-adj" onclick="adjComp('head',1)">＋</button><span class="sil-val" id="timeOffV">100ms</span></div>
-      <div style="font-size:8px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.4;margin:-2px 0 8px">時刻補正：検出した無音区間の開始/終了に一律で足す秒数。他のソフトと比べ全体が早い場合に。全削除してから調整。</div>
+      <div style="font-size:10.5px;font-weight:400;color:#c6c9de;line-height:1.5;margin:-2px 0 8px">時刻補正：検出した無音区間の開始/終了に一律で足す秒数。他のソフトと比べ全体が早い場合に。全削除してから調整。</div>
       <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">速度補正(ms)</span><button class="sil-adj" onclick="adjComp('spd',-1)">−</button><input type="range" id="spdComp" min="0" max="500" step="10" value="240"><button class="sil-adj" onclick="adjComp('spd',1)">＋</button><span class="sil-val" id="spdCompV">240ms</span></div>
       <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">再開補正(ms)</span><button class="sil-adj" onclick="adjComp('res',-1)">−</button><input type="range" id="resumeComp" min="0" max="500" step="10" value="50"><button class="sil-adj" onclick="adjComp('res',1)">＋</button><span class="sil-val" id="resumeCompV">50ms</span></div>
       <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">マーク反応補正(ms)</span><button class="sil-adj" onclick="adjComp('mk',-1)">−</button><input type="range" id="markComp" min="0" max="500" step="10" value="0"><button class="sil-adj" onclick="adjComp('mk',1)">＋</button><span class="sil-val" id="markCompV">0ms</span></div>
-      <div style="font-size:8px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.4;margin:-2px 0 8px">再開補正：一時停止→再生でわずかに戻る感じがある時、その分だけ先送りします（頭出し/ジャンプ後の再生には適用しません）。</div>
+      <div style="font-size:10.5px;font-weight:400;color:#c6c9de;line-height:1.5;margin:-2px 0 8px">再開補正：一時停止→再生でわずかに戻る感じがある時、その分だけ先送りします（頭出し/ジャンプ後の再生には適用しません）。</div>
       <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">重なり許容(ms)</span><button class="sil-adj" onclick="adjComp('ovl',-1)">−</button><input type="range" id="overlapTol" min="0" max="500" step="10" value="50"><button class="sil-adj" onclick="adjComp('ovl',1)">＋</button><span class="sil-val" id="overlapTolV">50ms</span></div>
-      <div style="font-size:8px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.4;margin:-2px 0 8px">重なり許容：この秒数より大きく重なる区間は追加しません（隣接する別区間は追加）。</div>
+      <div style="font-size:10.5px;font-weight:400;color:#c6c9de;line-height:1.5;margin:-2px 0 8px">重なり許容：この秒数より大きく重なる区間は追加しません（隣接する別区間は追加）。</div>
       <div style="border-top:1px solid #2a2a3d;margin:10px 0 8px"></div>
-      <div style="font-size:9px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.5;margin-bottom:8px">猶予：音が一瞬入っても、この時間続けて音がある時だけ無音終了とみなします（0=オフ）。</div>
+      <div style="font-size:11px;font-weight:400;color:#c6c9de;line-height:1.55;margin-bottom:8px">猶予：音が一瞬入っても、この時間続けて音がある時だけ無音終了とみなします（0=オフ）。</div>
       <div class="sil-row"><span class="sil-ctl-lbl" style="white-space:nowrap">猶予(ms)</span><button class="sil-adj" onclick="adjComp('rel',-1)">−</button><input type="range" id="releaseMs" min="0" max="400" step="10" value="0"><button class="sil-adj" onclick="adjComp('rel',1)">＋</button><span class="sil-val" id="releaseMsV">0ms</span></div>
+      </details>
       </div><!-- /tab-detect -->
 
       <div id="tab-play" class="setpanel" style="display:none">
-        <div style="background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:8px;padding:10px;margin-bottom:12px">
-          <div style="font-family:'Space Mono',monospace;font-size:9px;color:rgba(0,229,255,.7);margin-bottom:10px;letter-spacing:1px">SPEED PRESETS</div>
+        <div style="background:#1b1c28;border:1px solid #363850;border-radius:10px;padding:12px;margin-bottom:12px">
+          <div style="font-size:12.5px;font-weight:700;color:#74e8f7;margin-bottom:10px;letter-spacing:.3px">SPEED PRESETS</div>
           <div id="spdPresets" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"></div>
         </div>
-        <div style="background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:8px;padding:10px;margin-bottom:12px">
-          <div style="font-family:'Space Mono',monospace;font-size:9px;color:rgba(0,229,255,.7);margin-bottom:8px;letter-spacing:1px">仮マーク</div>
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-            <input type="checkbox" id="tempAutoClearChk" checked onchange="setTempAutoClear(this.checked)" style="width:18px;height:18px;accent-color:#69ff47">
-            <span style="font-size:11px;color:#e8e8f0">移動したら自動で解除する</span>
-          </label>
-          <div style="font-size:9px;color:#9a9ac0;margin-top:6px;line-height:1.7">OFFにすると仮マークが残り、何度でも往復できます（解除は「仮マーク 解除」をキーに割り当て）。</div>
-        </div>
-        <div style="background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:8px;padding:10px;margin-bottom:12px">
-          <div style="font-family:'Space Mono',monospace;font-size:9px;color:rgba(0,229,255,.7);margin-bottom:8px;letter-spacing:1px">通知の表示時間</div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <input type="range" id="toastSecR" min="2" max="10" step="0.5" value="4" style="flex:1;min-width:0">
-            <span id="toastSecV" style="font-family:'Space Mono',monospace;font-size:10px;color:#9a9ac0;min-width:44px;text-align:right">4.0秒</span>
-          </div>
-          <div style="font-size:9px;color:#9a9ac0;margin-top:6px;line-height:1.7">画面下の通知が表示される時間です。赤いエラー通知はこれより3秒長く表示されます。</div>
-        </div>
-        <div style="background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:8px;padding:10px;margin-bottom:12px">
-          <div style="font-family:'Space Mono',monospace;font-size:9px;color:rgba(0,229,255,.7);margin-bottom:8px;letter-spacing:1px">ヘッダーのぼやけ回避（iOS 27）</div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <input type="range" id="topPadR" min="0" max="30" step="1" value="11" style="flex:1;min-width:0">
-            <span id="topPadV" style="font-family:'Space Mono',monospace;font-size:10px;color:#9a9ac0;min-width:44px;text-align:right">11px</span>
-          </div>
-          <div style="font-size:9px;color:#9a9ac0;margin-top:6px;line-height:1.7">画面最上部に見えない層を置いてぼかしを消します（画面は狭くなりません）。ぼやけが残る場合は数値を上げてください。0でオフ。</div>
-        </div>
-        <div style="background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:8px;padding:10px">
-          <div style="font-family:'Space Mono',monospace;font-size:9px;color:rgba(0,229,255,.7);margin-bottom:8px;letter-spacing:1px">SKIP 秒数</div>
+        <div style="background:#1b1c28;border:1px solid #363850;border-radius:10px;padding:12px;margin-bottom:12px">
+          <div style="font-size:12.5px;font-weight:700;color:#74e8f7;margin-bottom:9px;letter-spacing:.3px">SKIP 秒数</div>
           <div style="display:flex;align-items:center;gap:8px">
             <button onclick="adjSkip(-1)" style="width:36px;height:36px;background:#1c1c28;border:1px solid var(--tap);border-radius:6px;color:#e8e8f0;font-size:18px;cursor:pointer">−</button>
             <input type="number" id="skipSecM" min="1" max="60" value="5" style="flex:1;background:#1c1c28;border:1px solid #2a2a3d;border-radius:6px;color:#e8e8f0;font-family:'Space Mono',monospace;font-size:16px;padding:6px;text-align:center">
@@ -471,54 +468,85 @@ canvas.cbtn:active{opacity:.7;transform:scale(.93)}
             <span style="font-family:'Space Mono',monospace;font-size:10px;color:#9a9ac0">秒</span>
           </div>
         </div>
+        <div style="background:#1b1c28;border:1px solid #363850;border-radius:10px;padding:12px;margin-bottom:12px">
+          <div style="font-size:12.5px;font-weight:700;color:#74e8f7;margin-bottom:9px;letter-spacing:.3px">表示サイズ</div>
+          <div class="sil-row"><span class="sil-ctl-lbl">時刻の文字</span><input type="range" id="dispTimeR" min="11" max="26" step="1" value="20"><span class="sil-val" id="dispTimeV">20px</span></div>
+          <div class="sil-row"><span class="sil-ctl-lbl">波形の高さ</span><input type="range" id="dispWaveR" min="32" max="96" step="4" value="60"><span class="sil-val" id="dispWaveV">60px</span></div>
+          <div class="sil-row"><span class="sil-ctl-lbl">シークバーの行</span><input type="range" id="dispSeekR" min="16" max="28" step="1" value="22"><span class="sil-val" id="dispSeekV">22px</span></div>
+          <div style="font-size:11px;font-weight:400;color:#c6c9de;margin-top:7px;line-height:1.6">動かすとすぐ画面に反映されます。時刻を大きくした分は、波形の高さやシークバーの行を小さくすると、下の一覧の広さを保てます。</div>
+        </div>
+        <div style="background:#1b1c28;border:1px solid #363850;border-radius:10px;padding:12px;margin-bottom:12px">
+          <div style="font-size:12.5px;font-weight:700;color:#74e8f7;margin-bottom:9px;letter-spacing:.3px">再生位置の記憶</div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="resumeChk" checked onchange="setResumeOn(this.checked)" style="width:18px;height:18px;accent-color:#00e5ff">
+            <span style="font-size:12.5px;font-weight:400;color:#e8e8f0">ファイルを開いたら前回の続きから</span>
+          </label>
+          <div style="font-size:11px;font-weight:400;color:#c6c9de;margin-top:7px;line-height:1.6">最後まで再生したファイルは、次に開いたとき先頭から始まります。</div>
+          <button onclick="resetAllPos()" style="margin-top:8px;width:100%;background:#1c1c28;border:1px solid var(--tap);border-radius:7px;color:#e8e8f0;font-size:11px;padding:9px;cursor:pointer">全ファイルの再生位置を先頭に戻す</button>
+        </div>
+        <div style="background:#1b1c28;border:1px solid #363850;border-radius:10px;padding:12px;margin-bottom:12px">
+          <div style="font-size:12.5px;font-weight:700;color:#74e8f7;margin-bottom:9px;letter-spacing:.3px">通知の表示時間</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="range" id="toastSecR" min="2" max="10" step="0.5" value="4" style="flex:1;min-width:0">
+            <span id="toastSecV" style="font-family:'Space Mono',monospace;font-size:12px;color:#e8e8f0;min-width:48px;text-align:right">4.0秒</span>
+          </div>
+          <div style="font-size:11px;font-weight:400;color:#c6c9de;margin-top:7px;line-height:1.6">画面下の通知が表示される時間です。赤いエラー通知はこれより3秒長く表示されます。</div>
+        </div>
+        <div style="background:#1b1c28;border:1px solid #363850;border-radius:10px;padding:12px;margin-bottom:12px">
+          <div style="font-size:12.5px;font-weight:700;color:#74e8f7;margin-bottom:9px;letter-spacing:.3px">ヘッダーのぼやけ回避（iOS 27）</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="range" id="topPadR" min="0" max="30" step="1" value="11" style="flex:1;min-width:0">
+            <span id="topPadV" style="font-family:'Space Mono',monospace;font-size:12px;color:#e8e8f0;min-width:48px;text-align:right">11px</span>
+          </div>
+          <div style="font-size:11px;font-weight:400;color:#c6c9de;margin-top:7px;line-height:1.6">画面最上部に見えない層を置いてぼかしを消します（画面は狭くなりません）。ぼやけが残る場合は数値を上げてください。0でオフ。</div>
+        </div>
       </div><!-- /tab-play -->
 
       <div id="tab-color" class="setpanel" style="display:none">
         <div id="colorRows">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-            <span style="font-family:'Space Mono',monospace;font-size:10px;color:#9a9ac0;flex:1">アクセント色</span>
+            <span style="font-size:12.5px;font-weight:400;color:#e8e8f0;flex:1">アクセント色</span>
             <input type="color" id="cpAc" value="#00e5ff" style="width:48px;height:36px;border:1px solid #2a2a3d;border-radius:6px;cursor:pointer;padding:2px;background:#1c1c28">
           </div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-            <span style="font-family:'Space Mono',monospace;font-size:10px;color:#9a9ac0;flex:1">マーク線色</span>
+            <span style="font-size:12.5px;font-weight:400;color:#e8e8f0;flex:1">マーク線色</span>
             <input type="color" id="cpA2" value="#ffdd00" style="width:48px;height:36px;border:1px solid #2a2a3d;border-radius:6px;cursor:pointer;padding:2px;background:#1c1c28">
           </div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-            <span style="font-family:'Space Mono',monospace;font-size:10px;color:#9a9ac0;flex:1">無音区間色</span>
+            <span style="font-size:12.5px;font-weight:400;color:#e8e8f0;flex:1">無音区間色</span>
             <input type="color" id="cpSil" value="#ff8c50" style="width:48px;height:36px;border:1px solid #2a2a3d;border-radius:6px;cursor:pointer;padding:2px;background:#1c1c28">
           </div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-            <span style="font-family:'Space Mono',monospace;font-size:10px;color:#9a9ac0;flex:1">マーク色(ボタン)</span>
+            <span style="font-size:12.5px;font-weight:400;color:#e8e8f0;flex:1">マーク色(ボタン)</span>
             <input type="color" id="cpMk" value="#ff4081" style="width:48px;height:36px;border:1px solid #2a2a3d;border-radius:6px;cursor:pointer;padding:2px;background:#1c1c28">
           </div>
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-            <span style="font-family:'Space Mono',monospace;font-size:10px;color:#9a9ac0;flex:1">仮マーク色</span>
+          <div style="display:none">
+            <span>（廃止）</span>
             <input type="color" id="cpTemp" value="#69ff47" style="width:48px;height:36px;border:1px solid #2a2a3d;border-radius:6px;cursor:pointer;padding:2px;background:#1c1c28">
           </div>
         </div>
       </div><!-- /tab-color -->
 
       <div id="tab-keys" class="setpanel" style="display:none">
-        <div style="font-family:'Space Mono',monospace;font-size:9px;color:#9a9ac0;letter-spacing:1px;margin-bottom:6px">キーボード / コントローラー</div>
-        <div style="background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:8px;padding:10px;margin-bottom:12px">
-          <div style="font-family:'Space Mono',monospace;font-size:9px;color:rgba(0,229,255,.7);margin-bottom:8px;letter-spacing:1px">🎮 長押しと判定する長さ</div>
+        <button onclick="openKeymapModal()" style="margin-bottom:12px;width:100%;background:rgba(0,229,255,.12);border:1px solid #00e5ff;border-radius:8px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:11px;padding:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"><span style="font-size:16px;line-height:1">⌨</span><span>キー割り当てを変更</span></button>
+        <div style="background:#1b1c28;border:1px solid #363850;border-radius:10px;padding:12px;margin-bottom:12px">
+          <div style="font-size:12.5px;font-weight:700;color:#74e8f7;margin-bottom:9px;letter-spacing:.3px">🎮 長押しと判定する長さ</div>
           <div style="display:flex;align-items:center;gap:8px">
             <button onclick="adjLongMs(-1)" style="width:34px;height:32px;background:#1c1c28;border:1px solid var(--tap);border-radius:6px;color:#e8e8f0;font-size:16px;cursor:pointer">−</button>
             <input type="range" id="gpLongMsR" min="300" max="1200" step="50" value="600" style="flex:1;min-width:0">
             <button onclick="adjLongMs(1)" style="width:34px;height:32px;background:#1c1c28;border:1px solid var(--tap);border-radius:6px;color:#e8e8f0;font-size:16px;cursor:pointer">＋</button>
-            <span id="gpLongMsV" style="font-family:'Space Mono',monospace;font-size:10px;color:#9a9ac0;min-width:52px;text-align:right">600ms</span>
+            <span id="gpLongMsV" style="font-family:'Space Mono',monospace;font-size:12px;color:#e8e8f0;min-width:56px;text-align:right">600ms</span>
           </div>
-          <div style="font-size:9px;color:#9a9ac0;margin-top:6px;line-height:1.7">短すぎると、普通に押しただけで長押しの機能が誤って動きます。長押しを使わない場合はこの設定は影響しません。</div>
+          <div style="font-size:11px;font-weight:400;color:#c6c9de;margin-top:7px;line-height:1.6">短すぎると、普通に押しただけで長押しの機能が誤って動きます。長押しを使わない場合はこの設定は影響しません。</div>
         </div>
         <div id="helpList" style="font-family:'Space Mono',monospace"></div>
-        <div style="font-size:9px;color:#9a9ac0;font-family:'Space Mono',monospace;line-height:1.5;margin-top:8px">速度プリセットの倍率は「再生」タブで変更できます。</div>
-        <button onclick="openKeymapModal()" style="margin-top:12px;width:100%;background:rgba(0,229,255,.12);border:1px solid #00e5ff;border-radius:8px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:11px;padding:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"><span style="font-size:16px;line-height:1">⌨</span><span>キー割り当てを変更</span></button>
+        <div style="font-size:11px;font-weight:400;color:#c6c9de;line-height:1.55;margin-top:8px">速度プリセットの倍率は「再生・表示」タブで変更できます。</div>
       </div><!-- /tab-keys -->
     </div>
     <div style="display:flex;gap:8px;margin-top:12px;flex-shrink:0">
-      <button onclick="resetActiveTab()" style="flex:1;background:#1c1c28;border:1px solid var(--tap);border-radius:7px;color:rgba(0,229,255,.72);font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">リセット</button>
-      <button onclick="closeSettings(false)" style="flex:1;background:#1c1c28;border:1px solid var(--tap);border-radius:7px;color:rgba(0,229,255,.72);font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">キャンセル</button>
-      <button onclick="closeSettings(true)" style="flex:1;background:rgba(0,229,255,.15);border:1px solid #00e5ff;border-radius:7px;color:#00e5ff;font-family:'Space Mono',monospace;font-size:11px;padding:9px;cursor:pointer">OK</button>
+      <button onclick="resetActiveTab()" style="flex:1;background:#262838;border:1px solid #454866;border-radius:8px;color:#e8e8f0;font-size:13px;padding:11px 4px;cursor:pointer">リセット</button>
+      <button onclick="closeSettings(false)" style="flex:1;background:#262838;border:1px solid #454866;border-radius:8px;color:#e8e8f0;font-size:13px;padding:11px 4px;cursor:pointer">キャンセル</button>
+      <button onclick="closeSettings(true)" style="flex:1;background:#00e5ff;border:1px solid #00e5ff;border-radius:8px;color:#04252c;font-size:13px;font-weight:700;padding:11px 4px;cursor:pointer">OK</button>
     </div>
   </div>
 </div>
@@ -612,7 +640,31 @@ let raf=null;
 let playlist=[], plIdx=-1, skipSec=5;
 let curMkIdx=-1;
 const SPD_PRESETS=[0.25,0.5,0.75,1.25,1.5,2.0]; // non-1.0 speed presets
-const LP=44, RH=22;
+const LP=44; let RH=22;
+// v129: 表示サイズ（設定で変更可）／前回の再生位置の記憶
+let timeFs=20, waveH=60, resumeOn=true;
+let posNow=0, posValid=false, posSavedAt=0, posDebT=null;
+function posLoadAll(){ try{ const m=JSON.parse(localStorage.getItem('ac_pos')||'{}'); return (m&&typeof m==='object')?m:{}; }catch(e){ return {}; } }
+function posFlush(){ // 開いているファイルの現在位置を保存。先頭付近・末尾（最後まで再生した／末尾へ移動した）は「記憶なし」＝次回は先頭から
+  posSavedAt=Date.now();
+  if(!resumeOn || !posValid || !curFileName) return;
+  try{
+    const m=posLoadAll(), k=lsKey(curFileName,curFileSize), p=fileAtEnd?0:posNow;
+    if(p>1 && (!duration || p<duration-3)) m[k]=[+p.toFixed(1),Date.now()]; else delete m[k];
+    const ks=Object.keys(m); if(ks.length>600){ ks.sort((a,b)=>(m[a][1]||0)-(m[b][1]||0)).slice(0,ks.length-500).forEach(x=>delete m[x]); }
+    localStorage.setItem('ac_pos',JSON.stringify(m));
+  }catch(e){}
+}
+function notePos(t,now){ posNow=t; if(now) posFlush(); else if(Date.now()-posSavedAt>5000) posFlush(); }
+function posDeb(){ clearTimeout(posDebT); posDebT=setTimeout(posFlush,500); }
+function resetAllPos(){
+  try{ localStorage.removeItem('ac_pos'); }catch(e){}
+  if(objURL && !isPlaying && !loadingFile){ seekTo(0); posNow=0; }
+  showToast('全ファイルの再生位置を先頭に戻しました');
+}
+function setResumeOn(v){ resumeOn=!!v; savePrefs(); }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState!=='visible') posFlush(); });
+window.addEventListener('pagehide',()=>{ posFlush(); });
 let ROWS=10;
 
 function onEnded(){
@@ -624,6 +676,7 @@ function onEnded(){
   }
   endHandled=true; // v116: eventとウォッチドッグの二重実行を防止
   fileAtEnd=true; freshLoad=false; // v127: 最後まで再生した
+  try{ posFlush(); }catch(e){} // v129: 最後まで再生したら位置の記憶を消す（次回は先頭から）
   // Finalize any growing silence when file ends
   if(rtInSil && rtSilTrunc){ rtInSil=false; rtSilTrunc=false; } // v122: 始まりを見ていない末尾無音は記録しない
   if(rtInSil && duration>0){
@@ -680,7 +733,7 @@ function onEnded(){
 // ── LocalStorage ───────────────────────────────
 const LS_PREFS='ac_prefs3';
 function savePrefs(){
-  try{ localStorage.setItem(LS_PREFS,JSON.stringify({scheme:'yakou',skipSec,playbackRate,spdPresets:SPD_PRESETS,tempAutoClear,gpLongMs,toastSec,blurFixH:topPad,preRoll,colors:{colorAc,colorA2,colorSilBar,colorSilFill,colorMarkLine,colorSilText,colorTemp}})); }catch(e){}
+  try{ localStorage.setItem(LS_PREFS,JSON.stringify({scheme:'yakou',skipSec,playbackRate,spdPresets:SPD_PRESETS,tempAutoClear,gpLongMs,toastSec,blurFixH:topPad,preRoll,timeFs,waveH,seekRH:RH,resumeOn,colors:{colorAc,colorA2,colorSilBar,colorSilFill,colorMarkLine,colorSilText,colorTemp}})); }catch(e){}
 }
 function loadPrefs(){
   try{
@@ -708,6 +761,10 @@ function loadPrefs(){
       savePrefs();
     }
     if(p.skipSec>0){ skipSec=p.skipSec; updateSkipLabels(); }
+    if(p.timeFs>=11 && p.timeFs<=26) timeFs=p.timeFs; // v129
+    if(p.waveH>=32 && p.waveH<=96) waveH=p.waveH;
+    if(p.seekRH>=16 && p.seekRH<=28) RH=p.seekRH;
+    if(typeof p.resumeOn==='boolean') resumeOn=p.resumeOn;
     if(p.playbackRate>0) playbackRate=p.playbackRate;
   }catch(e){}
 }
@@ -750,6 +807,7 @@ function setSrc(file){
 
 // ── Load ──────────────────────────────────────
 async function load(file){
+  try{ posFlush(); }catch(e){} posValid=false; posNow=0; // v129: 前のファイルの位置を保存してから切り替える
   showLd(true);
   loadingFile=true; pendingSeekT=null; pendingPlay=false; // v111/v125
   playGen++; detReloading=false; detFresh=false; prerollTarget=null; // v126: 保留中の再生・検出準備を無効化
@@ -772,7 +830,7 @@ async function load(file){
   drawWave(0); drawSeek(0);
 
   const cached=loadMk(file.name,file.size);
-  if(cached){ markers=cached.markers||[]; silReg=cached.silReg||[]; duration=cached.duration||0; tempMk=(typeof cached.tempMk==='number')?cached.tempMk:null; } // v117: 仮マークも復元
+  if(cached){ markers=cached.markers||[]; silReg=cached.silReg||[]; duration=cached.duration||0; tempMk=null; } // v129: 仮マーク機能は廃止（保存済みの値は読まない）
   else { markers=[]; tempMk=null; }
   // 並びを保証（hlMk/hlSil が「開始時刻でソート済み」を前提にするため。古い/外部importデータ対策）
   markers.sort((a,b)=>a.time-b.time);
@@ -802,17 +860,21 @@ async function load(file){
   [audioPlay,audioDet].forEach(el=>{ try{ if((el.currentTime||0)>0.05) el.currentTime=0; }catch(e){} });
   loadingFile=false; // v111
   freshLoad=true; loadWantT=0; // v127: 最初の再生が始まるまで、位置はアプリ側の値(loadWantT)を正とする
+  let resumed=0; // v129: 前回の続きから
+  if(resumeOn && pendingSeekT==null){ try{ const sp=posLoadAll()[lsKey(file.name,file.size)]; const p=sp&&+sp[0]; if(p>1 && duration>0 && p<duration-3) resumed=p; }catch(e){} }
   if(pendingSeekT!=null){ const v=pendingSeekT; pendingSeekT=null; seekTo(v); } // v111: 読込中に押されたマークジャンプ等をここで実行
+  else if(resumed){ seekTo(resumed); }
+  posNow=curT(); posValid=true; clearTimeout(posDebT);
   if(pendingPlay){ pendingPlay=false; setTimeout(()=>{ stopTime=0; play(); },0); } // v125: 読込中に押された再生をここで実行
 
-  drawWave(0); drawSeek(0);
-  showLd(false); showToast(badNote ? '読み込みを自動でやり直しました ['+badNote+'→'+(+duration||0).toFixed(1)+']' : file.name); renderPL();
+  drawWave(curT()); drawSeek(curT()); updateTime(curT());
+  showLd(false); showToast(badNote ? '読み込みを自動でやり直しました ['+badNote+'→'+(+duration||0).toFixed(1)+']' : (resumed ? file.name+' ／ 前回の続き '+fmtMs(resumed) : file.name)); renderPL();
   lastLoadAt=Date.now(); // v110: 読込直後の意図しない再生コマンド遮断用
   msUpdateMeta(); msUpdateState(); // v107: コントロールセンターの曲名等を更新
   restoreFocusNow(); // 読込直後に8BitDoが効くようfocusTrapへ復帰
 
   // decode waveform in background
-  buildWaveform(file).then(()=>{ drawWave(audioEl.currentTime); drawSeek(audioEl.currentTime); saveMk(); }).catch(()=>{});
+  buildWaveform(file).then(()=>{ if(lg!==loadGen) return; drawWave(curT()); drawSeek(curT()); saveMk(); }).catch(()=>{});
 }
 
 // ── Realtime silence detection ────────────────────────────────
@@ -983,7 +1045,7 @@ function drawLiveWave(){
   // Also called when paused to keep center line visible
   const cv=document.getElementById('waveCanvas'), wa=document.getElementById('waveArea');
   if(!wa.clientWidth) return;
-  const dpr=Math.min(window.devicePixelRatio||1,2), W=wa.clientWidth||320, H=72;
+  const dpr=Math.min(window.devicePixelRatio||1,2), W=wa.clientWidth||320, H=waveH;
   const c=cv.getContext('2d');
   const cw=W*dpr, ch=H*dpr;
   if(cv.width!==cw||cv.height!==ch){ cv.width=cw; cv.height=ch; cv.style.width=W+'px'; cv.style.height=H+'px'; } // サイズ変化時のみ再確保（毎フレームのバックバッファ再確保を回避）
@@ -1132,7 +1194,7 @@ function nextFile(){
 function lowerBound(arr,v,key){ let lo=0,hi=arr.length; while(lo<hi){ const mid=(lo+hi)>>1; if(key(arr[mid])<v) lo=mid+1; else hi=mid; } return lo; }
 function drawWave(ct){
   const cv=document.getElementById('waveCanvas'), wa=document.getElementById('waveArea');
-  const dpr=Math.min(window.devicePixelRatio||1,2), W=wa.clientWidth||320, H=72;
+  const dpr=Math.min(window.devicePixelRatio||1,2), W=wa.clientWidth||320, H=waveH;
   const c=cv.getContext('2d');
   const cw=W*dpr, ch=H*dpr;
   if(cv.width!==cw||cv.height!==ch){ cv.width=cw; cv.height=ch; cv.style.width=W+'px'; cv.style.height=H+'px'; }
@@ -1572,6 +1634,7 @@ function stop(){
   document.getElementById('silCurDur').textContent='--';
   if(wasP127){ const ed=(isFinite(audioEl.duration)&&audioEl.duration>0)?audioEl.duration:duration; fileAtEnd = ed>1 && elT127>=ed-0.05; } // v127
   drawWave(curT()); drawSeek(curT()); updateTime(curT());
+  if(posValid) notePos(curT(),true); // v129
   msUpdateState(); // v107
 }
 function seekTo(t){
@@ -1580,7 +1643,7 @@ function seekTo(t){
   if(detReloading){ // v126: 準備中のシークは目標位置の差し替えのみ（準備が終わり次第そこから再生）
     const c2=Math.max(0,Math.min(duration||0,t));
     fileAtEnd = duration>1 && c2>=duration-0.05; if(freshLoad) loadWantT=c2; // v127
-    detLoadTarget=c2; detSeekIssued=false; prerollTarget=c2;
+    detLoadTarget=c2; detSeekIssued=false; prerollTarget=c2; posNow=c2; posDeb();
     drawWave(c2); updateTime(c2); drawSeek(c2); hlMk(c2); hlSil(c2);
     return;
   }
@@ -1588,7 +1651,7 @@ function seekTo(t){
     const c3=Math.max(0,Math.min(duration||0,t));
     stop(); try{ audioEl.currentTime=c3; }catch(e){}
     fileAtEnd = duration>1 && c3>=duration-0.05; // v127（stop()が付けた値を、シーク先で上書き）
-    seekFromT=c3; seekIntentT=c3; seekIntentAt=Date.now();
+    seekFromT=c3; seekIntentT=c3; seekIntentAt=Date.now(); posNow=c3;
     drawWave(c3); updateTime(c3); drawSeek(c3); hlMk(c3); hlSil(c3);
     stopTime=0; play();
     return;
@@ -1605,6 +1668,7 @@ function seekTo(t){
   resetRTSilence();
   // (旧: シーク地点以降のsilRegを削除 → 頭出しで全消失していたため廃止。重複はrtLoopの重なり判定で防止)
   if(!isPlaying){ drawWave(cl); updateTime(cl); drawSeek(cl); }
+  if(posValid){ posNow=cl; posDeb(); } // v129
   hlMk(cl); hlSil(cl);
 }
 let lastSeekSec=-1;
@@ -1612,7 +1676,7 @@ function loop(){
   if(!isPlaying)return;
   try{
     const t=curT();
-    if(t>0) lastGoodTime=t; // 復旧用に直近の有効位置を記録
+    if(t>0){ lastGoodTime=t; notePos(t); } // 復旧用に直近の有効位置を記録／v129: 位置の記憶（5秒ごとに保存）
     // v116: 終端ウォッチドッグ。iOSは倍速/WebAudio経由でendedイベントを取りこぼすことがあり、
     // その場合「末尾無音が確定されない」「isPlayingが真のまま残る→次のplay()が仕様で先頭へ巻き戻る」が同時に起きる。
     if(duration>0 && !endHandled){
@@ -1894,7 +1958,7 @@ function exportBackup(scope){ // v125: scope='settings' なら設定のみ（マ
   const data={};
   try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i);
     if(!k || k.indexOf('ac_')!==0) continue;
-    if(onlySet && (k.indexOf('ac_mk4_')===0 || k==='ac_detect')) continue;
+    if(onlySet && (k.indexOf('ac_mk4_')===0 || k==='ac_detect' || k==='ac_pos')) continue;
     data[k]=localStorage.getItem(k); } }catch(e){}
   const n=Object.keys(data).filter(k=>k.indexOf('ac_mk4_')===0).length;
   dlJSON({type:'audiochk-backup',scope:onlySet?'settings':'all',ver:'v125',date:new Date().toISOString(),data},
@@ -1981,10 +2045,6 @@ const DEFAULT_KEYMAP={
   playpause:[' '],       // Space（Pは前ファイルへ）
   markadd:['m'],
   delnearprev:['x','Backspace','Delete'], // v118: 旧「マーク削除」を統合（BS/Delもそのまま使える）
-  temp:['g'],         // v118: 仮マーク＝なければセット／あれば移動（1キー運用）
-  tempset:[],         // v118: セットのみ（仮マークを付け直したい時用・既定キーなし）
-  tempjump:['b'],     // v118: 移動のみ
-  tempclear:[],       // v118: 解除のみ（自動解除OFFで運用する場合に便利・既定キーなし）
   audioreset:[],      // v119: 音声リセット（音が出なくなった時の復旧・既定キーなし）
   marknudgeback:['j'], // v105: 直近マークを−0.1秒移動
   marknudgefwd:['k'],  // v105: 直近マークを+0.1秒移動
@@ -2115,10 +2175,6 @@ function doAction(fn){
     case 'markadd': addMk(); break;
     case 'markdel': // v118: 旧アクション名（保存済みの割り当て互換）。統合先へ委譲
     case 'delnearprev': delNearOrPrev(); break;
-    case 'temp': tempToggle(); break;           // v118
-    case 'tempset': setTempMk(); break;
-    case 'tempjump': jumpTempMk(); break;
-    case 'tempclear': clearTempMk(); break;     // v118
     case 'audioreset': audioReset(); break;     // v119
     case 'marknudgeback': moveNearestMk(-0.1); break; // v105
     case 'marknudgefwd': moveNearestMk(0.1); break;   // v105
@@ -2151,7 +2207,7 @@ function doAction(fn){
   }
 }
 // ── Keymap editor (stage B) ──
-const FN_ORDER=['playpause','markadd','delnearprev','temp','tempset','tempjump','tempclear','marknudgeback','marknudgefwd','audioreset','skipback','skipfwd','fineback','finefwd','checkback','prevmark','nextmark','prevsil','nextsil','prevfile','nextfile','head','tail','timejump','report','speedreset','speed1','speed2','speed3','speed4','speed5','speed6','undo','redo','detect'];
+const FN_ORDER=['playpause','markadd','delnearprev','marknudgeback','marknudgefwd','audioreset','skipback','skipfwd','fineback','finefwd','checkback','prevmark','nextmark','prevsil','nextsil','prevfile','nextfile','head','tail','timejump','report','speedreset','speed1','speed2','speed3','speed4','speed5','speed6','undo','redo','detect'];
 const FN_LABELS={playpause:'再生/停止',markadd:'マーク追加',delnearprev:'現在/1つ前を削除（聞く:マーク 検出:無音）',temp:'仮マーク セット⇄移動',tempset:'仮マーク セットのみ',tempjump:'仮マーク 移動のみ',tempclear:'仮マーク 解除',audioreset:'音声リセット（音が出ない時）',marknudgeback:'マーク微調整 −0.1',marknudgefwd:'マーク微調整 +0.1',skipback:'−N秒スキップ',skipfwd:'+N秒スキップ',fineback:'−0.1秒',finefwd:'+0.1秒',checkback:'確認(−N秒＋×1.0⇄復帰)',prevmark:'前のマーク',nextmark:'次のマーク',prevsil:'前の無音',nextsil:'次の無音',prevfile:'前のファイル',nextfile:'次のファイル',head:'先頭へ',tail:'末尾へ',timejump:'タイムジャンプ',report:'情報ポップアップ',speedreset:'速度リセット(×1.0)',speed1:'速度プリセット1',speed2:'速度プリセット2',speed3:'速度プリセット3',speed4:'速度プリセット4',speed5:'速度プリセット5',speed6:'速度プリセット6',undo:'取り消し',redo:'やり直し',detect:'無音検出 ON/OFF'};
 function tokenLabel(t){
   if(t===' ')return'Space';
@@ -2266,6 +2322,7 @@ function loadGpMap(){
   try{ const o=JSON.parse(localStorage.getItem('ac_gpmap')||'null');
     if(o&&typeof o==='object'){
       for(const tok in o){ ['s','l'].forEach(sl=>{ if(o[tok][sl]==='markdel') o[tok][sl]='delnearprev'; }); } // v118: 旧アクション名を移行
+      for(const tok in o){ ['s','l'].forEach(sl=>{ if(typeof o[tok][sl]==='string' && o[tok][sl].indexOf('temp')===0) delete o[tok][sl]; }); } // v129: 廃止した仮マーク操作の割り当てを外す
       return o; // 保存済みマップ全体を採用（削除も保持される）
     }
   }catch(e){}
@@ -2816,6 +2873,7 @@ function syncSettingsUI(){
   const sm=document.getElementById('silMin'); if(sm){sm.value=silMinSec; document.getElementById('silMinV').textContent=silMinSec.toFixed(1)+'秒';}
   setCompUI('compD2L',compD2L); setCompUI('compL2D',compL2D); setCompUI('timeOff',timeOff); setCompUI('spdComp',spdComp); setCompUI('resumeComp',resumeComp); setCompUI('overlapTol',overlapTol); setCompUI('releaseMs',releaseMs); setCompUI('markComp',markComp);
   const tac=document.getElementById('tempAutoClearChk'); if(tac) tac.checked=tempAutoClear; // v118
+  try{ syncDispUI(); }catch(e){} // v129
   const tpr=document.getElementById('topPadR'); if(tpr){ tpr.value=topPad; document.getElementById('topPadV').textContent=topPad+'px'; } // v123
   const tsr=document.getElementById('toastSecR'); if(tsr){ tsr.value=toastSec; document.getElementById('toastSecV').textContent=toastSec.toFixed(1)+'秒'; } // v123
   const glr=document.getElementById('gpLongMsR'); if(glr){ glr.value=gpLongMs; document.getElementById('gpLongMsV').textContent=gpLongMs+'ms'; } // v121
@@ -2825,7 +2883,7 @@ function openSettingsModal(tab){
   // 全ドメインのバックアップを取得（キャンセルで一括復元）
   settingsBackup=snapSettings();
   colorBackup={colorAc,colorA2,colorSilBar,colorSilFill,colorMarkLine,colorSilText,colorTemp}; // v127: 仮マーク色も対象に
-  ctrlBackup={presets:SPD_PRESETS.slice(),skipSec,toastSec,topPad,gpLongMs,tempAutoClear}; // v127: 通知時間・ぼやけ回避・長押し・仮マーク設定もキャンセルで戻す
+  ctrlBackup={presets:SPD_PRESETS.slice(),skipSec,toastSec,topPad,gpLongMs,tempAutoClear,timeFs,waveH,seekRH:RH,resumeOn}; // v127: 通知時間・ぼやけ回避・長押し・仮マーク設定もキャンセルで戻す
   syncSettingsUI();
   buildColorPanel();
   renderSpdPresets(); document.getElementById('skipSecM').value=skipSec;
@@ -3037,6 +3095,7 @@ function restoreCtrl(){
   if(ctrlBackup.topPad>=0){ topPad=ctrlBackup.topPad; applyTopPad(); }
   if(ctrlBackup.gpLongMs>0) gpLongMs=ctrlBackup.gpLongMs;
   if(typeof ctrlBackup.tempAutoClear==='boolean') tempAutoClear=ctrlBackup.tempAutoClear;
+  if(ctrlBackup.timeFs){ timeFs=ctrlBackup.timeFs; waveH=ctrlBackup.waveH; RH=ctrlBackup.seekRH; resumeOn=ctrlBackup.resumeOn; applyDisp(); } // v129
   applyPresetsToButtons();
   document.querySelectorAll('.spb').forEach(b=>b.classList.toggle('on',parseFloat(b.dataset.speed)===playbackRate));
   savePrefs();
@@ -3044,7 +3103,7 @@ function restoreCtrl(){
 function resetCtrl(){
   [0.25,0.5,0.75,1.25,1.5,2.0].forEach((s,i)=>SPD_PRESETS[i]=s);
   setSk(5);
-  toastSec=4; topPad=11; applyTopPad(); tempAutoClear=true; syncSettingsUI(); // v127: 再生タブの他の項目もリセット対象に
+  toastSec=4; topPad=11; applyTopPad(); tempAutoClear=true; timeFs=20; waveH=60; RH=22; resumeOn=true; applyDisp(); syncSettingsUI(); // v127: 再生タブの他の項目もリセット対象に
   applyPresetsToButtons();
   document.querySelectorAll('.spb').forEach(b=>b.classList.toggle('on',parseFloat(b.dataset.speed)===playbackRate));
   renderSpdPresets();
@@ -3197,6 +3256,26 @@ function loadSilPrefs(){
 // ── Init ──────────────────────────────────────
 loadPrefs();
 applyTopPad(); // v123
+// v129: 表示サイズの適用／モード札（聞く・検出＋速度）の更新
+function applyDisp(){
+  const r=document.documentElement.style; r.setProperty('--timeFs',timeFs+'px'); r.setProperty('--waveH',waveH+'px');
+  const ir=document.getElementById('infoRow'); if(ir) ir.classList.toggle('sm',timeFs<16);
+  try{ drawWave(curT()); drawSeek(curT()); }catch(e){}
+}
+function updModeTag(){
+  const el=document.getElementById('modeTag'); if(!el) return;
+  const tx=(detectOn?'検出':'聞く')+' '+fmtSpd(activeRate());
+  if(el.textContent!==tx) el.textContent=tx;
+  if(document.body.classList.contains('det')!==!!detectOn) document.body.classList.toggle('det',!!detectOn);
+}
+function syncDispUI(){
+  [['dispTimeR','dispTimeV',timeFs],['dispWaveR','dispWaveV',waveH],['dispSeekR','dispSeekV',RH]].forEach(a=>{ const r=document.getElementById(a[0]); if(r){ r.value=a[2]; document.getElementById(a[1]).textContent=a[2]+'px'; } });
+  const rc=document.getElementById('resumeChk'); if(rc) rc.checked=resumeOn;
+}
+[['dispTimeR',v=>timeFs=v],['dispWaveR',v=>waveH=v],['dispSeekR',v=>RH=v]].forEach(a=>{
+  document.getElementById(a[0])?.addEventListener('input',function(){ a[1](parseInt(this.value)||0); syncDispUI(); applyDisp(); savePrefs(); });
+});
+applyDisp(); updModeTag(); setInterval(updModeTag,400);
 loadSilPrefs();
 // restore 検出モード (default ON)
 try{ detectOn = localStorage.getItem('ac_detect')!=='0'; }catch(e){}
